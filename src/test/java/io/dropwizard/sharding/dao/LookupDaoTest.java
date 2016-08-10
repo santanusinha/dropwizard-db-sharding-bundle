@@ -24,6 +24,7 @@ import io.dropwizard.sharding.dao.testdata.entities.Audit;
 import io.dropwizard.sharding.dao.testdata.entities.Phone;
 import io.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.dropwizard.sharding.sharding.ShardManager;
+import io.dropwizard.sharding.sharding.impl.EncodedBucketIdExtractor;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
@@ -46,6 +47,7 @@ public class LookupDaoTest {
     private LookupDao<Phone> phoneDao;
     private RelationalDao<Transaction> transactionDao;
     private RelationalDao<Audit> auditDao;
+    private ShardManager shardManager;
 
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
@@ -72,8 +74,7 @@ public class LookupDaoTest {
         for (int i = 0; i < 2; i++) {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
-        final ShardManager shardManager = new ShardManager(sessionFactories.size());
-        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardManager);
+        shardManager = new ShardManager(sessionFactories.size());
         phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardManager);
         transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardManager);
         auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardManager);
@@ -86,6 +87,7 @@ public class LookupDaoTest {
 
     @Test
     public void testSave() throws Exception {
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardManager);
         TestEntity testEntity = TestEntity.builder()
                                     .externalId("testId")
                                     .text("Some Text")
@@ -128,7 +130,53 @@ public class LookupDaoTest {
     }
 
     @Test
+    public void testSave_withKeyEncodedShardId() throws Exception {
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardManager, new EncodedBucketIdExtractor(4,3));
+        TestEntity testEntity = TestEntity.builder()
+                .externalId("shar001")
+                .text("Some Text")
+                .build();
+        lookupDao.save(testEntity);
+
+        assertEquals(true, lookupDao.exists("shar001"));
+        assertEquals(false, lookupDao.exists("shar002"));
+        Optional<TestEntity> result = lookupDao.get("shar001");
+        assertEquals("Some Text", result.get().getText());
+
+        testEntity.setText("Some New Text");
+        lookupDao.save(testEntity);
+        result = lookupDao.get("shar001");
+        assertEquals("Some New Text", result.get().getText());
+
+        boolean updateStatus = lookupDao.update("shar001", entity -> {
+            if(entity.isPresent()) {
+                TestEntity e = entity.get();
+                e.setText("Updated text");
+                return e;
+            }
+            return null;
+        });
+
+        assertTrue(updateStatus);
+        result = lookupDao.get("shar001");
+        assertEquals("Updated text", result.get().getText());
+
+        updateStatus = lookupDao.update("shar999", entity -> {
+            if(entity.isPresent()) {
+                TestEntity e = entity.get();
+                e.setText("Updated text");
+                return e;
+            }
+            return null;
+        });
+
+        assertFalse(updateStatus);
+    }
+
+
+    @Test
     public void testScatterGather() throws Exception {
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardManager);
         List<TestEntity> results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
                 .add(Restrictions.eq("externalId", "testId")));
         assertTrue(results.isEmpty());
@@ -146,6 +194,7 @@ public class LookupDaoTest {
 
     @Test
     public void testSaveInParentBucket() throws Exception {
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardManager);
         final String phoneNumber = "9830968020";
 
         Phone phone = Phone.builder()
@@ -196,6 +245,7 @@ public class LookupDaoTest {
 
     @Test
     public void testHierarchy() throws Exception {
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardManager);
         final String phoneNumber = "9986032019";
         saveHierarchy(phoneNumber);
         saveHierarchy("9986402019");

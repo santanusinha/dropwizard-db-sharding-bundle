@@ -18,8 +18,10 @@
 package io.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
+import io.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.dropwizard.sharding.sharding.LookupKey;
 import io.dropwizard.sharding.sharding.ShardManager;
+import io.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.sharding.utils.Transactions;
 import io.dropwizard.hibernate.AbstractDAO;
@@ -100,6 +102,7 @@ public class LookupDao<T> {
     private final Class<T> entityClass;
     private final ShardManager shardManager;
     private final Field keyField;
+    private final BucketIdExtractor bucketIdExtractor;
 
     /**
      * Creates a new sharded DAO. The number of managed shards and buckeing is controlled by the {@link ShardManager}.
@@ -107,9 +110,15 @@ public class LookupDao<T> {
      * @param sessionFactories a session provider for each shard
      */
     public LookupDao(List<SessionFactory> sessionFactories, Class<T> entityClass, ShardManager shardManager) {
+        this(sessionFactories, entityClass, shardManager, new ConsistentHashBucketIdExtractor<>());
+    }
+
+
+    public LookupDao(List<SessionFactory> sessionFactories, Class<T> entityClass, ShardManager shardManager, BucketIdExtractor bucketIdExtractor) {
         this.shardManager = shardManager;
         this.daos = sessionFactories.stream().map(LookupDaoPriv::new).collect(Collectors.toList());
         this.entityClass = entityClass;
+        this.bucketIdExtractor = bucketIdExtractor;
 
         Field fields[] = FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
         Preconditions.checkArgument(fields.length != 0, "At least one field needs to be sharding key");
@@ -149,7 +158,7 @@ public class LookupDao<T> {
      * @throws Exception
      */
     public <U> U get(String key, Function<T, U> handler) throws Exception {
-        int shardId = ShardCalculator.shardId(shardManager, key);
+        int shardId = ShardCalculator.shardId(shardManager, key, bucketIdExtractor);
         LookupDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, true, dao::get, key, handler);
     }
@@ -189,14 +198,14 @@ public class LookupDao<T> {
      */
     public <U> U save(T entity, Function<T, U> handler) throws Exception {
         final String key = keyField.get(entity).toString();
-        int shardId = ShardCalculator.shardId(shardManager, key);
+        int shardId = ShardCalculator.shardId(shardManager, key, bucketIdExtractor);
         log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key, shardId);
         LookupDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, false, dao::save, entity, handler);
     }
 
     public boolean update(String id, Function<Optional<T>, T> updater) {
-        int shardId = ShardCalculator.shardId(shardManager, id);
+        int shardId = ShardCalculator.shardId(shardManager, id, bucketIdExtractor);
         LookupDaoPriv dao = daos.get(shardId);
         try {
             return Transactions.<T, String, Boolean>execute(dao.sessionFactory, true, dao::get, id, entity -> {

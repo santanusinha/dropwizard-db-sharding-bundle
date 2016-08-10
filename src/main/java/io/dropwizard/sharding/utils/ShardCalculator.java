@@ -17,6 +17,7 @@
 
 package io.dropwizard.sharding.utils;
 
+import io.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.dropwizard.sharding.sharding.ShardManager;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,6 +31,11 @@ public class ShardCalculator {
 
     public static int shardId(ShardManager shardManager, String key) {
         int bucketId = BucketExtractors.hashed(key);
+        return shardManager.shardForBucket(bucketId);
+    }
+
+    public static int shardId(ShardManager shardManager, String key, BucketIdExtractor bucketIdExtractor) {
+        int bucketId = bucketIdExtractor.bucketId(key);
         return shardManager.shardForBucket(bucketId);
     }
 }
