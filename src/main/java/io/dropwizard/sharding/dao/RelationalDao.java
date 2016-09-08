@@ -242,6 +242,10 @@ public class RelationalDao<T> {
         return select(parentKey, criteria, 0, 10);
     }
 
+    public List<T> select(String parentKey, DetachedCriteria criteria, boolean completeTransaction) throws Exception {
+        return select(parentKey, criteria, 0, 10, t-> t, completeTransaction);
+    }
+
     public List<T> select(String parentKey, DetachedCriteria criteria, int first, int numResults) throws Exception {
         return select(parentKey, criteria, first, numResults, t-> t);
     }
@@ -251,6 +255,10 @@ public class RelationalDao<T> {
     }
 
     public<U> U select(String parentKey, DetachedCriteria criteria, int first, int numResults, Function<List<T>, U> handler) throws Exception {
+        return select(parentKey, criteria, first, numResults, handler, true);
+    }
+
+    public<U> U select(String parentKey, DetachedCriteria criteria, int first, int numResults, Function<List<T>, U> handler, boolean completeTransaction) throws Exception {
         int shardId = ShardCalculator.shardId(shardManager, bucketIdExtractor, parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         SelectParamPriv selectParam = SelectParamPriv.<T>builder()
@@ -258,7 +266,7 @@ public class RelationalDao<T> {
                 .start(first)
                 .numRows(numResults)
                 .build();
-        return Transactions.execute(dao.sessionFactory, true, dao::select, selectParam, handler);
+        return Transactions.execute(dao.sessionFactory, true, dao::select, selectParam, handler, completeTransaction);
     }
 
     public long count(String parentKey, DetachedCriteria criteria) throws Exception {
