@@ -26,6 +26,8 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
+import org.hibernate.criterion.DetachedCriteria;
+import org.hibernate.criterion.Restrictions;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -119,4 +121,45 @@ public class LockTest {
                 .execute();
 
     }
+
+
+    @Test
+    public void testSelectInLocking() throws Exception {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        lookupDao.save(p1);
+        System.out.println(lookupDao.get("0").get().getName());
+
+        lookupDao.lockedExecutor("0")
+                .save(relationDao, parent -> {
+                    SomeOtherObject result = SomeOtherObject.builder()
+                            .my_id(parent.getMyId())
+                            .value("Hello")
+                            .build();
+                    return result;
+                })
+                .execute();
+
+
+        lookupDao.lockedExecutor("0")
+                .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
+                .filter(parent -> {
+                    try {
+                        List<SomeOtherObject> obj = relationDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("value", "Hello")), false);
+                        System.out.println("fetched object inside locked context"  + obj.toString());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    return true;
+                })
+                .mutate(parent -> parent.setName("Changed"))
+                .execute();
+
+        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        System.out.println(lookupDao.get("0").get().getName());
+        System.out.println(relationDao.get("0", 1L).get());
+    }
+
 }
