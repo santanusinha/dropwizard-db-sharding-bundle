@@ -19,13 +19,13 @@ package io.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import io.dropwizard.hibernate.AbstractDAO;
 import io.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.dropwizard.sharding.sharding.LookupKey;
 import io.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.sharding.utils.TransactionHandler;
 import io.dropwizard.sharding.utils.Transactions;
-import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ClassUtils;
@@ -262,7 +262,7 @@ public class LookupDao<T> {
         }
         int shardId = ShardCalculator.shardId(shardManager, bucketIdExtractor, id);
         LookupDaoPriv dao = daos.get(shardId);
-        return new LockedContext<>(shardId, dao.sessionFactory, dao::save, entity);
+        return new LockedContext<>(shardId, dao.sessionFactory, dao::getLockedForWrite, id, dao::save, entity);
     }
 
     /**
@@ -328,22 +328,23 @@ public class LookupDao<T> {
         private T entity;
         private String key;
         private List<Function<T, Void>> operations = Lists.newArrayList();
-        private final Mode mode;
+        private TransactionHandler transactionHandler;
 
         public LockedContext(int shardId, SessionFactory sessionFactory, Function<String, T> getter, String key) {
             this.shardId = shardId;
             this.sessionFactory = sessionFactory;
-            this.function = getter;
             this.key = key;
-            this.mode = Mode.READ;
+            this.transactionHandler = new TransactionHandler(sessionFactory, false);
+            this.entity = generateEntityAndGetLock(key, null, Mode.READ, transactionHandler, getter, null);
         }
 
-        public LockedContext(int shardId, SessionFactory sessionFactory, Function<T, T> saver, T entity) {
+        public LockedContext(int shardId, SessionFactory sessionFactory, Function<String, T> getter,  String key,
+                             Function<T, T> saver, T entity) {
             this.shardId = shardId;
             this.sessionFactory = sessionFactory;
-            this.saver = saver;
-            this.entity = entity;
-            this.mode = Mode.INSERT;
+            this.key = key;
+            this.transactionHandler = new TransactionHandler(sessionFactory, false);
+            this.entity = generateEntityAndGetLock(key, entity, Mode.INSERT, transactionHandler, getter, saver);
         }
 
         public LockedContext<T> mutate(Mutator<T> mutator) {
@@ -408,12 +409,8 @@ public class LookupDao<T> {
         }
 
         public void execute() {
-            TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false);
-            transactionHandler.beforeStart();
             try {
-                T result = generateEntity();
-                operations
-                        .forEach(operation -> operation.apply(result));
+                operations.forEach(operation -> operation.apply(entity));
                 transactionHandler.afterEnd();
             } catch (Exception e) {
                 transactionHandler.onError();
@@ -421,23 +418,23 @@ public class LookupDao<T> {
             }
         }
 
-        private T generateEntity() {
-            T result = null;
-            switch (mode) {
-                case READ:
-                    result = function.apply(key);
-                    if (result == null) {
-                        throw new RuntimeException("Entity doesn't exist for key: " + key);
-                    }
-                    break;
-                case INSERT:
-                    result = saver.apply(entity);
-                    break;
-                default:
-                    break;
-
+        private T generateEntityAndGetLock(String key, T entity, Mode mode, TransactionHandler transactionHandler,
+                                           Function<String, T> getter, Function<T, T> saver) {
+            transactionHandler.beforeStart();
+            try {
+                T result = null;
+                if (mode == Mode.INSERT) {
+                    saver.apply(entity);
+                }
+                result = getter.apply(key);
+                if (result == null) {
+                    throw new RuntimeException("Entity doesn't exist for key: " + key);
+                }
+                return result;
+            } catch (Exception e) {
+                transactionHandler.onError();
+                throw e;
             }
-            return result;
         }
     }
 }
