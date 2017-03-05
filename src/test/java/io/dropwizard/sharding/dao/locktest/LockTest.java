@@ -22,16 +22,20 @@ import com.google.common.collect.Lists;
 import io.dropwizard.sharding.dao.LookupDao;
 import io.dropwizard.sharding.dao.RelationalDao;
 import io.dropwizard.sharding.sharding.ShardManager;
+import org.hibernate.PessimisticLockException;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.exception.ConstraintViolationException;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * Test locking behavior
@@ -69,12 +73,17 @@ public class LockTest {
         relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardManager, Integer::parseInt);
     }
 
+    @After
+    public void after() {
+        sessionFactories.forEach(SessionFactory::close);
+    }
+
     @Test
     public void testLocking() throws Exception {
         SomeLookupObject p1 = SomeLookupObject.builder()
-                                .myId("0")
-                                .name("Parent 1")
-                                .build();
+                .myId("0")
+                .name("Parent 1")
+                .build();
         lookupDao.save(p1);
         System.out.println(lookupDao.get("0").get().getName());
 
@@ -93,11 +102,41 @@ public class LockTest {
         Assert.assertEquals("Hello",relationDao.get("0", 1L).get().getValue());
     }
 
+
+    @Test(expected = PessimisticLockException.class)
+    public void testLockException() throws Exception {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        lookupDao.save(p1);
+        System.out.println(lookupDao.get("0").get().getName());
+
+        lookupDao.lockAndGetExecutor("0")
+                .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
+                .save(relationDao, parent -> SomeOtherObject.builder()
+                        .my_id(parent.getMyId())
+                        .value("Hello")
+                        .build())
+                .mutate(parent -> parent.setName("Changed1"));
+
+        Assert.assertFalse(relationDao.get("0", 1L).isPresent());
+
+        lookupDao.lockAndGetExecutor("0")
+                .mutate(parent -> {
+                    System.out.println(parent.getName());
+                    if (parent.getName().equals("Changed1")) {
+                        parent.setName("Changed2");
+                    }
+                })
+                .execute();
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void testLockingFail() throws Exception {
         SomeLookupObject p1 = SomeLookupObject.builder()
-                                .myId("0")
-                                .build();
+                .myId("0")
+                .build();
         lookupDao.save(p1);
         System.out.println(lookupDao.get("0").get().getName());
 
