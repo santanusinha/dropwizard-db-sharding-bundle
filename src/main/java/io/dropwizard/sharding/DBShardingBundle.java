@@ -36,6 +36,7 @@ import io.dropwizard.sharding.dao.*;
 import io.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
+import io.dropwizard.sharding.transformer.Transformer;
 import lombok.Getter;
 import lombok.val;
 import org.hibernate.SessionFactory;
@@ -184,5 +185,25 @@ public abstract class DBShardingBundle<T extends Configuration> implements Confi
                                                      Class[] extraConstructorParamClasses, Class[] extraConstructorParamObjects) {
         return new WrapperDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager, new ConsistentHashBucketIdExtractor<>(),
                 extraConstructorParamClasses, extraConstructorParamObjects);
+    }
+
+    public static <EntityType extends TransformationBase<TransformedData, Meta>, T extends Configuration, Data, TransformedData, Meta>
+    TransformerLookupDao<EntityType, Data, TransformedData, Meta> createTransformedLookupDao(DBShardingBundle<T> bundle,
+                                                                                             Class<EntityType> daoTypeClass,
+                                                                                             Transformer<Data, TransformedData, Meta> transformer) {
+        return new TransformerLookupDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager,
+                                          new ConsistentHashBucketIdExtractor<>(),
+                                          transformer);
+    }
+
+
+    public static <EntityType extends TransformationBase<TransformedData, Meta>, T extends Configuration, Data, TransformedData, Meta>
+    TransformaerRelationalDao<EntityType, Data, TransformedData, Meta> createTransformedRelationalDao(
+            DBShardingBundle<T> bundle,
+            Class<EntityType> daoTypeClass,
+            Transformer<Data, TransformedData, Meta> transformer) {
+        return new TransformaerRelationalDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager,
+                                               new ConsistentHashBucketIdExtractor<>(),
+                                               transformer);
     }
 }

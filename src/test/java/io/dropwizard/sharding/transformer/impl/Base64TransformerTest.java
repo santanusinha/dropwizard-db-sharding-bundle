@@ -13,7 +13,7 @@ import org.junit.Test;
 public class Base64TransformerTest {
 
     @Test
-    public void testEncrypt() throws Exception {
+    public void testTransform() throws Exception {
         Base64Transformer<Identity> transformer = new Base64Transformer<>(Identity.class, new ObjectMapper());
         Assert.assertNotNull(transformer.transform(ModelHelper.sampleIdentity()).getTransformedData());
         Identity identity = transformer.retrieve("eyJuYW1lIjoiUmFtIiwiYWRkcmVzcyI6eyJzdHJlZXQiOiIzcmQgc3RyZWV0IiwibG9jYXRpb24iOiJiYW5nYWxvcmUifSwiYWdlIjoxMH0=", "");

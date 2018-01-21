@@ -25,11 +25,10 @@ import static io.dropwizard.sharding.dao.testdata.ModelHelper.sampleStateCensus;
  * @author tushar.naik
  * @version 1.0  20/01/18 - 7:55 PM
  */
-public class TransformationRelationalDaoTest {
+public class TransformaerRelationalDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
-    private TransformerLookupDao<StateCensus, Identity, byte[], String> lookupDao;
-    private TransformationRelationalDao<StateCensus, Identity, byte[], String> relationalDao;
+    private TransformaerRelationalDao<StateCensus, Identity, byte[], String> relationalDao;
 
     @Before
     public void setUp() throws Exception {
@@ -38,16 +37,11 @@ public class TransformationRelationalDaoTest {
         }
         ShardManager shardManager = new ShardManager(sessionFactories.size());
         ObjectMapper mapper = new ObjectMapper();
-        lookupDao = new TransformerLookupDao<>(sessionFactories,
-                                               StateCensus.class,
-                                               shardManager,
-                                               new ConsistentHashBucketIdExtractor<>(),
-                                               new Base64ByteTransformer<>(Identity.class, mapper));
-        relationalDao = new TransformationRelationalDao<>(sessionFactories,
-                                                          StateCensus.class,
-                                                          shardManager,
-                                                          new ConsistentHashBucketIdExtractor<>(),
-                                                          new Base64ByteTransformer<>(Identity.class, mapper));
+        relationalDao = new TransformaerRelationalDao<>(sessionFactories,
+                                                        StateCensus.class,
+                                                        shardManager,
+                                                        new ConsistentHashBucketIdExtractor<>(),
+                                                        new Base64ByteTransformer<>(Identity.class, mapper));
 
     }
 
@@ -66,7 +60,7 @@ public class TransformationRelationalDaoTest {
         /* save data */
         Optional<StateCensus> save = relationalDao.save(entity.getStateName(), entity);
 
-        /* check if data is saved and encryption was performed */
+        /* check if data is saved and transformation was performed */
         Assert.assertTrue(save.isPresent());
         Assert.assertNotNull(save.get().getTransformedData());
 
@@ -125,7 +119,7 @@ public class TransformationRelationalDaoTest {
         /* save data */
         Optional<StateCensus> save = relationalDao.save(entity.getStateName(), entity);
 
-        /* check if data is saved and encryption was performed */
+        /* check if data is saved and transformation was performed */
         Assert.assertTrue(save.isPresent());
         Assert.assertNotNull(save.get().getTransformedData());
 

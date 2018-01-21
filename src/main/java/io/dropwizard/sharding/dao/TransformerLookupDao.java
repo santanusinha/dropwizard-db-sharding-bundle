@@ -2,8 +2,8 @@ package io.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
 import io.dropwizard.sharding.sharding.BucketIdExtractor;
-import io.dropwizard.sharding.sharding.TransformedField;
 import io.dropwizard.sharding.sharding.ShardManager;
+import io.dropwizard.sharding.sharding.TransformedField;
 import io.dropwizard.sharding.transformer.DataPackingManager;
 import io.dropwizard.sharding.transformer.TransformedPair;
 import io.dropwizard.sharding.transformer.Transformer;
@@ -21,8 +21,13 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * This dao is an extension of the {@link LookupDao}, which has the ability to mark data items as {@link TransformedField}
- * {@link TransformedField}s are fields which will be Transformed using a {@link Transformer}
+ * This dao is an extension of the {@link LookupDao}, which has the ability to mark any data item as {@link TransformedField}.
+ * A {@link TransformedField} is a field which will be Transformed using a {@link Transformer}
+ * <p>
+ * <b>Note:</b>
+ * - The entity must have only one field marked for transformation
+ * - If multiple fields exist, you may chose to wrap create a compound object housing the multiple fields.
+ * - The field needs to be annotated with {@link TransformedField} and {@link Transient}
  *
  * @param <T> Something that extends TransformationBase (main data)
  * @param <D> Type of data to be transformed
