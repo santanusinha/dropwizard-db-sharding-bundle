@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * @version 1.0  14/11/17 - 7:12 PM
  */
 @Slf4j
-public class TransformaerRelationalDao<T extends TransformationBase<E, M>, D, E, M>
+public class TransformedRelationalDao<T extends TransformationBase<E, M>, D, E, M>
         extends RelationalDao<T> implements DataPackingManager<T>, Transformer<D, E, M> {
 
     /* transformer that has a single type of data and transformationMeta for now (need to change this) */
@@ -48,10 +48,10 @@ public class TransformaerRelationalDao<T extends TransformationBase<E, M>, D, E,
     /* field which is going to be transformed */
     private final Field transformedField;
 
-    public TransformaerRelationalDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
-                                     ShardManager shardManager,
-                                     BucketIdExtractor<String> bucketIdExtractor,
-                                     Transformer<D, E, M> transformer) {
+    public TransformedRelationalDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
+                                    ShardManager shardManager,
+                                    BucketIdExtractor<String> bucketIdExtractor,
+                                    Transformer<D, E, M> transformer) {
         super(sessionFactories, entityClass, shardManager, bucketIdExtractor);
         this.transformer = transformer;
 
@@ -81,8 +81,8 @@ public class TransformaerRelationalDao<T extends TransformationBase<E, M>, D, E,
     }
 
     /**
-     * use this function to get T for the parent key and key, without decrypting the {@link TransformedField}
-     * This is for cases when you have no reason to access the {@link TransformedField} and don't want to incur unnecessary cost of decrypting it
+     * use this function to get T for the parent key and key, without retrieving the {@link TransformedField}
+     * This is for cases when you have no reason to access the {@link TransformedField} and don't want to incur unnecessary cost of retrieving it
      *
      * @param parentKey parent key
      * @param key       key
@@ -131,7 +131,7 @@ public class TransformaerRelationalDao<T extends TransformationBase<E, M>, D, E,
     }
 
     public boolean updateData(String parentKey, DetachedCriteria criteria, Function<D, D> updater) {
-        /* the updater function needs to be applied after the data is decrypted */
+        /* the updater function needs to be applied after the data is retrieved */
         return super.update(parentKey, criteria, t -> pack(t, updater.apply(retrieve(t))));
     }
 
@@ -202,8 +202,8 @@ public class TransformaerRelationalDao<T extends TransformationBase<E, M>, D, E,
         if (entity == null) {
             return null;
         }
-        Object decrypt = retrieve(entity);
-        transformedField.set(entity, decrypt);
+        Object retrieve = retrieve(entity);
+        transformedField.set(entity, retrieve);
         return entity;
     }
 

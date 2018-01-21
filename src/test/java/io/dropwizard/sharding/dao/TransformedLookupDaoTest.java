@@ -23,10 +23,10 @@ import static io.dropwizard.sharding.dao.DaoSessionHelper.buildSessionFactory;
  * @author tushar.naik
  * @version 1.0  20/01/18 - 8:32 PM
  */
-public class TransformerLookupDaoTest {
+public class TransformedLookupDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
-    private TransformerLookupDao<StateCensus, Identity, byte[], String> lookupDao;
+    private TransformedLookupDao<StateCensus, Identity, byte[], String> lookupDao;
 
     @Before
     public void setUp() throws Exception {
@@ -36,7 +36,7 @@ public class TransformerLookupDaoTest {
         }
         ShardManager shardManager = new ShardManager(sessionFactories.size());
         ObjectMapper mapper = new ObjectMapper();
-        lookupDao = new TransformerLookupDao<>(sessionFactories,
+        lookupDao = new TransformedLookupDao<>(sessionFactories,
                                                StateCensus.class,
                                                shardManager,
                                                new ConsistentHashBucketIdExtractor<>(),
@@ -67,7 +67,7 @@ public class TransformerLookupDaoTest {
         /* get the same lookup key */
         Optional<StateCensus> k1 = lookupDao.get(entity.getSsn());
 
-        /* check if data is intact after decryption */
+        /* check if data is intact after retrieving */
         Assert.assertTrue(k1.isPresent());
         Assert.assertNotNull(k1.get().getTransformedData());
         Assert.assertEquals(entity.getIdentity().getName(), k1.get().getIdentity().getName());

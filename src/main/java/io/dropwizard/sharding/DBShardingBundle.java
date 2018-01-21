@@ -188,22 +188,22 @@ public abstract class DBShardingBundle<T extends Configuration> implements Confi
     }
 
     public static <EntityType extends TransformationBase<TransformedData, Meta>, T extends Configuration, Data, TransformedData, Meta>
-    TransformerLookupDao<EntityType, Data, TransformedData, Meta> createTransformedLookupDao(DBShardingBundle<T> bundle,
+    TransformedLookupDao<EntityType, Data, TransformedData, Meta> createTransformedLookupDao(DBShardingBundle<T> bundle,
                                                                                              Class<EntityType> daoTypeClass,
                                                                                              Transformer<Data, TransformedData, Meta> transformer) {
-        return new TransformerLookupDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager,
+        return new TransformedLookupDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager,
                                           new ConsistentHashBucketIdExtractor<>(),
                                           transformer);
     }
 
 
     public static <EntityType extends TransformationBase<TransformedData, Meta>, T extends Configuration, Data, TransformedData, Meta>
-    TransformaerRelationalDao<EntityType, Data, TransformedData, Meta> createTransformedRelationalDao(
+    TransformedRelationalDao<EntityType, Data, TransformedData, Meta> createTransformedRelationalDao(
             DBShardingBundle<T> bundle,
             Class<EntityType> daoTypeClass,
             Transformer<Data, TransformedData, Meta> transformer) {
-        return new TransformaerRelationalDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager,
-                                               new ConsistentHashBucketIdExtractor<>(),
-                                               transformer);
+        return new TransformedRelationalDao<>(bundle.sessionFactories, daoTypeClass, bundle.shardManager,
+                                              new ConsistentHashBucketIdExtractor<>(),
+                                              transformer);
     }
 }

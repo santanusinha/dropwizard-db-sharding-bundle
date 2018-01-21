@@ -37,7 +37,7 @@ import java.util.function.Function;
  * @version 1.0  14/11/17 - 7:12 PM
  */
 @Slf4j
-public class TransformerLookupDao<T extends TransformationBase<E, M>, D, E, M>
+public class TransformedLookupDao<T extends TransformationBase<E, M>, D, E, M>
         extends LookupDao<T> implements DataPackingManager<T>, Transformer<D, E, M> {
 
     /* transformer that has a single type of data and transformationMeta for now (need to change this) */
@@ -46,7 +46,7 @@ public class TransformerLookupDao<T extends TransformationBase<E, M>, D, E, M>
     /* field which is going to be transformed */
     private final Field transformedField;
 
-    public TransformerLookupDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
+    public TransformedLookupDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
                                 ShardManager shardManager,
                                 BucketIdExtractor<String> bucketIdExtractor,
                                 Transformer<D, E, M> transformer) {
@@ -139,7 +139,7 @@ public class TransformerLookupDao<T extends TransformationBase<E, M>, D, E, M>
     }
 
     public boolean updateData(String id, Function<Optional<D>, D> updater) {
-        /* the updater function needs to be applied after the data is decrypted */
+        /* the updater function needs to be applied after the data is retrieved */
         Function<Optional<T>, T> unpackUpdateAndPack = t -> {
             if (t.isPresent()) {
                 return pack(t.get(), updater.apply(Optional.ofNullable(retrieve(t.get()))));
@@ -179,8 +179,8 @@ public class TransformerLookupDao<T extends TransformationBase<E, M>, D, E, M>
         if (entity == null) {
             return null;
         }
-        Object decrypt = retrieve(entity);
-        transformedField.set(entity, decrypt);
+        Object retrieve = retrieve(entity);
+        transformedField.set(entity, retrieve);
         return entity;
     }
 

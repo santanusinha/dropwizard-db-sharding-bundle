@@ -25,10 +25,10 @@ import static io.dropwizard.sharding.dao.testdata.ModelHelper.sampleStateCensus;
  * @author tushar.naik
  * @version 1.0  20/01/18 - 7:55 PM
  */
-public class TransformaerRelationalDaoTest {
+public class TransformedRelationalDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
-    private TransformaerRelationalDao<StateCensus, Identity, byte[], String> relationalDao;
+    private TransformedRelationalDao<StateCensus, Identity, byte[], String> relationalDao;
 
     @Before
     public void setUp() throws Exception {
@@ -37,11 +37,11 @@ public class TransformaerRelationalDaoTest {
         }
         ShardManager shardManager = new ShardManager(sessionFactories.size());
         ObjectMapper mapper = new ObjectMapper();
-        relationalDao = new TransformaerRelationalDao<>(sessionFactories,
-                                                        StateCensus.class,
-                                                        shardManager,
-                                                        new ConsistentHashBucketIdExtractor<>(),
-                                                        new Base64ByteTransformer<>(Identity.class, mapper));
+        relationalDao = new TransformedRelationalDao<>(sessionFactories,
+                                                       StateCensus.class,
+                                                       shardManager,
+                                                       new ConsistentHashBucketIdExtractor<>(),
+                                                       new Base64ByteTransformer<>(Identity.class, mapper));
 
     }
 
@@ -70,7 +70,7 @@ public class TransformaerRelationalDaoTest {
                                                                     .add(Restrictions.eq("ssn", entity.getSsn()))
                                                                     .add(Restrictions.eq("stateName", entity.getStateName())));
 
-        /* check if data is intact after decryption */
+        /* check if data is intact after retrieving */
         Assert.assertEquals(1, k1.size());
         Assert.assertNotNull(k1.get(0).getTransformedData());
         Assert.assertNotNull(k1.get(0).getIdentity());
@@ -85,7 +85,7 @@ public class TransformaerRelationalDaoTest {
 
                         0, 10);
 
-        /* check if data is intact after decryption */
+        /* check if data is intact after retrieving */
         Assert.assertFalse(k2.isEmpty());
         Assert.assertEquals(1, k2.size());
         Assert.assertNotNull(k2.get(0).getTransformedData());
@@ -129,7 +129,7 @@ public class TransformaerRelationalDaoTest {
                                                                     .add(Restrictions.eq("ssn", entity.getSsn()))
                                                                     .add(Restrictions.eq("stateName", entity.getStateName())));
 
-        /* check if data is intact after decryption */
+        /* check if data is intact after retrieving */
         Assert.assertEquals(1, k1.size());
         Assert.assertNotNull(k1.get(0).getTransformedData());
         Assert.assertNotNull(k1.get(0).getIdentity());
@@ -149,7 +149,7 @@ public class TransformaerRelationalDaoTest {
                                                                          .add(Restrictions.eq("ssn", entity.getSsn()))
                                                                          .add(Restrictions.eq("stateName", entity.getStateName())));
 
-        /* check if data is intact after decryption */
+        /* check if data is intact after retrieve */
         Assert.assertEquals(1, k1.size());
         Assert.assertNotNull(k1.get(0).getTransformedData());
         Assert.assertNotNull(k1.get(0).getIdentity());
