@@ -1,0 +1,108 @@
+package io.dropwizard.sharding.dao;
+
+import io.dropwizard.sharding.dao.snapshot.SnapshotEntity;
+import io.dropwizard.sharding.dao.snapshot.SnapshotEntityFactory;
+import io.dropwizard.sharding.sharding.BucketIdExtractor;
+import io.dropwizard.sharding.sharding.ShardManager;
+import io.dropwizard.sharding.utils.Transactions;
+import org.hibernate.SessionFactory;
+import org.hibernate.criterion.DetachedCriteria;
+import org.hibernate.criterion.Restrictions;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+
+public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao<T> {
+
+    private final Class<U> snapshotEntityClass;
+    private final SnapshotEntitySerializer<T> snapshotEntitySerializer;
+    private final RelationalDao<U> snapshotEntityRelationalDao;
+    private final SnapshotEntityFactory<U> snapshotEntityFactory;
+
+    public SnapshottedLookupDao(List<SessionFactory> sessionFactories,
+                                Class<T> entityClass,
+                                ShardManager shardManager,
+                                BucketIdExtractor<String> bucketIdExtractor,
+                                Class<U> snapshotEntityClass,
+                                SnapshotEntitySerializer<T> snapshotEntitySerializer,
+                                RelationalDao<U> snapshotEntityRelationalDao,
+                                SnapshotEntityFactory<U> snapshotEntityFactory) {
+        super(sessionFactories, entityClass, shardManager, bucketIdExtractor);
+        this.snapshotEntityClass = snapshotEntityClass;
+        this.snapshotEntitySerializer = snapshotEntitySerializer;
+        this.snapshotEntityRelationalDao = snapshotEntityRelationalDao;
+        this.snapshotEntityFactory = snapshotEntityFactory;
+    }
+
+    @Override
+    public Optional<T> save(T entity) throws Exception {
+        final String key = key(entity);
+        LockedContext<T> context = saveAndGetExecutor(entity);
+        applySnapshot(context, key, entity);
+        return Optional.ofNullable(context.execute());
+    }
+
+    @Override
+    public <U> U save(T entity, Function<T, U> handler) throws Exception {
+        final String key = key(entity);
+        LockedContext<T> context = saveAndGetExecutor(entity);
+        applySnapshot(context, key, entity);
+        return handler.apply(entity);
+    }
+
+    @Override
+    public boolean updateInLock(String id, Function<Optional<T>, T> updater) {
+        LookupDaoPriv dao = dao(id);
+        return updateImpl(shardId(id), id, dao::getLockedForWrite, updater, dao);
+    }
+
+    @Override
+    public boolean update(String id, Function<Optional<T>, T> updater) {
+        LookupDaoPriv dao = dao(id);
+        return updateImpl(shardId(id), id, dao::get, updater, dao);
+    }
+
+    public List<U> snapshots(String id) throws Exception {
+        return snapshotEntityRelationalDao.select(id, DetachedCriteria.forClass(snapshotEntityClass)
+                .add(Restrictions.eq("key", id)));
+    }
+
+    private boolean updateImpl(int shardId, String id, Function<String, T> getter, Function<Optional<T>, T> updater, LookupDaoPriv dao) {
+        try {
+            return Transactions.<T, String, Boolean>execute(dao.getSessionFactory(), true, getter, id, entity -> {
+                T newEntity = updater.apply(Optional.ofNullable(entity));
+                if (null == newEntity) {
+                    return false;
+                }
+                dao.update(newEntity);
+                snapshotEntityRelationalDao.save(shardId, dao.getSessionFactory(), snapshotEntity(id, entity));
+                return true;
+            });
+        } catch (Exception e) {
+            throw new RuntimeException("Error updating entity: " + id, e);
+        }
+    }
+
+    private U snapshotEntity(String key, T entity) {
+        byte[] serializedEntity = snapshotEntitySerializer.serialize(entity);
+        if (serializedEntity != null) {
+            U snapshotEntity = snapshotEntityFactory.newInstance();
+            snapshotEntity.setKey(key);
+            snapshotEntity.setData(serializedEntity);
+            snapshotEntity.setVersion(new Date().getTime());
+            return snapshotEntity;
+        }
+        return null;
+    }
+
+    private void applySnapshot(LockedContext<T> lockedContext, String key, T entity) {
+        U snapshotEntity = snapshotEntity(key, entity);
+        if (snapshotEntity != null) {
+            lockedContext.save(snapshotEntityRelationalDao, x -> snapshotEntity);
+        }
+    }
+
+}
+

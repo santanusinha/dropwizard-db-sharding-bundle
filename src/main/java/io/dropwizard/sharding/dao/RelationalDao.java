@@ -171,6 +171,11 @@ public class RelationalDao<T> {
         Transactions.execute(context.getSessionFactory(), false, dao::save, entity, t->t, false);
     }
 
+    <U> void save(int shardId, SessionFactory sessionFactory, T entity) {
+        RelationalDaoPriv dao = daos.get(shardId);
+        Transactions.execute(sessionFactory, false, dao::save, entity, t->t, false);
+    }
+
     <U> void save(LookupDao.LockedContext<U> context, T entity, Function<T, T> handler) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
         Transactions.execute(context.getSessionFactory(), false, dao::save, entity, handler, false);
