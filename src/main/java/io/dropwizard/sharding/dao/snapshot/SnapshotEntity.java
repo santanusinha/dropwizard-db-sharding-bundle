@@ -20,7 +20,7 @@ public abstract class SnapshotEntity {
     @Column
     private long id;
 
-    @Column(name = "key")
+    @Column(name = "parent_key")
     private String key;
 
     @Column(name = "version")
