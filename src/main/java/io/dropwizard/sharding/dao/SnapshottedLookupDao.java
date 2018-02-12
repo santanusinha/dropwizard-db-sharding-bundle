@@ -34,7 +34,7 @@ public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao
     @Override
     public Optional<T> save(T entity) throws Exception {
         final String key = key(entity);
-        LockedContext<T> context = saveAndGetExecutor(entity);
+        LockedContext<T> context = super.saveAndGetExecutor(entity);
         applySnapshot(context, key, entity);
         return Optional.ofNullable(context.execute());
     }
@@ -42,7 +42,7 @@ public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao
     @Override
     public <U> U save(T entity, Function<T, U> handler) throws Exception {
         final String key = key(entity);
-        LockedContext<T> context = saveAndGetExecutor(entity);
+        LockedContext<T> context = super.saveAndGetExecutor(entity);
         applySnapshot(context, key, entity);
         return handler.apply(entity);
     }
