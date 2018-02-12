@@ -1,6 +1,5 @@
 package io.dropwizard.sharding.dao.snapshot;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import io.dropwizard.sharding.TestUtils;
 import io.dropwizard.sharding.dao.RelationalDao;
@@ -38,19 +37,11 @@ public class SnapshotDaoTest {
                 new ConsistentHashBucketIdExtractor<>(),
                 SnapshotEntityImpl.class,
                 entity -> {
-                    try {
-                        return new ObjectMapper().writeValueAsBytes(entity);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
+                    SnapshotEntityImpl snapshotEntity = new SnapshotEntityImpl();
+                    snapshotEntity.setData(entity.getData().getBytes());
+                    return snapshotEntity;
                 },
-                snapshotDao,
-                new SnapshotEntityFactory<SnapshotEntityImpl>() {
-                    @Override
-                    public SnapshotEntityImpl newInstance() {
-                        return new SnapshotEntityImpl();
-                    }
-                });
+                snapshotDao);
     }
 
     @After

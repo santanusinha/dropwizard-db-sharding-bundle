@@ -1,7 +1,6 @@
 package io.dropwizard.sharding.dao;
 
 import io.dropwizard.sharding.dao.snapshot.SnapshotEntity;
-import io.dropwizard.sharding.dao.snapshot.SnapshotEntityFactory;
 import io.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.sharding.utils.Transactions;
@@ -9,7 +8,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Restrictions;
 
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -17,23 +15,20 @@ import java.util.function.Function;
 public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao<T> {
 
     private final Class<U> snapshotEntityClass;
-    private final SnapshotEntitySerializer<T> snapshotEntitySerializer;
+    private final SnapshotProvider<T, U> snapshotProvider;
     private final RelationalDao<U> snapshotEntityRelationalDao;
-    private final SnapshotEntityFactory<U> snapshotEntityFactory;
 
     public SnapshottedLookupDao(List<SessionFactory> sessionFactories,
                                 Class<T> entityClass,
                                 ShardManager shardManager,
                                 BucketIdExtractor<String> bucketIdExtractor,
                                 Class<U> snapshotEntityClass,
-                                SnapshotEntitySerializer<T> snapshotEntitySerializer,
-                                RelationalDao<U> snapshotEntityRelationalDao,
-                                SnapshotEntityFactory<U> snapshotEntityFactory) {
+                                SnapshotProvider<T, U> snapshotProvider,
+                                RelationalDao<U> snapshotEntityRelationalDao) {
         super(sessionFactories, entityClass, shardManager, bucketIdExtractor);
         this.snapshotEntityClass = snapshotEntityClass;
-        this.snapshotEntitySerializer = snapshotEntitySerializer;
+        this.snapshotProvider = snapshotProvider;
         this.snapshotEntityRelationalDao = snapshotEntityRelationalDao;
-        this.snapshotEntityFactory = snapshotEntityFactory;
     }
 
     @Override
@@ -64,12 +59,24 @@ public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao
         return updateImpl(shardId(id), id, dao::get, updater, dao);
     }
 
+    @Override
+    public LockedContext<T> lockAndGetExecutor(String id) {
+        throw new IllegalArgumentException("OperationNotSupportedOnSnapshottedDao");
+    }
+
+    @Override
+    public LockedContext<T> saveAndGetExecutor(T entity) {
+        throw new IllegalArgumentException("OperationNotSupportedOnSnapshottedDao");
+    }
+
     public List<U> snapshots(String id) throws Exception {
         return snapshotEntityRelationalDao.select(id, DetachedCriteria.forClass(snapshotEntityClass)
                 .add(Restrictions.eq("key", id)));
     }
 
-    private boolean updateImpl(int shardId, String id, Function<String, T> getter, Function<Optional<T>, T> updater, LookupDaoPriv dao) {
+    private boolean updateImpl(int shardId, String id,
+                               Function<String, T> getter,
+                               Function<Optional<T>, T> updater, LookupDaoPriv dao) {
         try {
             return Transactions.<T, String, Boolean>execute(dao.getSessionFactory(), true, getter, id, entity -> {
                 T newEntity = updater.apply(Optional.ofNullable(entity));
@@ -86,15 +93,10 @@ public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao
     }
 
     private U snapshotEntity(String key, T entity) {
-        byte[] serializedEntity = snapshotEntitySerializer.serialize(entity);
-        if (serializedEntity != null) {
-            U snapshotEntity = snapshotEntityFactory.newInstance();
-            snapshotEntity.setKey(key);
-            snapshotEntity.setData(serializedEntity);
-            snapshotEntity.setVersion(new Date().getTime());
-            return snapshotEntity;
-        }
-        return null;
+        U snapshotEntity = snapshotProvider.snapshot(entity);
+        snapshotEntity.setKey(key);
+        snapshotEntity.setVersion(System.currentTimeMillis());
+        return snapshotEntity;
     }
 
     private void applySnapshot(LockedContext<T> lockedContext, String key, T entity) {

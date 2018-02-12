@@ -26,9 +26,6 @@ public abstract class SnapshotEntity {
     @Column(name = "version")
     private long version;
 
-    @Column(name = "data")
-    private byte[] data;
-
     @Column(name = "created", columnDefinition = "datetime(3) default current_timestamp(3)", updatable = false, insertable = false)
     @Generated(value = GenerationTime.INSERT)
     private Date created;
