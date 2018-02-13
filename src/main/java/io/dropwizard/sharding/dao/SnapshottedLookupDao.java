@@ -69,9 +69,9 @@ public class SnapshottedLookupDao<T, U extends SnapshotEntity> extends LookupDao
         throw new IllegalArgumentException("OperationNotSupportedOnSnapshottedDao");
     }
 
-    public List<U> snapshots(String id) throws Exception {
+    public List<U> snapshots(String id, int start, int count) throws Exception {
         return snapshotEntityRelationalDao.select(id, DetachedCriteria.forClass(snapshotEntityClass)
-                .add(Restrictions.eq("key", id)));
+                .add(Restrictions.eq("key", id)), start, count);
     }
 
     private boolean updateImpl(int shardId, String id,
