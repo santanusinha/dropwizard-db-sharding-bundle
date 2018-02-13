@@ -57,7 +57,7 @@ public class SnapshotDaoTest {
                 .id(id)
                 .data("abcd")
                 .build());
-        List<SnapshotEntityImpl> snapshots = lookupDao.snapshots(id);
+        List<SnapshotEntityImpl> snapshots = lookupDao.snapshots(id, 0, 100);
         assertEquals(1, snapshots.size());
     }
 
@@ -72,7 +72,7 @@ public class SnapshotDaoTest {
             x.get().setData("EFGH");
             return x.get();
         });
-        List<SnapshotEntityImpl> snapshots = lookupDao.snapshots(id);
+        List<SnapshotEntityImpl> snapshots = lookupDao.snapshots(id, 0, 100);
         assertEquals(2, snapshots.size());
     }
 
