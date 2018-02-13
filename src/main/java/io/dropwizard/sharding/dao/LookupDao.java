@@ -57,8 +57,9 @@ public class LookupDao<T> {
     /**
      * This DAO wil be used to perform the ops inside a shard
      */
-    private final class LookupDaoPriv extends AbstractDAO<T> {
+    protected final class LookupDaoPriv extends AbstractDAO<T> {
 
+        @Getter
         private final SessionFactory sessionFactory;
 
         public LookupDaoPriv(SessionFactory sessionFactory) {
@@ -213,7 +214,7 @@ public class LookupDao<T> {
      * @throws Exception
      */
     public <U> U save(T entity, Function<T, U> handler) throws Exception {
-        final String key = keyField.get(entity).toString();
+        final String key = key(entity);
         int shardId = ShardCalculator.shardId(shardManager, bucketIdExtractor, key);
         log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key, shardId);
         LookupDaoPriv dao = daos.get(shardId);
@@ -236,7 +237,7 @@ public class LookupDao<T> {
         try {
             return Transactions.<T, String, Boolean>execute(dao.sessionFactory, true, getter, id, entity -> {
                 T newEntity = updater.apply(Optional.ofNullable(entity));
-                if(null == newEntity) {
+                if (null == newEntity) {
                     return false;
                 }
                 dao.update(newEntity);
@@ -304,9 +305,20 @@ public class LookupDao<T> {
         }).flatMap(Collection::stream).collect(Collectors.toList());
     }
 
+    final protected String key(T entity) throws Exception {
+        return keyField.get(entity).toString();
+    }
 
-    protected Field getKeyField() {
+    final protected Field getKeyField() {
         return this.keyField;
+    }
+
+    final protected int shardId(String key){
+        return ShardCalculator.shardId(shardManager, bucketIdExtractor, key);
+    }
+
+    final protected LookupDaoPriv dao(String key) {
+        return daos.get(shardId(key));
     }
 
     /**
