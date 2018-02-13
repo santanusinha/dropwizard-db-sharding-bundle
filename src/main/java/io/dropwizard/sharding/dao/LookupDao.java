@@ -190,10 +190,6 @@ public class LookupDao<T> {
         return get(key).isPresent();
     }
 
-    final protected String key(T entity) throws Exception {
-        return keyField.get(entity).toString();
-    }
-
     /**
      * Saves an entity on proper shard based on hash of the value in the key field in the object.
      * The updated entity is returned. If {@link org.hibernate.annotations.Cascade} is specified, this can be used
@@ -235,6 +231,21 @@ public class LookupDao<T> {
         int shardId = ShardCalculator.shardId(shardManager, bucketIdExtractor, id);
         LookupDaoPriv dao = daos.get(shardId);
         return updateImpl(id, dao::get, updater, dao);
+    }
+
+    private boolean updateImpl(String id, Function<String, T> getter, Function<Optional<T>, T> updater, LookupDaoPriv dao) {
+        try {
+            return Transactions.<T, String, Boolean>execute(dao.sessionFactory, true, getter, id, entity -> {
+                T newEntity = updater.apply(Optional.ofNullable(entity));
+                if (null == newEntity) {
+                    return false;
+                }
+                dao.update(newEntity);
+                return true;
+            });
+        } catch (Exception e) {
+            throw new RuntimeException("Error updating entity: " + id, e);
+        }
     }
 
     public LockedContext<T> lockAndGetExecutor(String id) {
@@ -294,32 +305,20 @@ public class LookupDao<T> {
         }).flatMap(Collection::stream).collect(Collectors.toList());
     }
 
+    final protected String key(T entity) throws Exception {
+        return keyField.get(entity).toString();
+    }
 
-    protected Field getKeyField() {
+    final protected Field getKeyField() {
         return this.keyField;
-    }
-
-    private boolean updateImpl(String id, Function<String, T> getter, Function<Optional<T>, T> updater, LookupDaoPriv dao) {
-        try {
-            return Transactions.<T, String, Boolean>execute(dao.sessionFactory, true, getter, id, entity -> {
-                T newEntity = updater.apply(Optional.ofNullable(entity));
-                if (null == newEntity) {
-                    return false;
-                }
-                dao.update(newEntity);
-                return true;
-            });
-        } catch (Exception e) {
-            throw new RuntimeException("Error updating entity: " + id, e);
-        }
-    }
-
-    final protected LookupDaoPriv dao(String key) {
-        return daos.get(shardId(key));
     }
 
     final protected int shardId(String key){
         return ShardCalculator.shardId(shardManager, bucketIdExtractor, key);
+    }
+
+    final protected LookupDaoPriv dao(String key) {
+        return daos.get(shardId(key));
     }
 
     /**
