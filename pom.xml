@@ -17,6 +17,7 @@
         <junit.version>4.12</junit.version>
         <h2.version>1.4.196</h2.version>
         <mockito.version>2.2.1</mockito.version>
+        <guice.version>4.2.0</guice.version>
     </properties>
 
     <distributionManagement>
@@ -118,6 +119,11 @@
             <groupId>org.reflections</groupId>
             <artifactId>reflections</artifactId>
             <version>0.9.11</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>${guice.version}</version>
         </dependency>
     </dependencies>
 
