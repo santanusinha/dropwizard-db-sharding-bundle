@@ -18,6 +18,7 @@
         <h2.version>1.4.196</h2.version>
         <mockito.version>2.2.1</mockito.version>
         <guice.version>4.2.0</guice.version>
+        <dropwizard.guice>4.0.1</dropwizard.guice>
     </properties>
 
     <distributionManagement>
@@ -124,6 +125,11 @@
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
             <version>${guice.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ru.vyarus</groupId>
+            <artifactId>dropwizard-guicey</artifactId>
+            <version>${dropwizard.guice}</version>
         </dependency>
     </dependencies>
 

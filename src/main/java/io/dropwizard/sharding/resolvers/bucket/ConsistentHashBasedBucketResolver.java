@@ -23,10 +23,10 @@ import io.dropwizard.sharding.resolvers.shard.HashBasedShardResolver;
 
 import java.nio.charset.StandardCharsets;
 
-public class ConsistentHashBasedBucketResolver<T> implements BucketResolver<T> {
+public class ConsistentHashBasedBucketResolver implements BucketResolver {
     @Override
-    public int resolve(T id) {
-        int hashKey = Hashing.murmur3_128().hashString(id.toString(), StandardCharsets.UTF_8).asInt();
+    public int resolve(String id) {
+        int hashKey = Hashing.murmur3_128().hashString(id, StandardCharsets.UTF_8).asInt();
         hashKey *= hashKey < 0 ? -1 : 1;
 
         return hashKey % (HashBasedShardResolver.MAX_BUCKET + 1);
