@@ -1,10 +1,20 @@
+server:
+  rootPath: /api/*
+  applicationConnectors:
+  - type: http
+    port: 25200
+  adminContextPath: /admin
+  adminConnectors:
+  - type: http
+    port: 25201
+
 multiDatabase:
   tenantDbMap:
     shard1:
       driverClass: "com.mysql.jdbc.Driver"
       user: "root"
-      password: "password"
-      url: "jdbc:mysql://localhost:3306/gst_stage_db"
+      password: ""
+      url: "jdbc:mysql://localhost:3306/testshard"
       maxWaitForConnection: 1s
       initialSize: 10
       minSize: 10
@@ -26,8 +36,8 @@ multiDatabase:
     shard2:
       driverClass: "com.mysql.jdbc.Driver"
       user: "root"
-      password: "password"
-      url: "jdbc:mysql://localhost:3306/gst_stage_db2"
+      password: ""
+      url: "jdbc:mysql://localhost:3306/testshard2"
       maxWaitForConnection: 1s
       initialSize: 10
       minSize: 10

@@ -1,7 +1,7 @@
-package io.dropwizard.sharding.testdata.dao;
+package io.dropwizard.sharding.test.testdata.dao;
 
 import io.dropwizard.hibernate.AbstractDAO;
-import io.dropwizard.sharding.testdata.entities.CustomerToBucketMapping;
+import io.dropwizard.sharding.test.testdata.entities.CustomerToBucketMapping;
 import org.hibernate.Criteria;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.Restrictions;

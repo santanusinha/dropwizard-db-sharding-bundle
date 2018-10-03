@@ -39,17 +39,21 @@ public abstract class ScanningMultiTenantHibernateBundle<T extends Configuration
         super(findEntityClassesFromDirectory(pckgs), sessionFactoryFactory);
     }
 
+    protected ScanningMultiTenantHibernateBundle(ImmutableList<Class<?>> entities,
+                                                 MultiTenantSessionFactoryFactory sessionFactoryFactory) {
+        super(entities, sessionFactoryFactory);
+    }
+
 
     /**
      * Method scanning given directory for classes containing Hibernate @Entity annotation
      *
      * @param pckgs string array with packages containing Hibernate entities (classes annotated with @Entity annotation)
-     *             e.g. com.codahale.fake.db.directory.entities
+     *              e.g. com.codahale.fake.db.directory.entities
      * @return ImmutableList with classes from given directory annotated with Hibernate @Entity annotation
      */
     public static ImmutableList<Class<?>> findEntityClassesFromDirectory(String[] pckgs) {
-        @SuppressWarnings("unchecked")
-        final AnnotationAcceptingListener asl = new AnnotationAcceptingListener(Entity.class);
+        @SuppressWarnings("unchecked") final AnnotationAcceptingListener asl = new AnnotationAcceptingListener(Entity.class);
         final PackageNamesScanner scanner = new PackageNamesScanner(pckgs, true);
 
         while (scanner.hasNext()) {

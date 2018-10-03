@@ -1,8 +1,8 @@
-package io.dropwizard.sharding.testdata.services;
+package io.dropwizard.sharding.test.testdata.services;
 
 import io.dropwizard.hibernate.UnitOfWork;
-import io.dropwizard.sharding.testdata.dao.OrderDao;
-import io.dropwizard.sharding.testdata.entities.Order;
+import io.dropwizard.sharding.test.testdata.dao.OrderDao;
+import io.dropwizard.sharding.test.testdata.entities.Order;
 import lombok.RequiredArgsConstructor;
 
 import javax.inject.Inject;

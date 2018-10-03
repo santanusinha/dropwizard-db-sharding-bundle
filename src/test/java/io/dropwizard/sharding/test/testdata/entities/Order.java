@@ -15,7 +15,7 @@
  *
  */
 
-package io.dropwizard.sharding.testdata.entities;
+package io.dropwizard.sharding.test.testdata.entities;
 
 import lombok.*;
 import org.hibernate.annotations.Cascade;

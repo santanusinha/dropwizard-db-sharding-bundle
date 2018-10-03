@@ -1,14 +1,15 @@
-package io.dropwizard.sharding.application;
+package io.dropwizard.sharding.test.application;
 
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Timed;
-import io.dropwizard.sharding.testdata.entities.Order;
-import io.dropwizard.sharding.testdata.services.OrderService;
+import io.dropwizard.sharding.test.testdata.entities.Order;
+import io.dropwizard.sharding.test.testdata.services.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.security.PermitAll;
 import javax.inject.Inject;
+import javax.inject.Singleton;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -20,6 +21,7 @@ import javax.ws.rs.core.MediaType;
 @Produces(value = {MediaType.APPLICATION_JSON})
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
 @Slf4j
+@Singleton
 public class TestResource {
     private final OrderService orderService;
 

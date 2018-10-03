@@ -15,8 +15,9 @@
  *
  */
 
-package io.dropwizard.sharding.testdata.entities;
+package io.dropwizard.sharding.test.testdata.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import javax.persistence.*;
@@ -26,8 +27,8 @@ import javax.persistence.*;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode
-@ToString
+@EqualsAndHashCode(exclude = "order")
+@ToString(exclude = "order")
 @Builder
 public class OrderItem {
     @Id
@@ -39,6 +40,7 @@ public class OrderItem {
 
     @ManyToOne
     @JoinColumn(name = "order_id")
+    @JsonIgnore
     private Order order;
 
 }

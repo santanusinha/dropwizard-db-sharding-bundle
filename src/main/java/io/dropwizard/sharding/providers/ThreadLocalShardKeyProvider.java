@@ -10,15 +10,16 @@ import javax.annotation.Nullable;
 @NoArgsConstructor
 public class ThreadLocalShardKeyProvider implements ShardKeyProvider {
 
-    private volatile String shardId;
+    private static ThreadLocal<String> context = new ThreadLocal<>();
 
     @Override
     @Nullable
     public String getKey() {
-        return this.shardId;
+        return context.get();
     }
 
+    @Override
     public void setKey(String shardId) {
-        this.shardId = shardId;
+        context.set(shardId);
     }
 }

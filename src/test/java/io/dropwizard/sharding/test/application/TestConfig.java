@@ -1,4 +1,4 @@
-package io.dropwizard.sharding.application;
+package io.dropwizard.sharding.test.application;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.dropwizard.Configuration;

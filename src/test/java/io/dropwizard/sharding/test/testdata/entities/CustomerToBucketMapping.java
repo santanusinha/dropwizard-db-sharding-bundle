@@ -1,4 +1,4 @@
-package io.dropwizard.sharding.testdata.entities;
+package io.dropwizard.sharding.test.testdata.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

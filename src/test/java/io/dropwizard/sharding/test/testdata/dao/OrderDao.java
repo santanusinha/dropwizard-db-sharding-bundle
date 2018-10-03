@@ -15,10 +15,10 @@
  *
  */
 
-package io.dropwizard.sharding.testdata.dao;
+package io.dropwizard.sharding.test.testdata.dao;
 
 import io.dropwizard.hibernate.AbstractDAO;
-import io.dropwizard.sharding.testdata.entities.Order;
+import io.dropwizard.sharding.test.testdata.entities.Order;
 import org.hibernate.SessionFactory;
 
 import javax.inject.Inject;
@@ -40,6 +40,9 @@ public class OrderDao extends AbstractDAO<Order> {
     }
 
     public Order save(Order order) {
+        order.getItems().forEach(oi -> {
+            oi.setOrder(order);
+        });
         return persist(order);
     }
 }

@@ -5,4 +5,6 @@ package io.dropwizard.sharding.providers;
  */
 public interface ShardKeyProvider {
     String getKey();
+
+    void setKey(String shardId);
 }

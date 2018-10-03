@@ -1,6 +1,6 @@
-package io.dropwizard.sharding.testdata.services;
+package io.dropwizard.sharding.test.testdata.services;
 
-import io.dropwizard.sharding.testdata.entities.Order;
+import io.dropwizard.sharding.test.testdata.entities.Order;
 
 /**
  * Created on 03/10/18
