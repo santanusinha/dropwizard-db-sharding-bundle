@@ -55,11 +55,11 @@ public class UnitOfWorkModule extends AbstractModule {
         public Object invoke(MethodInvocation mi) throws Throwable {
             String shardKey = shardKeyProvider.getKey();
             Objects.requireNonNull(shardKey, "No shard-key set for this session");
-            int bucketId = bucketResolver.resolve(shardKey);
-            int shardId = shardResolver.resolve(bucketId);
+            String bucketId = bucketResolver.resolve(shardKey);
+            String shardId = shardResolver.resolve(bucketId);
 
             TransactionRunner runner = new TransactionRunner(proxyFactory, sessionFactory,
-                    new ConstTenantIdentifierResolver(String.valueOf(shardId))) {
+                    new ConstTenantIdentifierResolver(shardId)) {
                 @Override
                 public Object run() throws Throwable {
                     return mi.proceed();

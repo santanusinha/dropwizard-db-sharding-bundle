@@ -131,6 +131,11 @@
             <artifactId>dropwizard-guicey</artifactId>
             <version>${dropwizard.guice}</version>
         </dependency>
+        <dependency>
+            <groupId>io.dropwizard</groupId>
+            <artifactId>dropwizard-client</artifactId>
+            <version>${dropwizard.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

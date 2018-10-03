@@ -1,6 +1,5 @@
 /*
  * Copyright 2016 Santanu Sinha <santanu.sinha@gmail.com>
- * Modifications copyright (C) 2018 Cleartax
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +15,30 @@
  *
  */
 
-package io.dropwizard.sharding.resolvers.bucket;
+package io.dropwizard.sharding.testdata.entities;
 
-import com.google.common.hash.Hashing;
-import io.dropwizard.sharding.resolvers.shard.HashBasedShardResolver;
+import lombok.*;
 
-import java.nio.charset.StandardCharsets;
+import javax.persistence.*;
 
-public class ConsistentHashBasedBucketResolver implements BucketResolver {
-    @Override
-    public String resolve(String id) {
-        int hashKey = Hashing.murmur3_128().hashString(id, StandardCharsets.UTF_8).asInt();
-        hashKey *= hashKey < 0 ? -1 : 1;
+@Entity
+@Table(name = "order_items")
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@EqualsAndHashCode
+@ToString
+@Builder
+public class OrderItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private long id;
 
-        return String.valueOf(hashKey % (HashBasedShardResolver.MAX_BUCKET + 1));
-    }
+    @Column(name = "name")
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "order_id")
+    private Order order;
+
 }

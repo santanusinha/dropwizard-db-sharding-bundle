@@ -18,7 +18,6 @@
 
 package io.dropwizard.sharding.resolvers.shard;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableRangeMap;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeMap;
@@ -34,28 +33,27 @@ public class HashBasedShardResolver implements ShardResolver {
     public static final int MIN_BUCKET = 0;
     public static final int MAX_BUCKET = 999;
 
-    private final RangeMap<Integer, Integer> buckets;
+    private final RangeMap<String, String> buckets;
 
     @Builder
     public HashBasedShardResolver(int numBuckets) {
         int interval = MAX_BUCKET / numBuckets;
         int shardCounter = 0;
         boolean endReached = false;
-        ImmutableRangeMap.Builder<Integer, Integer> builder = new ImmutableRangeMap.Builder<>();
+        ImmutableRangeMap.Builder<String, String> builder = new ImmutableRangeMap.Builder<>();
         for (int start = MIN_BUCKET; !endReached; start += interval, shardCounter++) {
             int end = start + interval - 1;
             endReached = !((MAX_BUCKET - start) > (2 * interval));
             end = endReached ? end + MAX_BUCKET - end : end;
-            builder.put(Range.closed(start, end), shardCounter);
+            builder.put(Range.closed(String.valueOf(start), String.valueOf(end)),
+                    String.valueOf(shardCounter));
         }
         this.buckets = builder.build();
         log.info("Buckets to shard allocation: {}", buckets);
     }
 
     @Override
-    public int resolve(int bucketId) {
-        Preconditions.checkArgument(bucketId >= MIN_BUCKET && bucketId <= MAX_BUCKET,
-                "Bucket id can only be in the range of [1-1000] (inclusive)");
+    public String resolve(String bucketId) {
         val entry = buckets.getEntry(bucketId);
         if (null == entry) {
             throw new IllegalAccessError("Bucket not mapped to any shard");

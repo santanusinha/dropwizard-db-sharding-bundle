@@ -26,11 +26,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RangeBasedShardResolver implements ShardResolver {
 
-    private final RangeMap<Integer, Integer> bucketToShardMap;
+    private final RangeMap<String, String> bucketToShardMap;
 
     @Override
-    public int resolve(int bucketId) {
-        Map.Entry<Range<Integer>, Integer> entry = bucketToShardMap.getEntry(bucketId);
+    public String resolve(String bucketId) {
+        Map.Entry<Range<String>, String> entry = bucketToShardMap.getEntry(bucketId);
         if (entry == null) {
             throw new IllegalAccessError(String.format("%s bucket not mapped to any shard", bucketId));
         }
