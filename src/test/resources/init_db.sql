@@ -5,7 +5,7 @@ CREATE TABLE `orders` (
   `customer_id` varchar(255) DEFAULT NULL,
   `amount` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+);
 
 DROP TABLE IF EXISTS `order_items`;
 CREATE TABLE `order_items` (
@@ -13,4 +13,4 @@ CREATE TABLE `order_items` (
   `name` varchar(255) DEFAULT NULL,
   `order_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+);
