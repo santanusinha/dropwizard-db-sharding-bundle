@@ -23,6 +23,7 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.matcher.Matchers;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantHibernateBundle;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
 import in.cleartax.dropwizard.sharding.providers.ShardKeyProvider;
@@ -67,22 +68,31 @@ public class UnitOfWorkModule extends AbstractModule {
         ShardResolver shardResolver;
         @Inject
         ShardKeyProvider shardKeyProvider;
+        @Inject
+        @Named("multiTenantConfiguration")
+        MultiTenantDataSourceFactory multiTenantDataSourceFactory;
+
+        private String getTenantIdentifier(MethodInvocation mi) {
+            boolean useDefaultShard = mi.getMethod().isAnnotationPresent(DefaultTenant.class);
+            String tenantId;
+            if (!useDefaultShard && multiTenantDataSourceFactory.isAllowMultipleTenants()) {
+                String shardKey = shardKeyProvider.getKey();
+                Objects.requireNonNull(shardKey, "No tenant-identifier set for this session");
+                String bucketId = bucketResolver.resolve(shardKey);
+                tenantId = shardResolver.resolve(bucketId);
+            } else {
+                tenantId = multiTenantDataSourceFactory.getDefaultTenant();
+            }
+            return tenantId;
+        }
 
         @Override
         public Object invoke(MethodInvocation mi) throws Throwable {
-            boolean useDefaultShard = mi.getMethod().isAnnotationPresent(DefaultTenant.class);
-            String shardId;
-            if (!useDefaultShard) {
-                String shardKey = shardKeyProvider.getKey();
-                Objects.requireNonNull(shardKey, "No shard-key set for this session");
-                String bucketId = bucketResolver.resolve(shardKey);
-                shardId = shardResolver.resolve(bucketId);
-            } else {
-                shardId = "shard1"; // TODO : Avoid hardcoding this
-            }
+            String tenantId = getTenantIdentifier(mi);
+            Objects.requireNonNull(tenantId, "No tenant-identifier found for this session");
 
             TransactionRunner runner = new TransactionRunner(proxyFactory, sessionFactory,
-                    new ConstTenantIdentifierResolver(shardId)) {
+                    new ConstTenantIdentifierResolver(tenantId)) {
                 @Override
                 public Object run() throws Throwable {
                     return mi.proceed();

@@ -34,7 +34,6 @@ import in.cleartax.dropwizard.sharding.transactions.TransactionRunner;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.http.HttpStatus;
 import org.hibernate.SessionFactory;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -44,9 +43,6 @@ import org.junit.runners.Parameterized;
 import ru.vyarus.dropwizard.guice.GuiceBundle;
 
 import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,9 +50,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @RunWith(Parameterized.class)
 @RequiredArgsConstructor
-public class OrderIntegrationTest {
+public class OrderIntegrationTestWithMultiTenancy {
     @ClassRule
-    public static final DropwizardAppRule<TestConfig> RULE = OrderIntegrationTestSuite.RULE;
+    public static final DropwizardAppRule<TestConfig> RULE = IntegrationTestSuiteWithMultiTenancy.RULE;
     private static final String AUTH_TOKEN = "X-Auth-Token";
     private static final List<String> shards = ImmutableList.of("shard1", "shard2");
     private static Client client;
@@ -72,28 +68,8 @@ public class OrderIntegrationTest {
 
     @BeforeClass
     public static void setUp() {
-        client = OrderIntegrationTestSuite.client;
+        client = IntegrationTestSuiteWithMultiTenancy.client;
         host = String.format("http://localhost:%d/api", RULE.getLocalPort());
-    }
-
-    private OrderDto createOrder(OrderDto order) {
-        Response response = client.target(
-                String.format("%s/v0.1/orders", host))
-                .request()
-                .header(AUTH_TOKEN, order.getCustomerId())
-                .put(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
-        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
-        return response.readEntity(OrderDto.class);
-    }
-
-    private OrderDto getOrder(long id, String customerId) {
-        Response response = client.target(
-                String.format("%s/v0.1/orders/%d", host, id))
-                .request()
-                .header(AUTH_TOKEN, customerId)
-                .get();
-        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
-        return response.readEntity(OrderDto.class);
     }
 
     private void assertOrderPresentOnShard(final String expectedOnShard, final OrderDto orderDto) throws Throwable {
@@ -139,13 +115,13 @@ public class OrderIntegrationTest {
                 ))
                 .customerId(customerIdAndShardId.getLeft())
                 .build();
-        orderDto = createOrder(orderDto);
+        orderDto = TestHelper.createOrder(orderDto, client, host, AUTH_TOKEN);
         assertThat(orderDto.getOrderId())
                 .describedAs("Created order for customer = " + customerIdAndShardId.getLeft())
                 .isEqualTo(orderId);
         assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
 
-        orderDto = getOrder(orderDto.getId(), orderDto.getCustomerId());
+        orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN);
         assertThat(orderDto.getOrderId())
                 .describedAs("Fetched order for customer = " + customerIdAndShardId.getLeft())
                 .isEqualTo(orderId);

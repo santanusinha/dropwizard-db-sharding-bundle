@@ -51,6 +51,7 @@ public class MultiTenantDataSourceFactory {
     private Duration validationQueryTimeout;
     @NotBlank
     private String defaultTenant;
+    private boolean allowMultipleTenants;
 
     public boolean isAutoCommentsEnabled() {
         return autoCommentsEnabled;
@@ -72,8 +73,9 @@ public class MultiTenantDataSourceFactory {
         return tenantDbMap.get(defaultTenant);
     }
 
-    @ValidationMethod
+    @ValidationMethod(message = "Tenant configuration is not valid")
     public boolean isValid() {
-        return getDefaultDataSourceFactory() != null;
+        return getDefaultDataSourceFactory() != null &&
+                (allowMultipleTenants ? tenantDbMap.size() > 1 : tenantDbMap.size() == 1);
     }
 }

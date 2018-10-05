@@ -79,6 +79,12 @@ public class TestModule extends AbstractModule {
         return hibernateBundle;
     }
 
+    @Provides
+    @Named("multiTenantConfiguration")
+    public MultiTenantDataSourceFactory getMultiTenantDataSource(TestConfig config) {
+        return config.getMultiTenantDataSourceFactory();
+    }
+
     private class CustomSessionFactory extends MultiTenantSessionFactoryFactory {
         @Override
         protected void configure(Configuration configuration, ServiceRegistry registry) {
