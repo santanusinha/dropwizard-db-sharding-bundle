@@ -41,9 +41,6 @@ public class MultiTenantDataSourceFactory {
     @NotEmpty
     private Map<String, DataSourceFactory> tenantDbMap;
 
-    @NotNull
-    private Map<String, String> properties = new LinkedHashMap<>();
-
     private boolean autoCommentsEnabled = true;
     @NotNull
     private String validationQuery = "/* Health Check */ SELECT 1";

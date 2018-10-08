@@ -17,6 +17,8 @@
 
 package in.cleartax.dropwizard.sharding.hibernate;
 
+import com.google.common.collect.Maps;
+import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.setup.Environment;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
@@ -57,12 +59,10 @@ public class MultiTenantSessionFactoryFactory {
                                 MultiTenantDataSourceFactory dbConfig,
                                 MultiTenantManagedDataSource dataSource,
                                 List<Class<?>> entities) {
-        final MultiTenantConnectionProvider provider = buildMultiTenantConnectionProvider(dataSource,
-                dbConfig.getProperties());
+        final MultiTenantConnectionProvider provider = buildMultiTenantConnectionProvider(dataSource, dbConfig);
         final SessionFactory factory = buildSessionFactory(bundle,
                 dbConfig,
                 provider,
-                dbConfig.getProperties(),
                 entities);
         final MultiTenantSessionFactoryManager managedFactory = new MultiTenantSessionFactoryManager(factory, dataSource);
         environment.lifecycle().manage(managedFactory);
@@ -70,10 +70,11 @@ public class MultiTenantSessionFactoryFactory {
     }
 
     private MultiTenantConnectionProvider buildMultiTenantConnectionProvider(
-            MultiTenantManagedDataSource multiTenantDataSource, Map<String, String> properties) {
+            MultiTenantManagedDataSource multiTenantDataSource, MultiTenantDataSourceFactory dbConfig) {
         Map<String, ConnectionProvider> connectionProviderMap = new HashMap<>();
         multiTenantDataSource.getTenantDataSourceMap().forEach(
-                (tenantKey,ds) -> connectionProviderMap.put(tenantKey, buildConnectionProvider(ds, properties)));
+                (tenantKey, ds) -> connectionProviderMap.put(tenantKey,
+                        buildConnectionProvider(ds, dbConfig.getTenantDbMap().get(tenantKey).getProperties())));
         return new ConfigurableMultiTenantConnectionProvider(connectionProviderMap);
     }
 
@@ -88,7 +89,6 @@ public class MultiTenantSessionFactoryFactory {
     private SessionFactory buildSessionFactory(MultiTenantHibernateBundle<?> bundle,
                                                MultiTenantDataSourceFactory dbConfig,
                                                MultiTenantConnectionProvider connectionProvider,
-                                               Map<String, String> properties,
                                                List<Class<?>> entities) {
         final Configuration configuration = new Configuration();
         configuration.setProperty(AvailableSettings.CURRENT_SESSION_CONTEXT_CLASS, "managed");
@@ -100,6 +100,10 @@ public class MultiTenantSessionFactoryFactory {
         configuration.setProperty(AvailableSettings.ORDER_INSERTS, "true");
         configuration.setProperty(AvailableSettings.USE_NEW_ID_GENERATOR_MAPPINGS, "true");
         configuration.setProperty("jadira.usertype.autoRegisterUserTypes", "true");
+        Map<String, String> properties = Maps.newHashMap();
+        for (DataSourceFactory ds : dbConfig.getTenantDbMap().values()) {
+            properties.putAll(ds.getProperties());
+        }
         for (Map.Entry<String, String> property : properties.entrySet()) {
             configuration.setProperty(property.getKey(), property.getValue());
         }
