@@ -46,7 +46,6 @@ public abstract class TransactionRunner {
             aspect.beforeStart(unitOfWork);
             result = run();
             aspect.afterEnd();
-            return result;
         } catch (Exception e) {
             ex = e;
             aspect.onError();

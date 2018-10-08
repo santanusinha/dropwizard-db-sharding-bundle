@@ -37,9 +37,6 @@ import org.hibernate.SessionFactory;
 import javax.inject.Named;
 import java.util.Objects;
 
-/**
- * Created on 19/09/18
- */
 public class UnitOfWorkModule extends AbstractModule {
 
     @Override
