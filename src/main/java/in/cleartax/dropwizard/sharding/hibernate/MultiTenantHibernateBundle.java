@@ -80,24 +80,12 @@ public abstract class MultiTenantHibernateBundle<T extends Configuration> implem
     public final void run(T configuration, Environment environment) throws Exception {
         final MultiTenantDataSourceFactory dbConfig = getDataSourceFactory(configuration);
         this.sessionFactory = sessionFactoryFactory.build(this, environment, dbConfig, entities, name());
-        registerUnitOfWorkListerIfAbsent(environment).registerSessionFactory(name(), sessionFactory);
         environment.healthChecks().register(name(),
                 new SessionFactoryHealthCheck(
                         environment.getHealthCheckExecutorService(),
                         dbConfig.getValidationQueryTimeout().orElse(Duration.seconds(5)),
                         sessionFactory,
                         dbConfig.getValidationQuery()));
-    }
-
-    private UnitOfWorkApplicationListener registerUnitOfWorkListerIfAbsent(Environment environment) {
-        for (Object singleton : environment.jersey().getResourceConfig().getSingletons()) {
-            if (singleton instanceof UnitOfWorkApplicationListener) {
-                return (UnitOfWorkApplicationListener) singleton;
-            }
-        }
-        final UnitOfWorkApplicationListener listener = new UnitOfWorkApplicationListener();
-        environment.jersey().register(listener);
-        return listener;
     }
 
     public boolean isLazyLoadingEnabled() {

@@ -21,6 +21,7 @@ import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Timed;
 import in.cleartax.dropwizard.sharding.test.sampleapp.testdata.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.test.sampleapp.testdata.services.OrderService;
+import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -46,6 +47,7 @@ public class TestResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @PermitAll
+    @UnitOfWork
     public OrderDto createOrUpdateInvoice(@NotNull OrderDto order) {
         return orderService.createOrder(order);
     }
