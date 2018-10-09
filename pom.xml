@@ -11,6 +11,7 @@
     <modules>
         <module>sharding-bom</module>
         <module>sharding-core</module>
+        <module>sharding-migrations</module>
     </modules>
     <name>${project.groupId}:${project.artifactId}</name>
     <url>https://github.com/ClearTax/dropwizard-db-sharding-bundle</url>
