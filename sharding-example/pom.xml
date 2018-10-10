@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>in.cleartax.dropwizard</groupId>
+    <artifactId>sharding-example</artifactId>
+    <version>0.1.2</version>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <name>Sharding demo app with integration test</name>
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <dropwizard.version>1.3.2</dropwizard.version>
+        <lombok.version>1.16.18</lombok.version>
+        <guava.version>25.1-jre</guava.version>
+        <h2.version>1.4.196</h2.version>
+        <mockito.version>2.2.1</mockito.version>
+        <guice.version>4.2.0</guice.version>
+        <dropwizard.guice>4.0.1</dropwizard.guice>
+        <guice.bridge.version>2.5.0-b36</guice.bridge.version>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.site.skip>true</maven.site.skip>
+        <maven.site.deploy.skip>true</maven.site.deploy.skip>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.dropwizard</groupId>
+                <artifactId>dropwizard-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>in.cleartax.dropwizard</groupId>
+            <artifactId>sharding-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.dropwizard</groupId>
+            <artifactId>dropwizard-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+        </dependency>
+        <!-- Refer https://www.pivotaltracker.com/story/show/141696157 & https://github.com/HubSpot/dropwizard-guice/issues/93 -->
+        <dependency>
+            <groupId>org.glassfish.hk2</groupId>
+            <artifactId>guice-bridge</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.vyarus</groupId>
+            <artifactId>dropwizard-guicey</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.dropwizard</groupId>
+            <artifactId>dropwizard-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
