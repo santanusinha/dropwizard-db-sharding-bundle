@@ -2,28 +2,27 @@
 
 Application level sharding for traditional relational databases.
 
-See tests for details and code for documentation.
+See sharding-example (including it's test) to understand the usage.
 
 Apache Licensed
 
 ## Usage
 
-This library is available in clojars. Please use the following repository setting:
-
-```
-<repository>
-    <id>clojars</id>
-    <name>Clojars repository</name>
-    <url>https://clojars.org/repo</url>
-</repository>
-```
-
-The project dependencies are:
+Include as dependency:
 ```
 <dependency>
-    <groupId>io.dropwizard.sharding</groupId>
-    <artifactId>db-sharding-bundle</artifactId>
-    <version>1.2.2-3</version>
+    <groupId>in.cleartax.dropwizard</groupId>
+    <artifactId>sharding-core</artifactId>
+    <version>0.1.2</version>
+</dependency>
+```
+
+for liquibase migration support, you can also include:
+```
+<dependency>
+    <groupId>in.cleartax.dropwizard</groupId>
+    <artifactId>sharding-migrations</artifactId>
+    <version>0.1.2</version>
 </dependency>
 ```
 
