@@ -5,7 +5,7 @@
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>db-sharding-bundle</artifactId>
     <packaging>pom</packaging>
-    <version>0.1.2</version>
+    <version>0.1.2-SNAPSHOT</version>
     <modules>
         <module>sharding-bom</module>
         <module>sharding-core</module>
