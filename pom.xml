@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>db-sharding-bundle</artifactId>
     <packaging>pom</packaging>
-    <version>0.1.2-SNAPSHOT</version>
+    <version>0.1.2</version>
     <modules>
         <module>sharding-bom</module>
         <module>sharding-core</module>
@@ -33,8 +31,8 @@
 
     <scm>
         <connection>scm:git:git://github.com/ClearTax/dropwizard-db-sharding-bundle.git</connection>
-        <developerConnection>scm:git:ssh://github.com/ClearTax/dropwizard-db-sharding-bundle.git</developerConnection>
-        <tag>HEAD</tag>
+        <developerConnection>scm:git:git@github.com:ClearTax/dropwizard-db-sharding-bundle.git</developerConnection>
+        <tag>0.1.2</tag>
         <url>https://github.com/ClearTax/dropwizard-db-sharding-bundle</url>
     </scm>
 
