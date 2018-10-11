@@ -27,21 +27,19 @@ import org.hibernate.SessionFactory;
 import org.hibernate.context.internal.ManagedSessionContext;
 
 @AllArgsConstructor
-public abstract class TransactionRunner {
+public abstract class TransactionRunner<T> {
     private MultiTenantUnitOfWorkAwareProxyFactory proxyFactory;
     private SessionFactory sessionFactory;
     private ConstTenantIdentifierResolver tenantIdentifierResolver;
 
-    public Object start(boolean reUseSession, UnitOfWork unitOfWork) throws Throwable {
-        if (reUseSession) {
-            if (ManagedSessionContext.hasBind(sessionFactory)) {
-                return run();
-            }
+    public T start(boolean reUseSession, UnitOfWork unitOfWork) throws Throwable {
+        if (reUseSession && ManagedSessionContext.hasBind(sessionFactory)) {
+            return run();
         }
         DelegatingTenantResolver.getInstance().setDelegate(tenantIdentifierResolver);
         UnitOfWorkAspect aspect = proxyFactory.newAspect();
         Exception ex = null;
-        Object result = null;
+        T result = null;
         try {
             aspect.beforeStart(unitOfWork);
             result = run();
@@ -59,5 +57,5 @@ public abstract class TransactionRunner {
         return result;
     }
 
-    public abstract Object run() throws Throwable;
+    public abstract T run() throws Throwable;
 }

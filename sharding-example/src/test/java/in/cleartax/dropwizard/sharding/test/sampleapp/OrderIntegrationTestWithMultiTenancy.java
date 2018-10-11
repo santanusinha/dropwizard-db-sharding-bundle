@@ -80,9 +80,9 @@ public class OrderIntegrationTestWithMultiTenancy {
         final SessionFactory sessionFactory = guiceBundle.getInjector()
                 .getInstance(Key.get(SessionFactory.class, Names.named("session")));
         for (final String eachShard : shards) {
-            new TransactionRunner(proxyFactory, sessionFactory, new ConstTenantIdentifierResolver(eachShard)) {
+            new TransactionRunner<Order>(proxyFactory, sessionFactory, new ConstTenantIdentifierResolver(eachShard)) {
                 @Override
-                public Object run() {
+                public Order run() {
                     Order order = orderDao.get(orderDto.getId());
                     if (eachShard.equals(expectedOnShard)) {
                         assertThat(order)
