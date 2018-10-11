@@ -38,13 +38,13 @@ public abstract class TransactionRunner<T> {
         }
         DelegatingTenantResolver.getInstance().setDelegate(tenantIdentifierResolver);
         UnitOfWorkAspect aspect = proxyFactory.newAspect();
-        Exception ex = null;
+        Throwable ex = null;
         T result = null;
         try {
             aspect.beforeStart(unitOfWork);
             result = run();
             aspect.afterEnd();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             ex = e;
             aspect.onError();
         } finally {

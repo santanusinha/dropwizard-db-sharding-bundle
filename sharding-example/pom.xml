@@ -6,7 +6,7 @@
 
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>sharding-example</artifactId>
-    <version>0.1.2-SNAPSHOT</version>
+    <version>0.2.3</version>
     <build>
         <plugins>
             <plugin>
@@ -38,8 +38,8 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>io.dropwizard</groupId>
-                <artifactId>dropwizard-bom</artifactId>
+                <groupId>in.cleartax.dropwizard</groupId>
+                <artifactId>sharding-bom</artifactId>
                 <version>${project.version}</version>
                 <type>pom</type>
                 <scope>import</scope>

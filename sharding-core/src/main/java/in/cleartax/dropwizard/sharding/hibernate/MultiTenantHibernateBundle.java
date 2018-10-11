@@ -20,9 +20,9 @@ package in.cleartax.dropwizard.sharding.hibernate;
 import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module;
 import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module.Feature;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
-import io.dropwizard.hibernate.SessionFactoryHealthCheck;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.util.Duration;
@@ -30,13 +30,11 @@ import org.hibernate.SessionFactory;
 
 public abstract class MultiTenantHibernateBundle<T extends Configuration> implements ConfiguredBundle<T> {
 
-    public static final String DEFAULT_NAME = "hibernate";
-
-    private SessionFactory sessionFactory;
-    private boolean lazyLoadingEnabled = true;
-
+    private static final String DEFAULT_NAME = "hibernate";
     private final ImmutableList<Class<?>> entities;
     private final MultiTenantSessionFactoryFactory sessionFactoryFactory;
+    private SessionFactory sessionFactory;
+    private boolean lazyLoadingEnabled = true;
 
     protected MultiTenantHibernateBundle(Class<?> entity, Class<?>... entities) {
         this(ImmutableList.<Class<?>>builder().add(entity).add(entities).build(),
@@ -76,14 +74,16 @@ public abstract class MultiTenantHibernateBundle<T extends Configuration> implem
     }
 
     @Override
-    public final void run(T configuration, Environment environment) throws Exception {
+    public final void run(T configuration, Environment environment) {
         final MultiTenantDataSourceFactory dbConfig = getDataSourceFactory(configuration);
         this.sessionFactory = sessionFactoryFactory.build(this, environment, dbConfig, entities, name());
         environment.healthChecks().register(name(),
-                new SessionFactoryHealthCheck(
+                new MultiTenantSessionFactoryHealthCheck(
                         environment.getHealthCheckExecutorService(),
                         dbConfig.getValidationQueryTimeout().orElse(Duration.seconds(5)),
                         sessionFactory,
+                        new MultiTenantUnitOfWorkAwareProxyFactory(this),
+                        Lists.newArrayList(dbConfig.getTenantDbMap().keySet()),
                         dbConfig.getValidationQuery()));
     }
 
