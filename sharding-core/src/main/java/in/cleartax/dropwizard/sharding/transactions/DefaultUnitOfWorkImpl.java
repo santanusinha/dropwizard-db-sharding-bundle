@@ -38,7 +38,7 @@ public class DefaultUnitOfWorkImpl implements UnitOfWork {
 
     @Override
     public boolean transactional() {
-        return true;
+        return false;
     }
 
     @Override

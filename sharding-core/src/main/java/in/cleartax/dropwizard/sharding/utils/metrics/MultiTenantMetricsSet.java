@@ -30,15 +30,20 @@ public abstract class MultiTenantMetricsSet implements MetricSet {
     @Override
     public Map<String, Metric> getMetrics() {
         return multiTenantDataSourceFactory.getTenantDbMap().keySet().stream()
-                .map(tenantId ->
-                        new TransactionRunner<Map<String, Metric>>(proxyFactory, sessionFactory,
+                .map(tenantId -> {
+                    try {
+                        return new TransactionRunner<Map<String, Metric>>(proxyFactory, sessionFactory,
                                 new ConstTenantIdentifierResolver(tenantId)) {
 
                             @Override
                             public Map<String, Metric> run() {
                                 return runOnTenant(tenantId);
                             }
-                        }.start(false, new DefaultUnitOfWorkImpl()))
+                        }.start(false, new DefaultUnitOfWorkImpl());
+                    } catch (Throwable t) {
+                        throw new RuntimeException(t);
+                    }
+                })
                 .flatMap(map -> map.entrySet().stream())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> {
                     throw new IllegalArgumentException("Metric key on different tenants cannot be same");

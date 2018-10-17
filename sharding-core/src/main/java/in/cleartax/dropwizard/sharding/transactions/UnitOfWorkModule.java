@@ -46,7 +46,6 @@ public class UnitOfWorkModule extends AbstractModule {
         requestInjection(interceptor);
     }
 
-    @SuppressWarnings("unused")
     @Provides
     @Singleton
     MultiTenantUnitOfWorkAwareProxyFactory provideUnitOfWorkAwareProxyFactory(MultiTenantHibernateBundle hibernateBundle) {
@@ -85,19 +84,15 @@ public class UnitOfWorkModule extends AbstractModule {
         }
 
         @Override
-        public Object invoke(MethodInvocation mi) {
+        public Object invoke(MethodInvocation mi) throws Throwable {
             String tenantId = getTenantIdentifier(mi);
             Objects.requireNonNull(tenantId, "No tenant-identifier found for this session");
 
             TransactionRunner runner = new TransactionRunner(proxyFactory, sessionFactory,
                     new ConstTenantIdentifierResolver(tenantId)) {
                 @Override
-                public Object run() {
-                    try {
-                        return mi.proceed();
-                    } catch (Throwable t) {
-                        throw new TransactionRollbackException(t);
-                    }
+                public Object run() throws Throwable {
+                    return mi.proceed();
                 }
             };
             return runner.start(mi.getMethod().isAnnotationPresent(ReuseSession.class),
