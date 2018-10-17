@@ -32,20 +32,23 @@ public abstract class TransactionRunner<T> {
     private SessionFactory sessionFactory;
     private ConstTenantIdentifierResolver tenantIdentifierResolver;
 
-    public T start(boolean reUseSession, UnitOfWork unitOfWork) throws Throwable {
+    public T start(boolean reUseSession, UnitOfWork unitOfWork) throws TransactionRollbackException {
         if (reUseSession && ManagedSessionContext.hasBind(sessionFactory)) {
             return run();
         }
         DelegatingTenantResolver.getInstance().setDelegate(tenantIdentifierResolver);
         UnitOfWorkAspect aspect = proxyFactory.newAspect();
-        Throwable ex = null;
+        TransactionRollbackException ex = null;
         T result = null;
         try {
             aspect.beforeStart(unitOfWork);
             result = run();
             aspect.afterEnd();
-        } catch (Throwable e) {
+        } catch (TransactionRollbackException e) {
             ex = e;
+            aspect.onError();
+        } catch (Exception e) {
+            ex = new TransactionRollbackException(e);
             aspect.onError();
         } finally {
             aspect.onFinish();
@@ -57,5 +60,5 @@ public abstract class TransactionRunner<T> {
         return result;
     }
 
-    public abstract T run() throws Throwable;
+    public abstract T run() throws RuntimeException;
 }

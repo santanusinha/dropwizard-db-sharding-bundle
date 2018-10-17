@@ -13,7 +13,7 @@ Include as dependency:
 <dependency>
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>sharding-core</artifactId>
-    <version>0.1.2</version>
+    <version>0.2.3</version>
 </dependency>
 ```
 
@@ -22,7 +22,7 @@ for liquibase migration support, you can also include:
 <dependency>
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>sharding-migrations</artifactId>
-    <version>0.1.2</version>
+    <version>0.2.3</version>
 </dependency>
 ```
 
