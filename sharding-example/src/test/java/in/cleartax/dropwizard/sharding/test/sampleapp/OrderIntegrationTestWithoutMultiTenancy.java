@@ -21,14 +21,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @RequiredArgsConstructor
 public class OrderIntegrationTestWithoutMultiTenancy {
     @ClassRule
-    public static final DropwizardAppRule<TestConfig> RULE = IntegrationTestSuiteWithoutMultiTenancy.RULE;
+    public static final DropwizardAppRule<TestConfig> RULE = TestSuiteWithoutMultiTenancy.RULE;
     private static final String AUTH_TOKEN = "X-Auth-Token";
     private static Client client;
     private static String host;
 
     @BeforeClass
     public static void setUp() {
-        client = IntegrationTestSuiteWithoutMultiTenancy.client;
+        client = TestSuiteWithoutMultiTenancy.client;
         host = String.format("http://localhost:%d/api", RULE.getLocalPort());
     }
 

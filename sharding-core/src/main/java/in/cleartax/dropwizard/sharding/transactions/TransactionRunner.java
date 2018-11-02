@@ -33,7 +33,9 @@ public abstract class TransactionRunner<T> {
     private ConstTenantIdentifierResolver tenantIdentifierResolver;
 
     public T start(boolean reUseSession, UnitOfWork unitOfWork) throws Throwable {
-        if (reUseSession && ManagedSessionContext.hasBind(sessionFactory)) {
+        if (reUseSession && ManagedSessionContext.hasBind(sessionFactory) &&
+                tenantIdentifierResolver.resolveCurrentTenantIdentifier()
+                        .equals(DelegatingTenantResolver.getInstance().resolveCurrentTenantIdentifier())) {
             return run();
         }
         DelegatingTenantResolver.getInstance().setDelegate(tenantIdentifierResolver);

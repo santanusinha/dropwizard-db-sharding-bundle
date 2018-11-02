@@ -52,7 +52,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @RequiredArgsConstructor
 public class OrderIntegrationTestWithMultiTenancy {
     @ClassRule
-    public static final DropwizardAppRule<TestConfig> RULE = IntegrationTestSuiteWithMultiTenancy.RULE;
+    public static final DropwizardAppRule<TestConfig> RULE = TestSuiteWithMultiTenancy.RULE;
     private static final String AUTH_TOKEN = "X-Auth-Token";
     private static final List<String> shards = ImmutableList.of("shard1", "shard2");
     private static Client client;
@@ -68,7 +68,7 @@ public class OrderIntegrationTestWithMultiTenancy {
 
     @BeforeClass
     public static void setUp() {
-        client = IntegrationTestSuiteWithMultiTenancy.client;
+        client = TestSuiteWithMultiTenancy.client;
         host = String.format("http://localhost:%d/api", RULE.getLocalPort());
     }
 

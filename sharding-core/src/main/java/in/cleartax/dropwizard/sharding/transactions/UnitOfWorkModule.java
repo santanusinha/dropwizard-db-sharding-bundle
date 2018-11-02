@@ -19,12 +19,9 @@ package in.cleartax.dropwizard.sharding.transactions;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
 import com.google.inject.matcher.Matchers;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantHibernateBundle;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
 import in.cleartax.dropwizard.sharding.providers.ShardKeyProvider;
 import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
@@ -44,12 +41,6 @@ public class UnitOfWorkModule extends AbstractModule {
         UnitOfWorkInterceptor interceptor = new UnitOfWorkInterceptor();
         bindInterceptor(Matchers.any(), Matchers.annotatedWith(UnitOfWork.class), interceptor);
         requestInjection(interceptor);
-    }
-
-    @Provides
-    @Singleton
-    MultiTenantUnitOfWorkAwareProxyFactory provideUnitOfWorkAwareProxyFactory(MultiTenantHibernateBundle hibernateBundle) {
-        return new MultiTenantUnitOfWorkAwareProxyFactory(hibernateBundle);
     }
 
     private static class UnitOfWorkInterceptor implements MethodInterceptor {

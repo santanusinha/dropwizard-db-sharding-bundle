@@ -21,6 +21,7 @@ import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Timed;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.services.OrderService;
+import in.cleartax.dropwizard.sharding.services.CustomerService;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ import javax.ws.rs.core.MediaType;
 @Singleton
 public class TestResource {
     private final OrderService orderService;
+    private final CustomerService customerService;
 
     @PUT
     @Timed
@@ -47,8 +49,12 @@ public class TestResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @PermitAll
-    @UnitOfWork
+    @UnitOfWork // Deliberately adding this here to test that,
+    // @ReuseSession doesn't re-use session as user lives on default shard and order is on a different shard
     public OrderDto createOrUpdateInvoice(@NotNull OrderDto order) {
+        if (!customerService.isValidUser(order.getCustomerId())) {
+            throw new IllegalAccessError("Unrecognized user");
+        }
         return orderService.createOrder(order);
     }
 

@@ -17,7 +17,6 @@
 
 package in.cleartax.dropwizard.sharding.application;
 
-import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
@@ -27,12 +26,10 @@ import in.cleartax.dropwizard.sharding.providers.ShardKeyProvider;
 import in.cleartax.dropwizard.sharding.providers.ThreadLocalShardKeyProvider;
 import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
 import in.cleartax.dropwizard.sharding.resolvers.shard.ShardResolver;
-import in.cleartax.dropwizard.sharding.entities.CustomerToBucketMapping;
-import in.cleartax.dropwizard.sharding.entities.Order;
-import in.cleartax.dropwizard.sharding.entities.OrderItem;
+import in.cleartax.dropwizard.sharding.services.CustomerService;
+import in.cleartax.dropwizard.sharding.services.CustomerServiceImpl;
 import in.cleartax.dropwizard.sharding.services.OrderService;
 import in.cleartax.dropwizard.sharding.services.OrderServiceImpl;
-import in.cleartax.dropwizard.sharding.utils.entities.BucketToShardMapping;
 import in.cleartax.dropwizard.sharding.utils.resolvers.shard.DbBasedShardResolver;
 import io.dropwizard.setup.Bootstrap;
 import org.hibernate.SessionFactory;
@@ -65,6 +62,7 @@ public class TestModule extends AbstractModule {
         bind(BucketResolver.class).to(CustomerBucketResolver.class);
         bind(ShardResolver.class).to(DbBasedShardResolver.class);
         bind(OrderService.class).to(OrderServiceImpl.class);
+        bind(CustomerService.class).to(CustomerServiceImpl.class);
     }
 
     @Provides
@@ -76,6 +74,12 @@ public class TestModule extends AbstractModule {
     @Provides
     public MultiTenantHibernateBundle getHibernateBundle() {
         return hibernateBundle;
+    }
+
+    @Provides
+    @Singleton
+    MultiTenantUnitOfWorkAwareProxyFactory provideUnitOfWorkAwareProxyFactory(MultiTenantHibernateBundle hibernateBundle) {
+        return new MultiTenantUnitOfWorkAwareProxyFactory(hibernateBundle);
     }
 
     @Provides
