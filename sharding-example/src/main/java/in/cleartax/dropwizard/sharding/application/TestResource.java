@@ -20,8 +20,8 @@ package in.cleartax.dropwizard.sharding.application;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Timed;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
-import in.cleartax.dropwizard.sharding.services.OrderService;
 import in.cleartax.dropwizard.sharding.services.CustomerService;
+import in.cleartax.dropwizard.sharding.services.OrderService;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +64,7 @@ public class TestResource {
     @Path("{id}")
     @Produces(MediaType.APPLICATION_JSON)
     @PermitAll
+    @UnitOfWork
     public OrderDto getOrder(@PathParam("id") long id) {
         return orderService.getOrder(id);
     }

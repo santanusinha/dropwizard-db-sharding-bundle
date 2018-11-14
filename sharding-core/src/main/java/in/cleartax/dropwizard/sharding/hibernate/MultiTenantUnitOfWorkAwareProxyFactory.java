@@ -18,7 +18,6 @@
 package in.cleartax.dropwizard.sharding.hibernate;
 
 import com.google.common.collect.ImmutableMap;
-import io.dropwizard.hibernate.UnitOfWorkAspect;
 import org.hibernate.SessionFactory;
 
 public class MultiTenantUnitOfWorkAwareProxyFactory {
@@ -39,15 +38,15 @@ public class MultiTenantUnitOfWorkAwareProxyFactory {
     /**
      * @return a new aspect
      */
-    public UnitOfWorkAspect newAspect() {
-        return new UnitOfWorkAspect(sessionFactories);
+    public MultiTenantUnitOfWorkAspect newAspect() {
+        return new MultiTenantUnitOfWorkAspect(sessionFactories);
     }
 
     /**
      * @param sessionFactories
      * @return a new aspect
      */
-    public UnitOfWorkAspect newAspect(ImmutableMap<String, SessionFactory> sessionFactories) {
-        return new UnitOfWorkAspect(sessionFactories);
+    public MultiTenantUnitOfWorkAspect newAspect(ImmutableMap<String, SessionFactory> sessionFactories) {
+        return new MultiTenantUnitOfWorkAspect(sessionFactories);
     }
 }

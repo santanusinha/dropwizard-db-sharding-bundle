@@ -46,7 +46,7 @@ public class TestHelper {
         JerseyClientConfiguration jerseyClientConfiguration = new JerseyClientConfiguration();
         // increasing minThreads from 1 (default) to 2 to ensure async requests run in parallel.
         jerseyClientConfiguration.setMinThreads(2);
-        jerseyClientConfiguration.setTimeout(Duration.seconds(60));
+        jerseyClientConfiguration.setTimeout(Duration.seconds(300));
         return new JerseyClientBuilder(rule.getEnvironment())
                 .using(jerseyClientConfiguration).build("test-client");
     }

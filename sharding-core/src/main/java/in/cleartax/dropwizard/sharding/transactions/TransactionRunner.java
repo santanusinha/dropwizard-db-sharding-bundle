@@ -19,9 +19,9 @@ package in.cleartax.dropwizard.sharding.transactions;
 
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
 import in.cleartax.dropwizard.sharding.hibernate.DelegatingTenantResolver;
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAspect;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
 import io.dropwizard.hibernate.UnitOfWork;
-import io.dropwizard.hibernate.UnitOfWorkAspect;
 import lombok.AllArgsConstructor;
 import org.hibernate.SessionFactory;
 import org.hibernate.context.internal.ManagedSessionContext;
@@ -39,7 +39,7 @@ public abstract class TransactionRunner<T> {
             return run();
         }
         DelegatingTenantResolver.getInstance().setDelegate(tenantIdentifierResolver);
-        UnitOfWorkAspect aspect = proxyFactory.newAspect();
+        MultiTenantUnitOfWorkAspect aspect = proxyFactory.newAspect();
         Exception ex = null;
         T result = null;
         try {

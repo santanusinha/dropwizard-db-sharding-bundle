@@ -77,15 +77,12 @@ public class TestModule extends AbstractModule {
     }
 
     @Provides
-    @Singleton
-    MultiTenantUnitOfWorkAwareProxyFactory provideUnitOfWorkAwareProxyFactory(MultiTenantHibernateBundle hibernateBundle) {
-        return new MultiTenantUnitOfWorkAwareProxyFactory(hibernateBundle);
-    }
-
-    @Provides
-    @Named("multiTenantConfiguration")
-    public MultiTenantDataSourceFactory getMultiTenantDataSource(TestConfig config) {
-        return config.getMultiTenantDataSourceFactory();
+    public MultiTenantSessionSource getMultiTenantDataSource(TestConfig config) {
+        return MultiTenantSessionSource.builder()
+                .dataSourceFactory(config.getMultiTenantDataSourceFactory())
+                .sessionFactory(getSession())
+                .unitOfWorkAwareProxyFactory(new MultiTenantUnitOfWorkAwareProxyFactory(hibernateBundle))
+                .build();
     }
 
     private class CustomSessionFactory extends MultiTenantSessionFactoryFactory {

@@ -19,8 +19,6 @@ package in.cleartax.dropwizard.sharding.test.sampleapp;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.inject.Key;
-import com.google.inject.name.Names;
 import in.cleartax.dropwizard.sharding.application.TestApplication;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
 import in.cleartax.dropwizard.sharding.dao.OrderDao;
@@ -28,13 +26,12 @@ import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.dto.OrderItemDto;
 import in.cleartax.dropwizard.sharding.entities.Order;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
 import in.cleartax.dropwizard.sharding.transactions.DefaultUnitOfWorkImpl;
 import in.cleartax.dropwizard.sharding.transactions.TransactionRunner;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.hibernate.SessionFactory;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -75,12 +72,11 @@ public class OrderIntegrationTestWithMultiTenancy {
     private void assertOrderPresentOnShard(final String expectedOnShard, final OrderDto orderDto) throws Throwable {
         final GuiceBundle<TestConfig> guiceBundle = ((TestApplication) RULE.getApplication()).getGuiceBundle();
         final OrderDao orderDao = guiceBundle.getInjector().getInstance(OrderDao.class);
-        final MultiTenantUnitOfWorkAwareProxyFactory proxyFactory = guiceBundle.getInjector()
-                .getInstance(MultiTenantUnitOfWorkAwareProxyFactory.class);
-        final SessionFactory sessionFactory = guiceBundle.getInjector()
-                .getInstance(Key.get(SessionFactory.class, Names.named("session")));
+        final MultiTenantSessionSource multiTenantSessionSource = guiceBundle.getInjector()
+                .getInstance(MultiTenantSessionSource.class);
         for (final String eachShard : shards) {
-            new TransactionRunner<Order>(proxyFactory, sessionFactory, new ConstTenantIdentifierResolver(eachShard)) {
+            new TransactionRunner<Order>(multiTenantSessionSource.getUnitOfWorkAwareProxyFactory(),
+                    multiTenantSessionSource.getSessionFactory(), new ConstTenantIdentifierResolver(eachShard)) {
                 @Override
                 public Order run() {
                     Order order = orderDao.get(orderDto.getId());

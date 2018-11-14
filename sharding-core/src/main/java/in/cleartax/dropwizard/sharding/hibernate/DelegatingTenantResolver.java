@@ -17,15 +17,17 @@
 
 package in.cleartax.dropwizard.sharding.hibernate;
 
+import com.google.common.base.Preconditions;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import java.util.Stack;
 
 public class DelegatingTenantResolver implements CurrentTenantIdentifierResolver {
 
     private static DelegatingTenantResolver instance;
 
-    private ThreadLocal<CurrentTenantIdentifierResolver> delegate = new ThreadLocal<>();
+    private ThreadLocal<Stack<CurrentTenantIdentifierResolver>> delegate =
+            ThreadLocal.withInitial(Stack::new);
 
     private DelegatingTenantResolver() {
 
@@ -43,18 +45,24 @@ public class DelegatingTenantResolver implements CurrentTenantIdentifierResolver
     }
 
     public void setDelegate(CurrentTenantIdentifierResolver resolver) {
-        delegate.set(resolver);
+        if (resolver != null) {
+            delegate.get().add(resolver);
+        } else {
+            delegate.get().pop();
+        }
     }
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        checkNotNull(delegate.get(), "Did you forget to set tenantId");
-
-        return delegate.get().resolveCurrentTenantIdentifier();
+        Preconditions.checkArgument(!delegate.get().isEmpty(), "Did you forget to set tenantId");
+        //noinspection ConstantConditions
+        return delegate.get().peek().resolveCurrentTenantIdentifier();
     }
 
     @Override
     public boolean validateExistingCurrentSessions() {
-        return delegate.get().validateExistingCurrentSessions();
+        Preconditions.checkArgument(!delegate.get().isEmpty(), "Did you forget to set tenantId");
+        //noinspection ConstantConditions
+        return delegate.get().peek().validateExistingCurrentSessions();
     }
 }
