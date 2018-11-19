@@ -19,7 +19,10 @@ package in.cleartax.dropwizard.sharding.application;
 
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Timed;
+import in.cleartax.dropwizard.sharding.dao.OrderDao;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
+import in.cleartax.dropwizard.sharding.dto.OrderMapper;
+import in.cleartax.dropwizard.sharding.entities.Order;
 import in.cleartax.dropwizard.sharding.services.CustomerService;
 import in.cleartax.dropwizard.sharding.services.OrderService;
 import io.dropwizard.hibernate.UnitOfWork;
@@ -42,6 +45,10 @@ public class TestResource {
     private final OrderService orderService;
     private final CustomerService customerService;
 
+    // Not recommended. Since this a demo app, injecting it, to test auto-flush
+    private final OrderDao orderDao;
+    private final OrderMapper orderMapper = new OrderMapper();
+
     @PUT
     @Timed
     @ExceptionMetered
@@ -51,7 +58,7 @@ public class TestResource {
     @PermitAll
     @UnitOfWork // Deliberately adding this here to test that,
     // @ReuseSession doesn't re-use session as user lives on default shard and order is on a different shard
-    public OrderDto createOrUpdateInvoice(@NotNull OrderDto order) {
+    public OrderDto createOrUpdateOrder(@NotNull OrderDto order) {
         if (!customerService.isValidUser(order.getCustomerId())) {
             throw new IllegalAccessError("Unrecognized user");
         }
@@ -67,5 +74,20 @@ public class TestResource {
     @UnitOfWork
     public OrderDto getOrder(@PathParam("id") long id) {
         return orderService.getOrder(id);
+    }
+
+    @POST
+    @Timed
+    @ExceptionMetered
+    @Path("auto-flush-test")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @PermitAll
+    @UnitOfWork
+    // No call will be made to orderDao.createOrUpdate. Hibernate's auto-flush must get triggered
+    public OrderDto updateOrderAutoFlush(@NotNull OrderDto order) {
+        Order orderEntity = orderDao.get(order.getId());
+        orderEntity = orderMapper.updateAmount(orderEntity, order);
+        return orderMapper.to(orderEntity);
     }
 }

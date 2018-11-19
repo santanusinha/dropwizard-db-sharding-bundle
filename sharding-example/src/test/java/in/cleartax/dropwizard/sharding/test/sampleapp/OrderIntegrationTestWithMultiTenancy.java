@@ -103,6 +103,7 @@ public class OrderIntegrationTestWithMultiTenancy {
     @Test
     public void testCreateOrder() throws Throwable {
         final String orderId = UUID.randomUUID().toString();
+        final int updatedAmt = 1000;
         OrderDto orderDto = OrderDto.builder()
                 .orderId(orderId)
                 .amount(100)
@@ -121,6 +122,14 @@ public class OrderIntegrationTestWithMultiTenancy {
         assertThat(orderDto.getOrderId())
                 .describedAs("Fetched order for customer = " + customerIdAndShardId.getLeft())
                 .isEqualTo(orderId);
+        assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
+
+        orderDto.setAmount(updatedAmt);
+        TestHelper.triggerAutoFlush(orderDto, client, host, AUTH_TOKEN);
+        orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN);
+        assertThat(orderDto.getAmount())
+                .describedAs("Auto-flush caused entity to be updated")
+                .isEqualTo(updatedAmt);
         assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
 
         assertOrderPresentOnShard(customerIdAndShardId.getRight(), orderDto);

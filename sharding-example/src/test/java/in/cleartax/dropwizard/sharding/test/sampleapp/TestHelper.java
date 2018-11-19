@@ -88,4 +88,15 @@ public class TestHelper {
         assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
         return response.readEntity(OrderDto.class);
     }
+
+    public static OrderDto triggerAutoFlush(OrderDto order, Client client, String host,
+                                            String authToken) {
+        Response response = client.target(
+                String.format("%s/v0.1/orders/auto-flush-test", host))
+                .request()
+                .header(authToken, order.getCustomerId())
+                .post(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+        return response.readEntity(OrderDto.class);
+    }
 }

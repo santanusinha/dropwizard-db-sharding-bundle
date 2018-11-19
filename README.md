@@ -22,7 +22,7 @@ for liquibase migration support, you can also include:
 <dependency>
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>sharding-migrations</artifactId>
-    <version>0.2.5</version>
+    <version>0.2.6</version>
 </dependency>
 ```
 
