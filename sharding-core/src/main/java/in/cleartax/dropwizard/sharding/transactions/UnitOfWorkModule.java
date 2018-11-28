@@ -19,24 +19,21 @@ package in.cleartax.dropwizard.sharding.transactions;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
 import com.google.inject.matcher.Matchers;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantHibernateBundle;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
+import in.cleartax.dropwizard.sharding.hibernate.DelegatingTenantResolver;
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
 import in.cleartax.dropwizard.sharding.providers.ShardKeyProvider;
 import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
 import in.cleartax.dropwizard.sharding.resolvers.shard.ShardResolver;
 import io.dropwizard.hibernate.UnitOfWork;
+import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-import org.hibernate.SessionFactory;
 
-import javax.inject.Named;
 import java.util.Objects;
 
+@Slf4j
 public class UnitOfWorkModule extends AbstractModule {
 
     @Override
@@ -46,19 +43,8 @@ public class UnitOfWorkModule extends AbstractModule {
         requestInjection(interceptor);
     }
 
-    @Provides
-    @Singleton
-    MultiTenantUnitOfWorkAwareProxyFactory provideUnitOfWorkAwareProxyFactory(MultiTenantHibernateBundle hibernateBundle) {
-        return new MultiTenantUnitOfWorkAwareProxyFactory(hibernateBundle);
-    }
-
     private static class UnitOfWorkInterceptor implements MethodInterceptor {
 
-        @Inject
-        MultiTenantUnitOfWorkAwareProxyFactory proxyFactory;
-        @Inject
-        @Named("session")
-        SessionFactory sessionFactory;
         @Inject
         BucketResolver bucketResolver;
         @Inject
@@ -66,19 +52,21 @@ public class UnitOfWorkModule extends AbstractModule {
         @Inject
         ShardKeyProvider shardKeyProvider;
         @Inject
-        @Named("multiTenantConfiguration")
-        MultiTenantDataSourceFactory multiTenantDataSourceFactory;
+        MultiTenantSessionSource multiTenantSessionSource;
 
         private String getTenantIdentifier(MethodInvocation mi) {
             boolean useDefaultShard = mi.getMethod().isAnnotationPresent(DefaultTenant.class);
             String tenantId;
-            if (!useDefaultShard && multiTenantDataSourceFactory.isAllowMultipleTenants()) {
+            if (!useDefaultShard && multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
                 String shardKey = shardKeyProvider.getKey();
-                Objects.requireNonNull(shardKey, "No tenant-identifier set for this session");
-                String bucketId = bucketResolver.resolve(shardKey);
-                tenantId = shardResolver.resolve(bucketId);
+                if (shardKey != null) {
+                    String bucketId = bucketResolver.resolve(shardKey);
+                    tenantId = shardResolver.resolve(bucketId);
+                } else {
+                    tenantId = DelegatingTenantResolver.getInstance().resolveCurrentTenantIdentifier();
+                }
             } else {
-                tenantId = multiTenantDataSourceFactory.getDefaultTenant();
+                tenantId = multiTenantSessionSource.getDataSourceFactory().getDefaultTenant();
             }
             return tenantId;
         }
@@ -88,7 +76,8 @@ public class UnitOfWorkModule extends AbstractModule {
             String tenantId = getTenantIdentifier(mi);
             Objects.requireNonNull(tenantId, "No tenant-identifier found for this session");
 
-            TransactionRunner runner = new TransactionRunner(proxyFactory, sessionFactory,
+            TransactionRunner runner = new TransactionRunner(multiTenantSessionSource.getUnitOfWorkAwareProxyFactory(),
+                    multiTenantSessionSource.getSessionFactory(),
                     new ConstTenantIdentifierResolver(tenantId)) {
                 @Override
                 public Object run() throws Throwable {

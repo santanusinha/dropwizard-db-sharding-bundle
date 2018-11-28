@@ -15,32 +15,26 @@
  *
  */
 
-package in.cleartax.dropwizard.sharding.utils.resolvers.shard;
+package in.cleartax.dropwizard.sharding.services;
 
-import in.cleartax.dropwizard.sharding.resolvers.shard.ShardResolver;
+import in.cleartax.dropwizard.sharding.dao.CustomerDao;
 import in.cleartax.dropwizard.sharding.transactions.DefaultTenant;
 import in.cleartax.dropwizard.sharding.transactions.ReuseSession;
-import in.cleartax.dropwizard.sharding.utils.dao.BucketToShardMappingDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 
 import javax.inject.Inject;
-import java.util.Optional;
 
 @RequiredArgsConstructor(onConstructor = @__(@Inject))
-public class DbBasedShardResolver implements ShardResolver {
+public class CustomerServiceImpl implements CustomerService {
 
-    private final BucketToShardMappingDAO dao;
+    private final CustomerDao customerDao;
 
-    @Override
     @UnitOfWork
-    @DefaultTenant
     @ReuseSession
-    public String resolve(String bucketId) {
-        Optional<String> shardId = dao.getShardId(bucketId);
-        if (!shardId.isPresent()) {
-            throw new IllegalAccessError(String.format("%s bucket not mapped to any shard", bucketId));
-        }
-        return shardId.get();
+    @DefaultTenant
+    @Override
+    public boolean isValidUser(String userName) {
+        return customerDao.getByUserName(userName) != null;
     }
 }

@@ -21,7 +21,6 @@ import in.cleartax.dropwizard.sharding.dao.OrderDao;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.dto.OrderMapper;
 import in.cleartax.dropwizard.sharding.entities.Order;
-import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 
 import javax.inject.Inject;
@@ -33,14 +32,12 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper = new OrderMapper();
 
     @Override
-    @UnitOfWork
     public OrderDto createOrder(OrderDto orderDto) {
         Order order = orderDao.save(orderMapper.from(orderDto));
         return orderMapper.to(order);
     }
 
     @Override
-    @UnitOfWork
     public OrderDto getOrder(long orderId) {
         Order order = orderDao.get(orderId);
         return orderMapper.to(order);

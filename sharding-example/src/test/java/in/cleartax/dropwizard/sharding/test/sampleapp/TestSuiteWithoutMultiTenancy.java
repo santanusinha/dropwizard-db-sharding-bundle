@@ -15,10 +15,10 @@ import javax.ws.rs.client.Client;
  * Created on 05/10/18
  */
 @RunWith(Suite.class)
-@Suite.SuiteClasses({OrderIntegrationTestWithMultiTenancy.class})
-public class IntegrationTestSuiteWithMultiTenancy {
+@Suite.SuiteClasses({OrderIntegrationTestWithoutMultiTenancy.class})
+public class TestSuiteWithoutMultiTenancy {
     private static final String TEST_CONFIG_PATH =
-            ResourceHelpers.resourceFilePath("test_with_multitenant.yml");
+            ResourceHelpers.resourceFilePath("test_no_multitenant.yml");
     @ClassRule
     public static final DropwizardAppRule<TestConfig> RULE =
             new DropwizardAppRule<>(TestApplication.class, TEST_CONFIG_PATH);

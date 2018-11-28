@@ -19,7 +19,11 @@ package in.cleartax.dropwizard.sharding.application;
 
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Timed;
+import in.cleartax.dropwizard.sharding.dao.OrderDao;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
+import in.cleartax.dropwizard.sharding.dto.OrderMapper;
+import in.cleartax.dropwizard.sharding.entities.Order;
+import in.cleartax.dropwizard.sharding.services.CustomerService;
 import in.cleartax.dropwizard.sharding.services.OrderService;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,11 @@ import javax.ws.rs.core.MediaType;
 @Singleton
 public class TestResource {
     private final OrderService orderService;
+    private final CustomerService customerService;
+
+    // Not recommended. Since this a demo app, injecting it, to test auto-flush
+    private final OrderDao orderDao;
+    private final OrderMapper orderMapper = new OrderMapper();
 
     @PUT
     @Timed
@@ -47,8 +56,12 @@ public class TestResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     @PermitAll
-    @UnitOfWork
-    public OrderDto createOrUpdateInvoice(@NotNull OrderDto order) {
+    @UnitOfWork // Deliberately adding this here to test that,
+    // @ReuseSession doesn't re-use session as user lives on default shard and order is on a different shard
+    public OrderDto createOrUpdateOrder(@NotNull OrderDto order) {
+        if (!customerService.isValidUser(order.getCustomerId())) {
+            throw new IllegalAccessError("Unrecognized user");
+        }
         return orderService.createOrder(order);
     }
 
@@ -58,7 +71,23 @@ public class TestResource {
     @Path("{id}")
     @Produces(MediaType.APPLICATION_JSON)
     @PermitAll
+    @UnitOfWork
     public OrderDto getOrder(@PathParam("id") long id) {
         return orderService.getOrder(id);
+    }
+
+    @POST
+    @Timed
+    @ExceptionMetered
+    @Path("auto-flush-test")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @PermitAll
+    @UnitOfWork
+    // No call will be made to orderDao.createOrUpdate. Hibernate's auto-flush must get triggered
+    public OrderDto updateOrderAutoFlush(@NotNull OrderDto order) {
+        Order orderEntity = orderDao.get(order.getId());
+        orderEntity = orderMapper.updateAmount(orderEntity, order);
+        return orderMapper.to(orderEntity);
     }
 }

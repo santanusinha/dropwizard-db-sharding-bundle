@@ -46,7 +46,7 @@ public class TestHelper {
         JerseyClientConfiguration jerseyClientConfiguration = new JerseyClientConfiguration();
         // increasing minThreads from 1 (default) to 2 to ensure async requests run in parallel.
         jerseyClientConfiguration.setMinThreads(2);
-        jerseyClientConfiguration.setTimeout(Duration.seconds(60));
+        jerseyClientConfiguration.setTimeout(Duration.seconds(300));
         return new JerseyClientBuilder(rule.getEnvironment())
                 .using(jerseyClientConfiguration).build("test-client");
     }
@@ -85,6 +85,17 @@ public class TestHelper {
                 .request()
                 .header(authToken, customerId)
                 .get();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+        return response.readEntity(OrderDto.class);
+    }
+
+    public static OrderDto triggerAutoFlush(OrderDto order, Client client, String host,
+                                            String authToken) {
+        Response response = client.target(
+                String.format("%s/v0.1/orders/auto-flush-test", host))
+                .request()
+                .header(authToken, order.getCustomerId())
+                .post(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
         assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
         return response.readEntity(OrderDto.class);
     }

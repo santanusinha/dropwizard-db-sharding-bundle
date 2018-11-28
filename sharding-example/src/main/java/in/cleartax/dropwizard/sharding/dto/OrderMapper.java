@@ -56,4 +56,9 @@ public class OrderMapper {
                 .items(orderDto.getItems().stream().map(this::from).collect(Collectors.toList()))
                 .build();
     }
+
+    public Order updateAmount(Order order, OrderDto orderDto) {
+        order.setAmount(orderDto.getAmount());
+        return order;
+    }
 }
