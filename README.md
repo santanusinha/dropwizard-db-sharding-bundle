@@ -13,7 +13,7 @@ Include as dependency:
 <dependency>
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>sharding-core</artifactId>
-    <version>0.2.4</version>
+    <version>0.2.6</version>
 </dependency>
 ```
 
