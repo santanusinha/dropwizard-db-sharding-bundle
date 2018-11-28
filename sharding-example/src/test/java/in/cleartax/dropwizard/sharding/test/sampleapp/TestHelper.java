@@ -3,9 +3,9 @@ package in.cleartax.dropwizard.sharding.test.sampleapp;
 import com.google.common.io.Resources;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantManagedDataSource;
 import io.dropwizard.client.JerseyClientBuilder;
 import io.dropwizard.client.JerseyClientConfiguration;
-import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.db.ManagedDataSource;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
@@ -34,13 +34,17 @@ public class TestHelper {
 
     public static Client onSuiteRun(DropwizardAppRule<TestConfig> rule)
             throws Exception {
-        for (DataSourceFactory ds : rule.getConfiguration().getMultiTenantDataSourceFactory()
-                .getTenantDbMap().values()) {
-            initDb(ds, "init_db.sql", rule);
+
+        MultiTenantManagedDataSource multiTenantManagedDataSource =
+                rule.getConfiguration().getMultiTenantDataSourceFactory()
+                        .build(rule.getEnvironment().metrics(), "migrations");
+
+        for (ManagedDataSource ms : multiTenantManagedDataSource.getTenantDataSourceMap().values()) {
+            initDb("init_db.sql", ms);
         }
 
-        initDb(rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultDataSourceFactory(),
-                "default_shard_config.sql", rule);
+        initDb("default_shard_config.sql", multiTenantManagedDataSource.getTenantDataSourceMap().get(
+                rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultTenant()));
 
         // Building Jersey client
         JerseyClientConfiguration jerseyClientConfiguration = new JerseyClientConfiguration();
@@ -52,11 +56,8 @@ public class TestHelper {
     }
 
 
-    private static void initDb(DataSourceFactory ds, String sqlFile,
-                               DropwizardAppRule<TestConfig> rule) throws SQLException, IOException {
-        ManagedDataSource managedDataSource = ds
-                .build(rule.getEnvironment().metrics(), "init");
-
+    private static void initDb(String sqlFile,
+                               ManagedDataSource managedDataSource) throws SQLException, IOException {
         // Seed data
         log.info("Running init_db.sql to load seed data");
         try (Connection connection = managedDataSource.getConnection()) {
@@ -82,6 +83,17 @@ public class TestHelper {
                                     String authToken) {
         Response response = client.target(
                 String.format("%s/v0.1/orders/%d", host, id))
+                .request()
+                .header(authToken, customerId)
+                .get();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+        return response.readEntity(OrderDto.class);
+    }
+
+    public static OrderDto getOrder(long id, String customerId, Client client, String host,
+                                    String authToken, String shardId) {
+        Response response = client.target(
+                String.format("%s/v0.1/orders/%d/%s", host, id, shardId))
                 .request()
                 .header(authToken, customerId)
                 .get();

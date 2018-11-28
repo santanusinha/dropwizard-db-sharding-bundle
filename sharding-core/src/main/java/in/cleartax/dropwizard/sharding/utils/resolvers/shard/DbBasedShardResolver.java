@@ -18,8 +18,8 @@
 package in.cleartax.dropwizard.sharding.utils.resolvers.shard;
 
 import in.cleartax.dropwizard.sharding.resolvers.shard.ShardResolver;
-import in.cleartax.dropwizard.sharding.transactions.DefaultTenant;
 import in.cleartax.dropwizard.sharding.transactions.ReuseSession;
+import in.cleartax.dropwizard.sharding.transactions.TenantIdentifier;
 import in.cleartax.dropwizard.sharding.utils.dao.BucketToShardMappingDAO;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class DbBasedShardResolver implements ShardResolver {
 
     @Override
     @UnitOfWork
-    @DefaultTenant
+    @TenantIdentifier(useDefault = true)
     @ReuseSession
     public String resolve(String bucketId) {
         Optional<String> shardId = dao.getShardId(bucketId);

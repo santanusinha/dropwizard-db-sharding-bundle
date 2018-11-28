@@ -17,6 +17,7 @@
 
 package in.cleartax.dropwizard.sharding.transactions;
 
+import com.google.common.base.Preconditions;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.matcher.Matchers;
@@ -30,6 +31,7 @@ import io.dropwizard.hibernate.UnitOfWork;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.Objects;
 
@@ -54,23 +56,6 @@ public class UnitOfWorkModule extends AbstractModule {
         @Inject
         MultiTenantSessionSource multiTenantSessionSource;
 
-        private String getTenantIdentifier(MethodInvocation mi) {
-            boolean useDefaultShard = mi.getMethod().isAnnotationPresent(DefaultTenant.class);
-            String tenantId;
-            if (!useDefaultShard && multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
-                String shardKey = shardKeyProvider.getKey();
-                if (shardKey != null) {
-                    String bucketId = bucketResolver.resolve(shardKey);
-                    tenantId = shardResolver.resolve(bucketId);
-                } else {
-                    tenantId = DelegatingTenantResolver.getInstance().resolveCurrentTenantIdentifier();
-                }
-            } else {
-                tenantId = multiTenantSessionSource.getDataSourceFactory().getDefaultTenant();
-            }
-            return tenantId;
-        }
-
         @Override
         public Object invoke(MethodInvocation mi) throws Throwable {
             String tenantId = getTenantIdentifier(mi);
@@ -86,6 +71,47 @@ public class UnitOfWorkModule extends AbstractModule {
             };
             return runner.start(mi.getMethod().isAnnotationPresent(ReuseSession.class),
                     mi.getMethod().getAnnotation(UnitOfWork.class));
+        }
+
+        private String getTenantIdentifier(MethodInvocation mi) {
+            String tenantId;
+            if (!multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
+                tenantId = getDefaultTenant();
+            } else if (this.isExplicitTenantIdentifierPresent(mi)) {
+                TenantIdentifier tenantIdentifier = mi.getMethod().getAnnotation(TenantIdentifier.class);
+                tenantId = extractTenantIdentifier(tenantIdentifier);
+            } else {
+                tenantId = resolveTenantIdentifier(shardKeyProvider.getKey());
+            }
+            return tenantId;
+        }
+
+        private String getDefaultTenant() {
+            return multiTenantSessionSource.getDataSourceFactory().getDefaultTenant();
+        }
+
+        private boolean isExplicitTenantIdentifierPresent(MethodInvocation mi) {
+            return mi.getMethod().isAnnotationPresent(TenantIdentifier.class);
+        }
+
+        private String extractTenantIdentifier(TenantIdentifier tenantIdentifier) {
+            if (tenantIdentifier.useDefault()) {
+                return getDefaultTenant();
+            }
+            Preconditions.checkArgument(StringUtils.isNotBlank(tenantIdentifier.tenantIdentifier()),
+                    "When useDefault = false, tenantIdentifier is mandatory");
+            return tenantIdentifier.tenantIdentifier();
+        }
+
+        private String resolveTenantIdentifier(String shardKey) {
+            String tenantId;
+            if (shardKey != null) {
+                String bucketId = bucketResolver.resolve(shardKey);
+                tenantId = shardResolver.resolve(bucketId);
+            } else {
+                tenantId = DelegatingTenantResolver.getInstance().resolveCurrentTenantIdentifier();
+            }
+            return tenantId;
         }
     }
 }
