@@ -21,4 +21,6 @@ public interface ShardKeyProvider {
     String getKey();
 
     void setKey(String shardId);
+
+    void clear();
 }

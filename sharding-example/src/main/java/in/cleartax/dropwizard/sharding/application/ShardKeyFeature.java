@@ -34,6 +34,7 @@ public class ShardKeyFeature implements DynamicFeature {
 
     @Override
     public void configure(ResourceInfo resourceInfo, FeatureContext context) {
-        context.register(new ShardKeyFilter(shardKeyProvider));
+        context.register(new ShardKeyRequestFilter(shardKeyProvider));
+        context.register(new ShardKeyResponseFilter(shardKeyProvider));
     }
 }

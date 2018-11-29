@@ -48,6 +48,7 @@ public class MultiTenantDataSourceFactory {
     @NotBlank
     private String defaultTenant;
     private boolean allowMultipleTenants;
+    private boolean verboseLogging;
 
     public boolean isAutoCommentsEnabled() {
         return autoCommentsEnabled;

@@ -76,10 +76,12 @@ public class UnitOfWorkModule extends AbstractModule {
         private String getTenantIdentifier(MethodInvocation mi) {
             String tenantId;
             if (!multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
+                logIfApplicable("Using default-tenant as multi-tenant is disabled");
                 tenantId = getDefaultTenant();
             } else if (this.isExplicitTenantIdentifierPresent(mi)) {
                 TenantIdentifier tenantIdentifier = mi.getMethod().getAnnotation(TenantIdentifier.class);
                 tenantId = extractTenantIdentifier(tenantIdentifier);
+                logIfApplicable("Using explicit tenant-id " + tenantId + " provided via TenantIdentifier");
             } else {
                 tenantId = resolveTenantIdentifier(shardKeyProvider.getKey());
             }
@@ -108,10 +110,18 @@ public class UnitOfWorkModule extends AbstractModule {
             if (shardKey != null) {
                 String bucketId = bucketResolver.resolve(shardKey);
                 tenantId = shardResolver.resolve(bucketId);
+                logIfApplicable("Extracted tenant-id " + tenantId + " from shard key passed");
             } else {
                 tenantId = DelegatingTenantResolver.getInstance().resolveCurrentTenantIdentifier();
+                logIfApplicable("Found tenant-id " + tenantId + " from tenant-resolver");
             }
             return tenantId;
+        }
+
+        private void logIfApplicable(String msg) {
+            if (multiTenantSessionSource.getDataSourceFactory().isVerboseLogging()) {
+                log.info(msg);
+            }
         }
     }
 }
