@@ -18,8 +18,8 @@
 package in.cleartax.dropwizard.sharding.services;
 
 import in.cleartax.dropwizard.sharding.dao.CustomerDao;
-import in.cleartax.dropwizard.sharding.transactions.DefaultTenant;
 import in.cleartax.dropwizard.sharding.transactions.ReuseSession;
+import in.cleartax.dropwizard.sharding.transactions.TenantIdentifier;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 
@@ -32,7 +32,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @UnitOfWork
     @ReuseSession
-    @DefaultTenant
+    @TenantIdentifier(useDefault = true)
     @Override
     public boolean isValidUser(String userName) {
         return customerDao.getByUserName(userName) != null;

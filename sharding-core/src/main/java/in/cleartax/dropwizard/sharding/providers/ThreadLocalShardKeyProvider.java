@@ -17,14 +17,18 @@
 
 package in.cleartax.dropwizard.sharding.providers;
 
+import com.google.common.base.Preconditions;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Nullable;
+import java.util.Objects;
 
 /**
  * Created on 23/09/18
  */
 @NoArgsConstructor
+@Slf4j
 public class ThreadLocalShardKeyProvider implements ShardKeyProvider {
 
     private static ThreadLocal<String> context = new ThreadLocal<>();
@@ -37,6 +41,15 @@ public class ThreadLocalShardKeyProvider implements ShardKeyProvider {
 
     @Override
     public void setKey(String shardId) {
+        Preconditions.checkState(Objects.isNull(this.getKey()), "Trying to set shard-key without " +
+                "clearing previous context: " + this.getKey() + ", Thread: " + Thread.currentThread().getName());
+        log.debug("Setting shard-key = {} in Thread: {}", shardId, Thread.currentThread().getName());
         context.set(shardId);
+    }
+
+    @Override
+    public void clear() {
+        log.debug("Clearing shard-key = {} in Thread: {}", this.getKey(), Thread.currentThread().getName());
+        context.remove();
     }
 }

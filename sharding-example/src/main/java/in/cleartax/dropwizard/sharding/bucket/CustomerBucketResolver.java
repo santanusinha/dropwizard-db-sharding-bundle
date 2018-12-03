@@ -17,9 +17,9 @@
 
 package in.cleartax.dropwizard.sharding.bucket;
 
-import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
 import in.cleartax.dropwizard.sharding.dao.CustomerToBucketMappingDAO;
-import in.cleartax.dropwizard.sharding.transactions.DefaultTenant;
+import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
+import in.cleartax.dropwizard.sharding.transactions.TenantIdentifier;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +33,7 @@ public class CustomerBucketResolver implements BucketResolver {
 
     @Override
     @UnitOfWork
-    @DefaultTenant
+    @TenantIdentifier(useDefault = true)
     public String resolve(String customerId) {
         Optional<String> bucketId = dao.getBucketId(customerId);
         if (!bucketId.isPresent()) {

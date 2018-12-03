@@ -52,6 +52,10 @@ public class DelegatingTenantResolver implements CurrentTenantIdentifierResolver
         }
     }
 
+    public boolean hasTenantIdentifier() {
+        return !delegate.get().isEmpty();
+    }
+
     @Override
     public String resolveCurrentTenantIdentifier() {
         Preconditions.checkArgument(!delegate.get().isEmpty(), "Did you forget to set tenantId");

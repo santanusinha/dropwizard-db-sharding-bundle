@@ -28,7 +28,7 @@ import java.io.IOException;
 
 @Priority(Priorities.AUTHENTICATION + 1)
 @RequiredArgsConstructor
-public class ShardKeyFilter implements ContainerRequestFilter {
+public class ShardKeyRequestFilter implements ContainerRequestFilter {
 
     private final ShardKeyProvider shardKeyProvider;
 

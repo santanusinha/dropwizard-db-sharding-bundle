@@ -124,6 +124,14 @@ public class OrderIntegrationTestWithMultiTenancy {
                 .isEqualTo(orderId);
         assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
 
+        orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN,
+                customerIdAndShardId.getRight());
+        assertThat(orderDto.getOrderId())
+                .describedAs("Fetched order for customer = " + customerIdAndShardId.getLeft() +
+                        " from shard = " + customerIdAndShardId.getRight())
+                .isEqualTo(orderId);
+        assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
+
         orderDto.setAmount(updatedAmt);
         TestHelper.triggerAutoFlush(orderDto, client, host, AUTH_TOKEN);
         orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN);

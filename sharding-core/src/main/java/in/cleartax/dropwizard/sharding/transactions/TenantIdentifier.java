@@ -17,10 +17,28 @@
 
 package in.cleartax.dropwizard.sharding.transactions;
 
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
+import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
+import io.dropwizard.hibernate.UnitOfWork;
+
 import java.lang.annotation.*;
 
+/**
+ * Force {@link UnitOfWork} to open session on the specified tenant
+ */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-public @interface DefaultTenant {
+public @interface TenantIdentifier {
+    /**
+     * If {@code true}, then {@link UnitOfWorkModule} will use the tenantId mentioned in
+     * {@link MultiTenantSessionSource#dataSourceFactory}.{@link MultiTenantDataSourceFactory#defaultTenant}
+     */
+    boolean useDefault();
+
+    /**
+     * If {@link #useDefault()}, is false, then {@link UnitOfWorkModule} will read the
+     * tenantIdentifier mentioned
+     */
+    String tenantIdentifier() default "";
 }
