@@ -49,6 +49,8 @@ public class MultiTenantDataSourceFactory {
     private String defaultTenant;
     private boolean allowMultipleTenants;
     private boolean verboseLogging;
+    private boolean readOnlyReplicaEnabled;
+    private String defaultReadReplicaTenant;
 
     public boolean isAutoCommentsEnabled() {
         return autoCommentsEnabled;
@@ -73,6 +75,7 @@ public class MultiTenantDataSourceFactory {
     @ValidationMethod(message = "Tenant configuration is not valid")
     public boolean isValid() {
         return getDefaultDataSourceFactory() != null &&
-                (allowMultipleTenants ? tenantDbMap.size() > 1 : tenantDbMap.size() == 1);
+                (allowMultipleTenants ? tenantDbMap.size() > 1 : tenantDbMap.size() == 1) &&
+                (!readOnlyReplicaEnabled || !defaultReadReplicaTenant.isEmpty());
     }
 }
