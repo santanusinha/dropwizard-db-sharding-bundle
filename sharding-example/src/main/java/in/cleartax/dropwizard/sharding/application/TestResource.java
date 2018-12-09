@@ -25,6 +25,7 @@ import in.cleartax.dropwizard.sharding.dto.OrderMapper;
 import in.cleartax.dropwizard.sharding.entities.Order;
 import in.cleartax.dropwizard.sharding.services.CustomerService;
 import in.cleartax.dropwizard.sharding.services.OrderService;
+import in.cleartax.dropwizard.sharding.transactions.ReadOnlyTenant;
 import in.cleartax.dropwizard.sharding.transactions.TenantIdentifier;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
@@ -115,6 +116,19 @@ public class TestResource {
     @TenantIdentifier(useDefault = false, tenantIdentifier = "shard2")
     // Test API which only reads from shard2. Don't follow this pattern on production
     public OrderDto getOrderFromShard2(@PathParam("id") long id) {
+        return orderService.getOrder(id);
+    }
+
+    @GET
+    @Timed
+    @ExceptionMetered
+    @Path("/replica/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @PermitAll
+    @UnitOfWork
+    @ReadOnlyTenant
+    // Test API which only reads from readReplica. Don't follow this pattern on production
+    public OrderDto getOrderFromReadReplica(@PathParam("id") long id) {
         return orderService.getOrder(id);
     }
 }

@@ -45,7 +45,10 @@ public class TestHelper {
 
         initDb("default_shard_config.sql", multiTenantManagedDataSource.getTenantDataSourceMap().get(
                 rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultTenant()));
-
+        if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled()) {
+            initDb("default_replica_data.sql", multiTenantManagedDataSource.getTenantDataSourceMap()
+                    .get(rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultReadReplicaTenant()));
+        }
         // Building Jersey client
         JerseyClientConfiguration jerseyClientConfiguration = new JerseyClientConfiguration();
         // increasing minThreads from 1 (default) to 2 to ensure async requests run in parallel.
@@ -83,6 +86,17 @@ public class TestHelper {
                                     String authToken) {
         Response response = client.target(
                 String.format("%s/v0.1/orders/%d", host, id))
+                .request()
+                .header(authToken, customerId)
+                .get();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+        return response.readEntity(OrderDto.class);
+    }
+
+    public static OrderDto getOrderFromReplica(long id, String customerId, Client client, String host,
+                                    String authToken) {
+        Response response = client.target(
+                String.format("%s/v0.1/orders/replica/%d", host, id))
                 .request()
                 .header(authToken, customerId)
                 .get();

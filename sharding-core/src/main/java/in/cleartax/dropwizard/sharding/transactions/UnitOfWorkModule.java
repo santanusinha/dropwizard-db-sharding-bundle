@@ -84,6 +84,7 @@ public class UnitOfWorkModule extends AbstractModule {
                 logIfApplicable("Using explicit tenant-id " + tenantId + " provided via TenantIdentifier");
             } else if (this.isExplicitReadOnlyAnnotationPresent(mi)) {
                 tenantId = extractReadOnlyReplica();
+                logIfApplicable("ReadOnly annotation is used so using read replica tenant with id " + tenantId);
             } else {
                 tenantId = resolveTenantIdentifier(shardKeyProvider.getKey());
             }

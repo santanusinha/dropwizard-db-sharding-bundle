@@ -34,4 +34,5 @@ public class OrderDto {
     private String customerId;
     private List<OrderItemDto> items;
     private int amount;
+    private boolean readOnly;
 }

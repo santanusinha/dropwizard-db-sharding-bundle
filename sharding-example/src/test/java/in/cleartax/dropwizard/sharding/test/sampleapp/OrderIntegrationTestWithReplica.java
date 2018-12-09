@@ -47,25 +47,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @RunWith(Parameterized.class)
 @RequiredArgsConstructor
-public class OrderIntegrationTestWithMultiTenancy {
+public class OrderIntegrationTestWithReplica {
     @ClassRule
-    public static final DropwizardAppRule<TestConfig> RULE = TestSuiteWithMultiTenancy.RULE;
+    public static final DropwizardAppRule<TestConfig> RULE = TestSuiteWithReplicaEnabled.RULE;
     private static final String AUTH_TOKEN = "X-Auth-Token";
-    private static final List<String> shards = ImmutableList.of("shard1", "shard2");
+    private static final List<String> shards = ImmutableList.of("readReplica", "shard1");
     private static Client client;
     private static String host;
-    private final ImmutablePair<String, String> customerIdAndShardId;
+    private final ImmutablePair<Integer, ImmutablePair<String, String > > orderIdAndCustomerIdTenantIdMap; // {orderId, (customerId, shardId)}
 
     @Parameterized.Parameters
-    public static List<ImmutablePair<String, String>> customerIds() {
-        return Lists.newArrayList(ImmutablePair.of("1", "shard1"));
-//                ImmutablePair.of("2", "shard1"),
-//                ImmutablePair.of("3", "shard2"));
+    public static List<ImmutablePair<Integer, ImmutablePair<String, String> > > customerIds() {
+        return Lists.newArrayList(ImmutablePair.of(1, ImmutablePair.of("1", "readReplica")));
     }
 
     @BeforeClass
     public static void setUp() {
-        client = TestSuiteWithMultiTenancy.client;
+        client = TestSuiteWithReplicaEnabled.client;
         host = String.format("http://localhost:%d/api", RULE.getLocalPort());
     }
 
@@ -102,44 +100,16 @@ public class OrderIntegrationTestWithMultiTenancy {
 
     @Test
     public void testCreateOrder() throws Throwable {
-        final String orderId = UUID.randomUUID().toString();
-        final int updatedAmt = 1000;
-        OrderDto orderDto = OrderDto.builder()
-                .orderId(orderId)
-                .amount(100)
-                .items(Lists.newArrayList(
-                        OrderItemDto.builder().name("test").build()
-                ))
-                .customerId(customerIdAndShardId.getLeft())
-                .build();
-        orderDto = TestHelper.createOrder(orderDto, client, host, AUTH_TOKEN);
-        assertThat(orderDto.getOrderId())
-                .describedAs("Created order for customer = " + customerIdAndShardId.getLeft())
-                .isEqualTo(orderId);
-        assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
+        final Integer orderId = orderIdAndCustomerIdTenantIdMap.getLeft();
+        final String orderExtId = "11111111-2222-3333-4444-aaaaaaaaaaa" + orderId;
+        final String customerId = orderIdAndCustomerIdTenantIdMap.getRight().getLeft();
 
-        orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN);
-        assertThat(orderDto.getOrderId())
-                .describedAs("Fetched order for customer = " + customerIdAndShardId.getLeft())
-                .isEqualTo(orderId);
-        assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
-
-        orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN,
-                customerIdAndShardId.getRight());
-        assertThat(orderDto.getOrderId())
-                .describedAs("Fetched order for customer = " + customerIdAndShardId.getLeft() +
-                        " from shard = " + customerIdAndShardId.getRight())
-                .isEqualTo(orderId);
-        assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
-
-        orderDto.setAmount(updatedAmt);
-        TestHelper.triggerAutoFlush(orderDto, client, host, AUTH_TOKEN);
-        orderDto = TestHelper.getOrder(orderDto.getId(), orderDto.getCustomerId(), client, host, AUTH_TOKEN);
-        assertThat(orderDto.getAmount())
-                .describedAs("Auto-flush caused entity to be updated")
-                .isEqualTo(updatedAmt);
-        assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
-
-        assertOrderPresentOnShard(customerIdAndShardId.getRight(), orderDto);
+        OrderDto orderDtoFromReplica = TestHelper.getOrderFromReplica(orderId,customerId, client, host, AUTH_TOKEN);
+        assertThat(orderDtoFromReplica.getOrderId())
+                .describedAs("Fetched order for customer = " + orderIdAndCustomerIdTenantIdMap.getRight().getLeft())
+                .isEqualTo(orderExtId);
+        assertThat(orderDtoFromReplica.getCustomerId()).isEqualTo(orderIdAndCustomerIdTenantIdMap.getRight().getLeft());
+        assertThat(orderDtoFromReplica.isReadOnly()).isEqualTo(true); // Just another layer of check
+        assertOrderPresentOnShard(orderIdAndCustomerIdTenantIdMap.getRight().getRight(), orderDtoFromReplica);
     }
 }
