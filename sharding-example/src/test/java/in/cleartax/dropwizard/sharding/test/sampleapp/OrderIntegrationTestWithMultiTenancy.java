@@ -58,7 +58,7 @@ public class OrderIntegrationTestWithMultiTenancy {
 
     @Parameterized.Parameters
     public static List<ImmutablePair<String, String>> customerIds() {
-        return Lists.newArrayList(ImmutablePair.of("1", "shard1")
+        return Lists.newArrayList(ImmutablePair.of("1", "shard1"),
                 ImmutablePair.of("2", "shard1"),
                 ImmutablePair.of("3", "shard2"));
     }
