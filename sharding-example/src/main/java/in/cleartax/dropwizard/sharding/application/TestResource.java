@@ -30,13 +30,16 @@ import in.cleartax.dropwizard.sharding.transactions.TenantIdentifier;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.JDBCException;
 
+import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 @Path("v0.1/orders")
 @Produces(value = {MediaType.APPLICATION_JSON})
@@ -65,6 +68,22 @@ public class TestResource {
             throw new IllegalAccessError("Unrecognized user");
         }
         return orderService.createOrder(order);
+    }
+
+    @PUT
+    @Timed
+    @ExceptionMetered
+    @Path("/replica")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @PermitAll
+    @UnitOfWork
+    @ReadOnlyTenant
+    public OrderDto createOrUpdateOrderOnReplica(@NotNull OrderDto order) {
+        if (!customerService.isValidUser(order.getCustomerId())) {
+            throw new IllegalAccessError("Unrecognized user");
+        }
+            return orderService.createOrder(order);
     }
 
     @GET

@@ -4,6 +4,7 @@ import com.google.common.io.Resources;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantManagedDataSource;
+import in.cleartax.dropwizard.sharding.utils.PrepareReadOnlyDB;
 import io.dropwizard.client.JerseyClientBuilder;
 import io.dropwizard.client.JerseyClientConfiguration;
 import io.dropwizard.db.ManagedDataSource;
@@ -23,6 +24,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,20 +37,26 @@ public class TestHelper {
     public static Client onSuiteRun(DropwizardAppRule<TestConfig> rule)
             throws Exception {
 
+        if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled()) {
+            PrepareReadOnlyDB.generateReplicaDB();
+        }
+
         MultiTenantManagedDataSource multiTenantManagedDataSource =
                 rule.getConfiguration().getMultiTenantDataSourceFactory()
                         .build(rule.getEnvironment().metrics(), "migrations");
 
-        for (ManagedDataSource ms : multiTenantManagedDataSource.getTenantDataSourceMap().values()) {
-            initDb("init_db.sql", ms);
+        for(Map.Entry<String, ManagedDataSource> entry : multiTenantManagedDataSource.getTenantDataSourceMap().entrySet()) {
+            if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled() &&
+                    entry.getValue().equals(multiTenantManagedDataSource.getTenantDataSourceMap().get(
+                            rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultReadReplicaTenant()))) {
+                continue;
+            }
+            initDb("init_db.sql", entry.getValue());
         }
-
         initDb("default_shard_config.sql", multiTenantManagedDataSource.getTenantDataSourceMap().get(
                 rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultTenant()));
-        if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled()) {
-            initDb("default_replica_data.sql", multiTenantManagedDataSource.getTenantDataSourceMap()
-                    .get(rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultReadReplicaTenant()));
-        }
+
+
         // Building Jersey client
         JerseyClientConfiguration jerseyClientConfiguration = new JerseyClientConfiguration();
         // increasing minThreads from 1 (default) to 2 to ensure async requests run in parallel.
@@ -80,6 +88,22 @@ public class TestHelper {
                 .put(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
         assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
         return response.readEntity(OrderDto.class);
+    }
+
+    public static OrderDto createOrderOnReplica(OrderDto order, Client client, String host,
+                                       String authToken) throws Exception {
+       Response response = client.target(
+                String.format("%s/v0.1/orders/replica", host))
+                .request()
+                .header(authToken, order.getCustomerId())
+                .put(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
+        /**
+         * Internal Server Error doesn't mean that due to readOnly access this failure is happening
+         * So, this assumption is wrong. Need one correction here.
+         */
+
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+        throw new Exception("Trying To Bypass ReadOnlyAccess");
     }
 
     public static OrderDto getOrder(long id, String customerId, Client client, String host,

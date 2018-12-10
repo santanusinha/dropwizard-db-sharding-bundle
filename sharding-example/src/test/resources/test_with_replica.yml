@@ -12,7 +12,7 @@ multiDatabase:
   tenantDbMap:
     shard1:
       driverClass: org.h2.Driver
-      url: "jdbc:h2:mem:test;MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE" # Case insensitive comparison for text, to follow MySQL's default behaviour
+      url: "jdbc:h2:mem:test1;MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE" # Case insensitive comparison for text, to follow MySQL's default behaviour
       properties:
         charSet: UTF-8
         hibernate.dialect: org.hibernate.dialect.H2Dialect
@@ -22,7 +22,7 @@ multiDatabase:
         org.hibernate.envers.audit_table_suffix: "_aud"
     readReplica:
       driverClass: org.h2.Driver
-      url: "jdbc:h2:mem:test2;MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE" # Case insensitive comparison for text, to follow MySQL's default behaviour
+      url: "jdbc:h2:split:zip:/tmp/testReadOnly/test.zip!/test;MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE;"#ACCESS_MODE_DATA=R" # Case insensitive comparison for text, to follow MySQL's default behaviour
       properties:
         charSet: UTF-8
         hibernate.dialect: org.hibernate.dialect.H2Dialect

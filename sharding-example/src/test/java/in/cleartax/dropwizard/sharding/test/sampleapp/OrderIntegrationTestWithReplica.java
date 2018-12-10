@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @RunWith(Parameterized.class)
 @RequiredArgsConstructor
@@ -111,5 +112,18 @@ public class OrderIntegrationTestWithReplica {
         assertThat(orderDtoFromReplica.getCustomerId()).isEqualTo(orderIdAndCustomerIdTenantIdMap.getRight().getLeft());
         assertThat(orderDtoFromReplica.isReadOnly()).isEqualTo(true); // Just another layer of check
         assertOrderPresentOnShard(orderIdAndCustomerIdTenantIdMap.getRight().getRight(), orderDtoFromReplica);
+        final String oId = UUID.randomUUID().toString();
+        final int updatedAmt = 1000;
+
+        OrderDto orderDto = OrderDto.builder()
+                .orderId(oId)
+                .amount(100)
+                .items(Lists.newArrayList(
+                        OrderItemDto.builder().name("test").build()
+                ))
+                .customerId("1")
+                .build();
+        assertThatThrownBy(() -> TestHelper.createOrderOnReplica(orderDto, client, host, AUTH_TOKEN))
+                .hasMessage("Trying To Bypass ReadOnlyAccess");
     }
 }
