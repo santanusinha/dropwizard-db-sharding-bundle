@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpStatus;
 import org.h2.tools.RunScript;
 
+import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
@@ -97,13 +98,8 @@ public class TestHelper {
                 .request()
                 .header(authToken, order.getCustomerId())
                 .put(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
-        /**
-         * Internal Server Error doesn't mean that due to readOnly access this failure is happening
-         * So, this assumption is wrong. Need one correction here.
-         */
-
-        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-        throw new Exception("Trying To Bypass ReadOnlyAccess");
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_FORBIDDEN);
+        throw new ForbiddenException("Unauthorized Access Of ReadOnlyDB");
     }
 
     public static OrderDto getOrder(long id, String customerId, Client client, String host,

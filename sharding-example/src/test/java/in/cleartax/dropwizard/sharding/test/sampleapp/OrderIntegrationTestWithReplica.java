@@ -39,6 +39,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import ru.vyarus.dropwizard.guice.GuiceBundle;
 
+import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.client.Client;
 import java.util.List;
 import java.util.UUID;
@@ -110,10 +111,8 @@ public class OrderIntegrationTestWithReplica {
                 .describedAs("Fetched order for customer = " + orderIdAndCustomerIdTenantIdMap.getRight().getLeft())
                 .isEqualTo(orderExtId);
         assertThat(orderDtoFromReplica.getCustomerId()).isEqualTo(orderIdAndCustomerIdTenantIdMap.getRight().getLeft());
-        assertThat(orderDtoFromReplica.isReadOnly()).isEqualTo(true); // Just another layer of check
         assertOrderPresentOnShard(orderIdAndCustomerIdTenantIdMap.getRight().getRight(), orderDtoFromReplica);
         final String oId = UUID.randomUUID().toString();
-        final int updatedAmt = 1000;
 
         OrderDto orderDto = OrderDto.builder()
                 .orderId(oId)
@@ -124,6 +123,7 @@ public class OrderIntegrationTestWithReplica {
                 .customerId("1")
                 .build();
         assertThatThrownBy(() -> TestHelper.createOrderOnReplica(orderDto, client, host, AUTH_TOKEN))
-                .hasMessage("Trying To Bypass ReadOnlyAccess");
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Unauthorized Access Of ReadOnlyDB");
     }
 }

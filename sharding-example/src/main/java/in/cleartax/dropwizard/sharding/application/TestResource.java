@@ -32,7 +32,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.JDBCException;
 
-import javax.annotation.Resource;
 import javax.annotation.security.PermitAll;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -83,7 +82,14 @@ public class TestResource {
         if (!customerService.isValidUser(order.getCustomerId())) {
             throw new IllegalAccessError("Unrecognized user");
         }
+        try {
             return orderService.createOrder(order);
+        } catch (JDBCException e) {
+            if(e.getSQLException().getMessage().contains("The database is read only")) {
+                throw new WebApplicationException(Response.Status.FORBIDDEN);
+            }
+            throw new WebApplicationException(Response.Status.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @GET

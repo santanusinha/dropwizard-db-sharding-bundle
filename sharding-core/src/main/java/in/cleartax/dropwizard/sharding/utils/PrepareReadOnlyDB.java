@@ -47,7 +47,6 @@ public class PrepareReadOnlyDB {
                 "  `order_ext_id` varchar(255) DEFAULT NULL,\n" +
                 "  `customer_id` varchar(255) DEFAULT NULL,\n" +
                 "  `amount` int(11) DEFAULT NULL,\n" +
-                "  `readOnly` bit DEFAULT 0,\n" +
                 "  PRIMARY KEY (`id`)\n" +
                 ");");
 
@@ -60,7 +59,7 @@ public class PrepareReadOnlyDB {
                 ");");
         stat.execute("TRUNCATE TABLE `orders`;\n" +
                 "TRUNCATE TABLE `order_items`;\n" +
-                "INSERT INTO `orders` (`id`, `order_ext_id`, `customer_id`, `amount`, `readOnly`) VALUES ('1', '11111111-2222-3333-4444-aaaaaaaaaaa1', 1, 10000, 1);\n" +
+                "INSERT INTO `orders` (`id`, `order_ext_id`, `customer_id`, `amount`) VALUES ('1', '11111111-2222-3333-4444-aaaaaaaaaaa1', 1, 10000);\n" +
                 "INSERT INTO `order_items` (`id`, `name`, `order_id`) VALUES ('0', 'test', '10');\n" +
                 "INSERT INTO `order_items` (`id`, `name`, `order_id`) VALUES ('1', 'test', '10');");
 

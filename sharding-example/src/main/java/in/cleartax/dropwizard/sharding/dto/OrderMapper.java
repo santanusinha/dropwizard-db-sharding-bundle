@@ -43,7 +43,6 @@ public class OrderMapper {
                 .id(order.getId())
                 .customerId(order.getCustomerId())
                 .orderId(order.getOrderId())
-                .readOnly(order.isReadonly())
                 .items(order.getItems().stream().map(this::to).collect(Collectors.toList()))
                 .build();
     }
@@ -54,7 +53,6 @@ public class OrderMapper {
                 .id(orderDto.getId())
                 .customerId(orderDto.getCustomerId())
                 .orderId(orderDto.getOrderId())
-                .readonly(orderDto.isReadOnly())
                 .items(orderDto.getItems().stream().map(this::from).collect(Collectors.toList()))
                 .build();
     }

@@ -4,7 +4,6 @@ CREATE TABLE `orders` (
   `order_ext_id` varchar(255) DEFAULT NULL,
   `customer_id` varchar(255) DEFAULT NULL,
   `amount` int(11) DEFAULT NULL,
-  `readOnly` bit DEFAULT 0,
   PRIMARY KEY (`id`)
 );
 

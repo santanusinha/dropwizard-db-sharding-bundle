@@ -76,6 +76,6 @@ public class MultiTenantDataSourceFactory {
     public boolean isValid() {
         return getDefaultDataSourceFactory() != null &&
                 (allowMultipleTenants ? tenantDbMap.size() > 1 : tenantDbMap.size() == 1) &&
-                (!readOnlyReplicaEnabled || !defaultReadReplicaTenant.isEmpty()); // condition modification not null && then not empty
+                (!readOnlyReplicaEnabled || (defaultReadReplicaTenant != null && !defaultReadReplicaTenant.isEmpty()));
     }
 }

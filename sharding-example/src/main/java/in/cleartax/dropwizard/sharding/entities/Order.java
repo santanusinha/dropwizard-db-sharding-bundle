@@ -52,7 +52,4 @@ public class Order {
     @Column(name = "amount")
     private int amount;
 
-    @Column(name = "readOnly")
-    private boolean readonly;
-
 }
