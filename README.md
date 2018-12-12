@@ -2,7 +2,9 @@
 
 This library adds support for Database sharding in [Dropwizard](https://www.dropwizard.io) based applications.
 Make sure you're familiar with Dropwizard, dependency injection framework like [Guice](https://github.com/google/guice) and concepts like [ThreadLocals](https://docs.oracle.com/javase/7/docs/api/java/lang/ThreadLocal.html) before going ahead.
+
 **License:** [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
 **Stable version:** 0.2.8
 
 ## Why this library?
@@ -97,3 +99,6 @@ Example use-case: This might be useful in case you're aggregating data from acro
 4. **Connect to a shard without using @UnitOfWork**
 
 This is not recommended because then you'll need hibernate specific objects in your business code. In case required, you can instantiate [TransactionRunner](https://github.com/ClearTax/dropwizard-db-sharding-bundle/blob/master/sharding-core/src/main/java/in/cleartax/dropwizard/sharding/transactions/TransactionRunner.java) and use it as [mentioned here](https://github.com/ClearTax/dropwizard-db-sharding-bundle/blob/0f8fc581eb/sharding-core/src/main/java/in/cleartax/dropwizard/sharding/transactions/UnitOfWorkModule.java#L79)
+
+
+**Note:** In case you don't need sharding but still need flexibility of using ```@UnitOfWork``` outside of resources and ability to use nested ```@UnitOfWork``` you can still do so. Refer [these tests](https://github.com/ClearTax/dropwizard-db-sharding-bundle/blob/master/sharding-example/src/test/java/in/cleartax/dropwizard/sharding/test/sampleapp/TestSuiteWithoutMultiTenancy.java) to understand the use-case.
