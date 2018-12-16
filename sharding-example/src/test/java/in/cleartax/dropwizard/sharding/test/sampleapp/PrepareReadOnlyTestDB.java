@@ -20,7 +20,6 @@ import java.sql.Statement;
  */
 public class PrepareReadOnlyTestDB {
 
-    // TODO: We can get rid of hardcoding of filepath.
     public static void generateReplicaDB() throws Exception {
 
         // delete all files in this directory
