@@ -1,4 +1,4 @@
-package in.cleartax.dropwizard.sharding.utils;
+package in.cleartax.dropwizard.sharding.test.sampleapp;
 
 /**
  * Created by mohitsingh on 10/12/18.
@@ -18,7 +18,7 @@ import java.sql.Statement;
  * random-access. Splitting up the file is only needed if the database file is
  * larger than a few megabytes.
  */
-public class PrepareReadOnlyDB {
+public class PrepareReadOnlyTestDB {
 
     // TODO: We can get rid of hardcoding of filepath.
     public static void generateReplicaDB() throws Exception {

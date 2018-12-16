@@ -4,7 +4,6 @@ import com.google.common.io.Resources;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantManagedDataSource;
-import in.cleartax.dropwizard.sharding.utils.PrepareReadOnlyDB;
 import io.dropwizard.client.JerseyClientBuilder;
 import io.dropwizard.client.JerseyClientConfiguration;
 import io.dropwizard.db.ManagedDataSource;
@@ -39,7 +38,7 @@ public class TestHelper {
             throws Exception {
 
         if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled()) {
-            PrepareReadOnlyDB.generateReplicaDB();
+            PrepareReadOnlyTestDB.generateReplicaDB();
         }
 
         MultiTenantManagedDataSource multiTenantManagedDataSource =
