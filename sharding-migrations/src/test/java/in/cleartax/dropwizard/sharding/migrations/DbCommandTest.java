@@ -38,13 +38,13 @@ public class DbCommandTest extends AbstractMigrationTest {
         createSubparser(dbCommand).printHelp(new PrintWriter(new OutputStreamWriter(baos, UTF_8), true));
         assertThat(baos.toString(UTF_8)).isEqualTo(String.format(
                 "usage: db db [-h]%n" +
-                        "          {calculate-checksum,clear-checksums,drop-all,dump,fast-forward,generateReplicaDB-docs,locks,migrate,prepare-rollback,rollback,status,tag,test}%n" +
+                        "          {calculate-checksum,clear-checksums,drop-all,dump,fast-forward,generate-docs,locks,migrate,prepare-rollback,rollback,status,tag,test}%n" +
                         "          ...%n" +
                         "%n" +
                         "Run database migration tasks%n" +
                         "%n" +
                         "positional arguments:%n" +
-                        "  {calculate-checksum,clear-checksums,drop-all,dump,fast-forward,generateReplicaDB-docs,locks,migrate,prepare-rollback,rollback,status,tag,test}%n" +
+                        "  {calculate-checksum,clear-checksums,drop-all,dump,fast-forward,generate-docs,locks,migrate,prepare-rollback,rollback,status,tag,test}%n" +
                         "%n" +
                         "named arguments:%n" +
                         "  -h, --help             show this help message and exit%n"));

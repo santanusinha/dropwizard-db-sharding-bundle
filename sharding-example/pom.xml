@@ -63,7 +63,7 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>compile</scope>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

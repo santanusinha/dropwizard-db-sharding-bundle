@@ -22,13 +22,12 @@ import java.sql.DriverManager;
 @Slf4j
 public class PrepareReadOnlyTestDB {
 
-    public static final String TEMP_DIR_PATH = System.getProperty("java.io.tmpdir");
-    public static final String TEMP_DB_SUBDIRECTORY = "readOnly";
-    public static final String TEMP_DB_NAME = "readonly_test";
+    static final String TEMP_DIR_PATH = System.getProperty("java.io.tmpdir");
+    static final String TEMP_DB_SUBDIRECTORY = "readOnly";
+    static final String TEMP_DB_NAME = "readonly_test";
 
     public static String generateReplicaDB() throws Exception {
 
-        // delete all files in this directory
         String readOnlyDbDirectoryPath = Paths.get(TEMP_DIR_PATH, TEMP_DB_SUBDIRECTORY).toString();
         String readOnlyDbFile = Paths.get(readOnlyDbDirectoryPath, TEMP_DB_NAME).toString();
         String readOnlyDbFileZip = readOnlyDbFile + ".zip";
@@ -47,9 +46,8 @@ public class PrepareReadOnlyTestDB {
         conn = DriverManager.getConnection(
                 "jdbc:h2:split:22:" + readOnlyDbFile);
 
-        log.info("adding test data...");
-        //Statement stat = conn.createStatement();
         try {
+            log.info("adding test data...");
             TestHelper.initDb("init_read_replica.sql", conn);
             log.info("create the zip file...");
             Backup.execute(readOnlyDbFileZip, readOnlyDbDirectoryPath, "", true);
@@ -60,7 +58,7 @@ public class PrepareReadOnlyTestDB {
             return readOnlyDBUrl;
         }
         catch (Exception e) {
-            log.debug("Unable to create readOnly DB");
+            log.debug("Unable to create readOnly DB", e);
         }
         finally {
             conn.close();

@@ -19,16 +19,9 @@ package in.cleartax.dropwizard.sharding.test.sampleapp;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import in.cleartax.dropwizard.sharding.application.TestApplication;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
-import in.cleartax.dropwizard.sharding.dao.OrderDao;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.dto.OrderItemDto;
-import in.cleartax.dropwizard.sharding.entities.Order;
-import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
-import in.cleartax.dropwizard.sharding.transactions.DefaultUnitOfWorkImpl;
-import in.cleartax.dropwizard.sharding.transactions.TransactionRunner;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -37,7 +30,6 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import ru.vyarus.dropwizard.guice.GuiceBundle;
 
 import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.client.Client;

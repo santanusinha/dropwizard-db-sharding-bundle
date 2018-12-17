@@ -4,7 +4,6 @@ import in.cleartax.dropwizard.sharding.application.TestApplication;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
 import in.cleartax.dropwizard.sharding.test.sampleapp.utils.ReadOnlyDBConfigModifier;
 import io.dropwizard.setup.Environment;
-import io.dropwizard.testing.ResourceHelpers;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import org.junit.ClassRule;
 import org.junit.runner.RunWith;

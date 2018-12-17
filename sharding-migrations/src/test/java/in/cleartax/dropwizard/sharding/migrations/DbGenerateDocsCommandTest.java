@@ -32,7 +32,7 @@ public class DbGenerateDocsCommandTest extends AbstractMigrationTest {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         createSubparser(generateDocsCommand).printHelp(new PrintWriter(new OutputStreamWriter(baos, UTF_8), true));
         assertThat(baos.toString(UTF_8)).isEqualTo(String.format(
-                "usage: db generateReplicaDB-docs [-h] [--migrations MIGRATIONS-FILE]%n" +
+                "usage: db generate-docs [-h] [--migrations MIGRATIONS-FILE]%n" +
                         "          [--catalog CATALOG] [--schema SCHEMA] [file] output%n" +
                         "%n" +
                         "Generate documentation about the database state.%n" +
