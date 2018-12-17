@@ -4,13 +4,14 @@ package in.cleartax.dropwizard.sharding.test.sampleapp;
  * Created by mohitsingh on 10/12/18.
  */
 
+import lombok.extern.slf4j.Slf4j;
 import org.h2.store.fs.FileUtils;
 import org.h2.tools.Backup;
 import org.h2.tools.DeleteDbFiles;
 
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.Statement;
 
 /**
  * This sample application shows how to create and use a read-only database in a
@@ -18,12 +19,20 @@ import java.sql.Statement;
  * random-access. Splitting up the file is only needed if the database file is
  * larger than a few megabytes.
  */
+@Slf4j
 public class PrepareReadOnlyTestDB {
 
-    public static void generateReplicaDB() throws Exception {
+    public static final String TEMP_DIR_PATH = System.getProperty("java.io.tmpdir");
+    public static final String TEMP_DB_SUBDIRECTORY = "readOnly";
+    public static final String TEMP_DB_NAME = "readonly_test";
+
+    public static String generateReplicaDB() throws Exception {
 
         // delete all files in this directory
-        FileUtils.deleteRecursive("/tmp/testReadOnly", false);
+        String readOnlyDbDirectoryPath = Paths.get(TEMP_DIR_PATH, TEMP_DB_SUBDIRECTORY).toString();
+        String readOnlyDbFile = Paths.get(readOnlyDbDirectoryPath, TEMP_DB_NAME).toString();
+        String readOnlyDbFileZip = readOnlyDbFile + ".zip";
+        FileUtils.deleteRecursive(readOnlyDbDirectoryPath, false);
 
 
         Connection conn;
@@ -36,41 +45,27 @@ public class PrepareReadOnlyTestDB {
         // the prefix split:22: is used, which means each part is
         // 2^22 bytes long
         conn = DriverManager.getConnection(
-                "jdbc:h2:split:22:/tmp/testReadOnly/test");
+                "jdbc:h2:split:22:" + readOnlyDbFile);
 
-        System.out.println("adding test data...");
-        Statement stat = conn.createStatement();
-        stat.execute("DROP TABLE IF EXISTS `orders`;\n" +
-                "CREATE TABLE `orders` (\n" +
-                "  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n" +
-                "  `order_ext_id` varchar(255) DEFAULT NULL,\n" +
-                "  `customer_id` varchar(255) DEFAULT NULL,\n" +
-                "  `amount` int(11) DEFAULT NULL,\n" +
-                "  PRIMARY KEY (`id`)\n" +
-                ");");
+        log.info("adding test data...");
+        //Statement stat = conn.createStatement();
+        try {
+            TestHelper.initDb("init_read_replica.sql", conn);
+            log.info("create the zip file...");
+            Backup.execute(readOnlyDbFileZip, readOnlyDbDirectoryPath, "", true);
+            String readOnlyDBUrl = "jdbc:h2:split:zip:" + readOnlyDbFileZip + "!/" + TEMP_DB_NAME + ";MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE;";
 
-        stat.execute("DROP TABLE IF EXISTS `order_items`;\n" +
-                "CREATE TABLE `order_items` (\n" +
-                "  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n" +
-                "  `name` varchar(255) DEFAULT NULL,\n" +
-                "  `order_id` int(11) DEFAULT NULL,\n" +
-                "  PRIMARY KEY (`id`)\n" +
-                ");");
-        stat.execute("TRUNCATE TABLE `orders`;\n" +
-                "TRUNCATE TABLE `order_items`;\n" +
-                "INSERT INTO `orders` (`id`, `order_ext_id`, `customer_id`, `amount`) VALUES ('1', '11111111-2222-3333-4444-aaaaaaaaaaa1', 1, 10000);\n" +
-                "INSERT INTO `order_items` (`id`, `name`, `order_id`) VALUES ('0', 'test', '10');\n" +
-                "INSERT INTO `order_items` (`id`, `name`, `order_id`) VALUES ('1', 'test', '10');");
-
-        System.out.println("defrag to reduce random access...");
-        stat.execute("shutdown defrag");
-        conn.close();
-
-        System.out.println("create the zip file...");
-        Backup.execute("/tmp/testReadOnly/test.zip", "/tmp/testReadOnly", "", true);
-
-        // delete the old database files
-        DeleteDbFiles.execute("split:/tmp/testReadOnly", "test", true);
+            // delete the old database files
+            DeleteDbFiles.execute("split:"+readOnlyDbDirectoryPath, TEMP_DB_NAME, true);
+            return readOnlyDBUrl;
+        }
+        catch (Exception e) {
+            log.debug("Unable to create readOnly DB");
+        }
+        finally {
+            conn.close();
+        }
+        return null;
     }
 
 }

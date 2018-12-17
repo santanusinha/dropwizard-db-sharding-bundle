@@ -79,6 +79,13 @@ public class TestHelper {
         }
     }
 
+    public static void initDb(String sqlFile, Connection con) throws SQLException, IOException {
+        URL url = Resources.getResource(sqlFile);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+            RunScript.execute(con, reader);
+        }
+    }
+
     public static OrderDto createOrder(OrderDto order, Client client, String host,
                                        String authToken) {
         Response response = client.target(
