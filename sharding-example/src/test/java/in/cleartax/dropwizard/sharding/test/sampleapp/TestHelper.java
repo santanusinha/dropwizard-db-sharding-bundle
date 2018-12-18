@@ -46,7 +46,7 @@ public class TestHelper {
                         .build(rule.getEnvironment().metrics(), "migrations");
 
         for(Map.Entry<String, ManagedDataSource> entry : multiTenantManagedDataSource.getTenantDataSourceMap().entrySet()) {
-            if(rule.getConfiguration().getMultiTenantDataSourceFactory().getWriteShards().containsKey(entry.getKey())) {
+            if(rule.getConfiguration().getMultiTenantDataSourceFactory().getWritableTenants().containsKey(entry.getKey())) {
                 initDb("init_db.sql", entry.getValue());
             }
         }

@@ -73,7 +73,7 @@ public class MultiTenantDataSourceFactory {
         return tenantDbMap.get(defaultTenant);
     }
 
-    public Map<String, DataSourceFactory> getWriteShards() {
+    public Map<String, DataSourceFactory> getWritableTenants() {
         if(defaultReadReplicaTenant == null || defaultReadReplicaTenant.isEmpty()) { return tenantDbMap; }
         return tenantDbMap.entrySet().stream().filter(t -> !t.getKey().equals(defaultReadReplicaTenant))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
