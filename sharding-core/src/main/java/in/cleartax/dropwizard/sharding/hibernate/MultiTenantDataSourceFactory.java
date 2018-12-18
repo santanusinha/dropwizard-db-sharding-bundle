@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 public class MultiTenantDataSourceFactory {
+
     @NotEmpty
     private Map<String, DataSourceFactory> tenantDbMap;
 
@@ -70,6 +71,12 @@ public class MultiTenantDataSourceFactory {
 
     public DataSourceFactory getDefaultDataSourceFactory() {
         return tenantDbMap.get(defaultTenant);
+    }
+
+    public Map<String, DataSourceFactory> getWritableTenants() {
+        if(defaultReadReplicaTenant == null || defaultReadReplicaTenant.isEmpty()) { return tenantDbMap; }
+        return tenantDbMap.entrySet().stream().filter(t -> !t.getKey().equals(defaultReadReplicaTenant))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     @ValidationMethod(message = "Tenant configuration is not valid")
