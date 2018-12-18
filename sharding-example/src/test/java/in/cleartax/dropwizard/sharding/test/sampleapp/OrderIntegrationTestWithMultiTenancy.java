@@ -19,16 +19,9 @@ package in.cleartax.dropwizard.sharding.test.sampleapp;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import in.cleartax.dropwizard.sharding.application.TestApplication;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
-import in.cleartax.dropwizard.sharding.dao.OrderDao;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.dto.OrderItemDto;
-import in.cleartax.dropwizard.sharding.entities.Order;
-import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
-import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
-import in.cleartax.dropwizard.sharding.transactions.DefaultUnitOfWorkImpl;
-import in.cleartax.dropwizard.sharding.transactions.TransactionRunner;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -37,12 +30,12 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import ru.vyarus.dropwizard.guice.GuiceBundle;
 
 import javax.ws.rs.client.Client;
 import java.util.List;
 import java.util.UUID;
 
+import static in.cleartax.dropwizard.sharding.test.sampleapp.utils.AssertionUtil.assertOrderPresentOnShard;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @RunWith(Parameterized.class)
@@ -67,37 +60,6 @@ public class OrderIntegrationTestWithMultiTenancy {
     public static void setUp() {
         client = TestSuiteWithMultiTenancy.client;
         host = String.format("http://localhost:%d/api", RULE.getLocalPort());
-    }
-
-    private void assertOrderPresentOnShard(final String expectedOnShard, final OrderDto orderDto) throws Throwable {
-        final GuiceBundle<TestConfig> guiceBundle = ((TestApplication) RULE.getApplication()).getGuiceBundle();
-        final OrderDao orderDao = guiceBundle.getInjector().getInstance(OrderDao.class);
-        final MultiTenantSessionSource multiTenantSessionSource = guiceBundle.getInjector()
-                .getInstance(MultiTenantSessionSource.class);
-        for (final String eachShard : shards) {
-            new TransactionRunner<Order>(multiTenantSessionSource.getUnitOfWorkAwareProxyFactory(),
-                    multiTenantSessionSource.getSessionFactory(), new ConstTenantIdentifierResolver(eachShard)) {
-                @Override
-                public Order run() {
-                    Order order = orderDao.get(orderDto.getId());
-                    if (eachShard.equals(expectedOnShard)) {
-                        assertThat(order)
-                                .describedAs(String.format("Expecting order with id: %s, " +
-                                                "for customer: %s, on shard: %s",
-                                        orderDto.getId(), orderDto.getCustomerId(), eachShard))
-                                .isNotNull();
-                    } else {
-                        // Two orders with same ID can exist on different shard
-                        assertThat(order == null || !order.getCustomerId().equals(orderDto.getCustomerId()))
-                                .describedAs(String.format("Not expecting order with id: %s, " +
-                                                "for customer: %s, on shard: %s",
-                                        orderDto.getId(), orderDto.getCustomerId(), eachShard))
-                                .isTrue();
-                    }
-                    return order;
-                }
-            }.start(false, new DefaultUnitOfWorkImpl());
-        }
     }
 
     @Test
@@ -140,6 +102,6 @@ public class OrderIntegrationTestWithMultiTenancy {
                 .isEqualTo(updatedAmt);
         assertThat(orderDto.getCustomerId()).isEqualTo(customerIdAndShardId.getLeft());
 
-        assertOrderPresentOnShard(customerIdAndShardId.getRight(), orderDto);
+        assertOrderPresentOnShard(customerIdAndShardId.getRight(), orderDto, shards, RULE);
     }
 }

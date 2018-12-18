@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpStatus;
 import org.h2.tools.RunScript;
 
+import javax.ws.rs.ForbiddenException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
@@ -23,6 +24,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,16 +37,25 @@ public class TestHelper {
     public static Client onSuiteRun(DropwizardAppRule<TestConfig> rule)
             throws Exception {
 
+        if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled()) {
+            PrepareReadOnlyTestDB.generateReplicaDB();
+        }
+
         MultiTenantManagedDataSource multiTenantManagedDataSource =
                 rule.getConfiguration().getMultiTenantDataSourceFactory()
                         .build(rule.getEnvironment().metrics(), "migrations");
 
-        for (ManagedDataSource ms : multiTenantManagedDataSource.getTenantDataSourceMap().values()) {
-            initDb("init_db.sql", ms);
+        for(Map.Entry<String, ManagedDataSource> entry : multiTenantManagedDataSource.getTenantDataSourceMap().entrySet()) {
+            if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled() &&
+                    entry.getValue().equals(multiTenantManagedDataSource.getTenantDataSourceMap().get(
+                            rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultReadReplicaTenant()))) {
+                continue;
+            }
+            initDb("init_db.sql", entry.getValue());
         }
-
         initDb("default_shard_config.sql", multiTenantManagedDataSource.getTenantDataSourceMap().get(
                 rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultTenant()));
+
 
         // Building Jersey client
         JerseyClientConfiguration jerseyClientConfiguration = new JerseyClientConfiguration();
@@ -68,6 +79,13 @@ public class TestHelper {
         }
     }
 
+    public static void initDb(String sqlFile, Connection con) throws SQLException, IOException {
+        URL url = Resources.getResource(sqlFile);
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()))) {
+            RunScript.execute(con, reader);
+        }
+    }
+
     public static OrderDto createOrder(OrderDto order, Client client, String host,
                                        String authToken) {
         Response response = client.target(
@@ -79,10 +97,32 @@ public class TestHelper {
         return response.readEntity(OrderDto.class);
     }
 
+    public static OrderDto createOrderOnReplica(OrderDto order, Client client, String host,
+                                       String authToken) throws Exception {
+       Response response = client.target(
+                String.format("%s/v0.1/orders/replica", host))
+                .request()
+                .header(authToken, order.getCustomerId())
+                .put(Entity.entity(order, MediaType.APPLICATION_JSON_TYPE));
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_FORBIDDEN);
+        throw new ForbiddenException("Unauthorized Access Of ReadOnlyDB");
+    }
+
     public static OrderDto getOrder(long id, String customerId, Client client, String host,
                                     String authToken) {
         Response response = client.target(
                 String.format("%s/v0.1/orders/%d", host, id))
+                .request()
+                .header(authToken, customerId)
+                .get();
+        assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+        return response.readEntity(OrderDto.class);
+    }
+
+    public static OrderDto getOrderFromReplica(long id, String customerId, Client client, String host,
+                                    String authToken) {
+        Response response = client.target(
+                String.format("%s/v0.1/orders/replica/%d", host, id))
                 .request()
                 .header(authToken, customerId)
                 .get();

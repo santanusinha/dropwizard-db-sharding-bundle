@@ -22,6 +22,7 @@ import in.cleartax.dropwizard.sharding.dto.OrderDto;
 import in.cleartax.dropwizard.sharding.dto.OrderMapper;
 import in.cleartax.dropwizard.sharding.entities.Order;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.JDBCException;
 
 import javax.inject.Inject;
 
@@ -32,13 +33,13 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper = new OrderMapper();
 
     @Override
-    public OrderDto createOrder(OrderDto orderDto) {
+    public OrderDto createOrder(OrderDto orderDto) throws JDBCException {
         Order order = orderDao.save(orderMapper.from(orderDto));
         return orderMapper.to(order);
     }
 
     @Override
-    public OrderDto getOrder(long orderId) {
+    public OrderDto getOrder(long orderId) throws JDBCException {
         Order order = orderDao.get(orderId);
         return orderMapper.to(order);
     }

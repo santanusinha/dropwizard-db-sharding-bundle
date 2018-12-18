@@ -25,10 +25,12 @@ import in.cleartax.dropwizard.sharding.dto.OrderMapper;
 import in.cleartax.dropwizard.sharding.entities.Order;
 import in.cleartax.dropwizard.sharding.services.CustomerService;
 import in.cleartax.dropwizard.sharding.services.OrderService;
+import in.cleartax.dropwizard.sharding.transactions.ReadOnlyTenant;
 import in.cleartax.dropwizard.sharding.transactions.TenantIdentifier;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.JDBCException;
 
 import javax.annotation.security.PermitAll;
 import javax.inject.Inject;
@@ -36,6 +38,7 @@ import javax.inject.Singleton;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 @Path("v0.1/orders")
 @Produces(value = {MediaType.APPLICATION_JSON})
@@ -64,6 +67,29 @@ public class TestResource {
             throw new IllegalAccessError("Unrecognized user");
         }
         return orderService.createOrder(order);
+    }
+
+    @PUT
+    @Timed
+    @ExceptionMetered
+    @Path("/replica")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @PermitAll
+    @UnitOfWork
+    @ReadOnlyTenant
+    public OrderDto createOrUpdateOrderOnReplica(@NotNull OrderDto order) {
+        if (!customerService.isValidUser(order.getCustomerId())) {
+            throw new IllegalAccessError("Unrecognized user");
+        }
+        try {
+            return orderService.createOrder(order);
+        } catch (JDBCException e) {
+            if(e.getSQLException().getMessage().contains("The database is read only")) {
+                throw new WebApplicationException(Response.Status.FORBIDDEN);
+            }
+            throw new WebApplicationException(Response.Status.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @GET
@@ -115,6 +141,19 @@ public class TestResource {
     @TenantIdentifier(useDefault = false, tenantIdentifier = "shard2")
     // Test API which only reads from shard2. Don't follow this pattern on production
     public OrderDto getOrderFromShard2(@PathParam("id") long id) {
+        return orderService.getOrder(id);
+    }
+
+    @GET
+    @Timed
+    @ExceptionMetered
+    @Path("/replica/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    @PermitAll
+    @UnitOfWork
+    @ReadOnlyTenant
+    // Test API which only reads from readReplica. Don't follow this pattern on production
+    public OrderDto getOrderFromReadReplica(@PathParam("id") long id) {
         return orderService.getOrder(id);
     }
 }

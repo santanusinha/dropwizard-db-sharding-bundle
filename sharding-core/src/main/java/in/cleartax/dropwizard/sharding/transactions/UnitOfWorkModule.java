@@ -82,6 +82,9 @@ public class UnitOfWorkModule extends AbstractModule {
                 TenantIdentifier tenantIdentifier = mi.getMethod().getAnnotation(TenantIdentifier.class);
                 tenantId = extractTenantIdentifier(tenantIdentifier);
                 logIfApplicable("Using explicit tenant-id " + tenantId + " provided via TenantIdentifier");
+            } else if (this.isExplicitReadOnlyAnnotationPresent(mi)) {
+                tenantId = extractReadOnlyReplica();
+                logIfApplicable("ReadOnly annotation is used so using read replica tenant with id " + tenantId);
             } else {
                 tenantId = resolveTenantIdentifier(shardKeyProvider.getKey());
             }
@@ -94,6 +97,10 @@ public class UnitOfWorkModule extends AbstractModule {
 
         private boolean isExplicitTenantIdentifierPresent(MethodInvocation mi) {
             return mi.getMethod().isAnnotationPresent(TenantIdentifier.class);
+        }
+
+        private boolean isExplicitReadOnlyAnnotationPresent(MethodInvocation mi) {
+            return mi.getMethod().isAnnotationPresent(ReadOnlyTenant.class);
         }
 
         private String extractTenantIdentifier(TenantIdentifier tenantIdentifier) {
@@ -116,6 +123,13 @@ public class UnitOfWorkModule extends AbstractModule {
                 logIfApplicable("Found tenant-id " + tenantId + " from tenant-resolver");
             }
             return tenantId;
+        }
+
+        private String extractReadOnlyReplica() {
+            if(multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()) {
+                return multiTenantSessionSource.getDataSourceFactory().getDefaultReadReplicaTenant();
+            }
+            return null;
         }
 
         private void logIfApplicable(String msg) {
