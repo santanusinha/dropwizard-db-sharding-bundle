@@ -46,12 +46,9 @@ public class TestHelper {
                         .build(rule.getEnvironment().metrics(), "migrations");
 
         for(Map.Entry<String, ManagedDataSource> entry : multiTenantManagedDataSource.getTenantDataSourceMap().entrySet()) {
-            if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled() &&
-                    entry.getValue().equals(multiTenantManagedDataSource.getTenantDataSourceMap().get(
-                            rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultReadReplicaTenant()))) {
-                continue;
+            if(rule.getConfiguration().getMultiTenantDataSourceFactory().getWriteShards().containsKey(entry.getKey())) {
+                initDb("init_db.sql", entry.getValue());
             }
-            initDb("init_db.sql", entry.getValue());
         }
         initDb("default_shard_config.sql", multiTenantManagedDataSource.getTenantDataSourceMap().get(
                 rule.getConfiguration().getMultiTenantDataSourceFactory().getDefaultTenant()));
