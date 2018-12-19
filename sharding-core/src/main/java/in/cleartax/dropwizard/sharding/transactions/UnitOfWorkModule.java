@@ -82,8 +82,8 @@ public class UnitOfWorkModule extends AbstractModule {
                 TenantIdentifier tenantIdentifier = mi.getMethod().getAnnotation(TenantIdentifier.class);
                 tenantId = extractTenantIdentifier(tenantIdentifier);
                 logIfApplicable("Using explicit tenant-id " + tenantId + " provided via TenantIdentifier");
-            } else if (this.isExplicitReadOnlyAnnotationPresent(mi)
-                    && multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()) {
+            } else if (multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()
+                    && this.isExplicitReadOnlyAnnotationPresent(mi)) {
                 tenantId = extractReadOnlyReplica();
                 logIfApplicable("ReadOnly annotation is used so using read replica tenant with id " + tenantId);
             } else {
