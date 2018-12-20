@@ -75,17 +75,17 @@ public class UnitOfWorkModule extends AbstractModule {
 
         private String getTenantIdentifier(MethodInvocation mi) {
             String tenantId;
-            if (!multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
+            if (multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()
+                    && this.isExplicitReadOnlyAnnotationPresent(mi)) {
+                tenantId = extractReadOnlyReplica();
+                logIfApplicable("ReadOnly annotation is used so using read replica tenant with id " + tenantId);
+            } else if (!multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
                 logIfApplicable("Using default-tenant as multi-tenant is disabled");
                 tenantId = getDefaultTenant();
             } else if (this.isExplicitTenantIdentifierPresent(mi)) {
                 TenantIdentifier tenantIdentifier = mi.getMethod().getAnnotation(TenantIdentifier.class);
                 tenantId = extractTenantIdentifier(tenantIdentifier);
                 logIfApplicable("Using explicit tenant-id " + tenantId + " provided via TenantIdentifier");
-            } else if (multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()
-                    && this.isExplicitReadOnlyAnnotationPresent(mi)) {
-                tenantId = extractReadOnlyReplica();
-                logIfApplicable("ReadOnly annotation is used so using read replica tenant with id " + tenantId);
             } else {
                 tenantId = resolveTenantIdentifier(shardKeyProvider.getKey());
             }

@@ -87,7 +87,7 @@ public class MultiTenantDataSourceFactory {
     @ValidationMethod(message = "Tenant configuration is not valid")
     public boolean isValid() {
         return getDefaultDataSourceFactory() != null &&
-                (allowMultipleTenants ? tenantDbMap.size() > 1 : tenantDbMap.size() == 1) &&
+                (allowMultipleTenants ? tenantDbMap.size() > 1 : getWritableTenants().size() == 1) &&
                 (!readOnlyReplicaEnabled || (defaultReadReplicaTenant != null && !defaultReadReplicaTenant.isEmpty()));
     }
 }
