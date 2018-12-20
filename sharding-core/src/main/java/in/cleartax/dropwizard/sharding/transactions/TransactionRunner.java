@@ -23,16 +23,24 @@ import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAspect;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
 import org.hibernate.context.internal.ManagedSessionContext;
 
 @AllArgsConstructor
+@Slf4j
 public abstract class TransactionRunner<T> {
     private MultiTenantUnitOfWorkAwareProxyFactory proxyFactory;
     private SessionFactory sessionFactory;
     private ConstTenantIdentifierResolver tenantIdentifierResolver;
 
+
     public T start(boolean reUseSession, UnitOfWork unitOfWork) throws Throwable {
+        return start(reUseSession, unitOfWork, "unnamed-context");
+    }
+
+
+    public T start(boolean reUseSession, UnitOfWork unitOfWork, String context) throws Throwable {
         if (reUseSession && ManagedSessionContext.hasBind(sessionFactory) &&
                 tenantIdentifierResolver.resolveCurrentTenantIdentifier()
                         .equals(DelegatingTenantResolver.getInstance().resolveCurrentTenantIdentifier())) {
@@ -42,6 +50,7 @@ public abstract class TransactionRunner<T> {
         MultiTenantUnitOfWorkAspect aspect = proxyFactory.newAspect();
         Exception ex = null;
         T result = null;
+        long startTime = System.currentTimeMillis();
         try {
             aspect.beforeStart(unitOfWork);
             result = run();
@@ -51,8 +60,11 @@ public abstract class TransactionRunner<T> {
             aspect.onError();
         } finally {
             aspect.onFinish();
+            log.trace("[DATABASE] transaction={} error={} context={} time-elapsed={}",
+                    unitOfWork.transactional(), ex != null, context, System.currentTimeMillis() - startTime);
             DelegatingTenantResolver.getInstance().setDelegate(null);
         }
+
         if (ex != null) {
             throw ex;
         }

@@ -49,7 +49,7 @@ public class AssertionUtil {
                     }
                     return order;
                 }
-            }.start(false, new DefaultUnitOfWorkImpl());
+            }.start(false, new DefaultUnitOfWorkImpl(), "AssertionUtil#assertOrderPresentOnShard");
         }
     }
 }

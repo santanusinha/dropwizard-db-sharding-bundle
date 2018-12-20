@@ -33,6 +33,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 
+import java.lang.reflect.Method;
 import java.util.Objects;
 
 @Slf4j
@@ -70,7 +71,7 @@ public class UnitOfWorkModule extends AbstractModule {
                 }
             };
             return runner.start(mi.getMethod().isAnnotationPresent(ReuseSession.class),
-                    mi.getMethod().getAnnotation(UnitOfWork.class));
+                    mi.getMethod().getAnnotation(UnitOfWork.class), resolveOperationName(mi));
         }
 
         private String getTenantIdentifier(MethodInvocation mi) {
@@ -137,6 +138,15 @@ public class UnitOfWorkModule extends AbstractModule {
             if (multiTenantSessionSource.getDataSourceFactory().isVerboseLogging()) {
                 log.info(msg);
             }
+        }
+
+        private String resolveOperationName(MethodInvocation methodInvocation) {
+
+            if (Objects.nonNull(methodInvocation) && Objects.nonNull(methodInvocation.getMethod())) {
+                Method method = methodInvocation.getMethod();
+                return String.format("%s#%s", method.getDeclaringClass().getName(), method.getName());
+            }
+            return null;
         }
     }
 }

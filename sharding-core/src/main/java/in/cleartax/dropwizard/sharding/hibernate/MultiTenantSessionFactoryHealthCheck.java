@@ -85,7 +85,7 @@ public class MultiTenantSessionFactoryHealthCheck extends HealthCheck {
                         sessionFactory.getCurrentSession().createNativeQuery(validationQuery).list();
                         return null;
                     }
-                }.start(false, new DefaultUnitOfWorkImpl());
+                }.start(false, new DefaultUnitOfWorkImpl(), "healthCheck");
             }
         } catch (Throwable t) {
             throw new RuntimeException(t);

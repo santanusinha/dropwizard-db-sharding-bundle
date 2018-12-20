@@ -39,7 +39,7 @@ public abstract class MultiTenantMetricsSet implements MetricSet {
                             public Map<String, Metric> run() {
                                 return runOnTenant(tenantId);
                             }
-                        }.start(false, new DefaultUnitOfWorkImpl());
+                        }.start(false, new DefaultUnitOfWorkImpl(), "MultiTenantMetricsSet#getMetrics");
                     } catch (Throwable t) {
                         throw new RuntimeException(t);
                     }
