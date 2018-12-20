@@ -26,8 +26,8 @@ public class MultiDatabaseConfigValidator {
         final Validator validator = Validators.newValidator();
         final YamlConfigurationFactory<MultiTenantDataSourceFactory> factory = new YamlConfigurationFactory<>(MultiTenantDataSourceFactory.class, validator, objectMapper, "dw");
 
-        final File correctReadReplicaYaml = new File(Thread.currentThread().getContextClassLoader().getResource("correct_multi_tenant_conf.yml").getPath());
-        final File correctMultiTenantYaml = new File(Thread.currentThread().getContextClassLoader().getResource("correct_multi_tenant_conf.yml").getPath());
+        final File correctReadReplicaYaml = new File(Thread.currentThread().getContextClassLoader().getResource("correct_multi_tenant_db_conf.yml").getPath());
+        final File correctMultiTenantYaml = new File(Thread.currentThread().getContextClassLoader().getResource("correct_multi_tenant_db_conf.yml").getPath());
 
         final MultiTenantDataSourceFactory configuration1 = factory.build(correctReadReplicaYaml);
         assertThat(configuration1.isValid()).isTrue();
@@ -41,7 +41,7 @@ public class MultiDatabaseConfigValidator {
         final Validator validator = Validators.newValidator();
         final YamlConfigurationFactory<MultiTenantDataSourceFactory> factory = new YamlConfigurationFactory<>(MultiTenantDataSourceFactory.class, validator, objectMapper, "dw");
 
-        final File incorrectMultiTenantYaml = new File(Thread.currentThread().getContextClassLoader().getResource("incorrect_multi_tenant_conf.yml").getPath());
+        final File incorrectMultiTenantYaml = new File(Thread.currentThread().getContextClassLoader().getResource("incorrect_multi_tenant_db_conf.yml").getPath());
         final MultiTenantDataSourceFactory configuration1 = factory.build(incorrectMultiTenantYaml);
     }
 }
