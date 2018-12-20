@@ -75,7 +75,9 @@ public class UnitOfWorkModule extends AbstractModule {
 
         private String getTenantIdentifier(MethodInvocation mi) {
             String tenantId;
-            if (!multiTenantSessionSource.getDataSourceFactory().isAllowMultipleTenants()) {
+            if (!multiTenantSessionSource.getDataSourceFactory().isAllowMultipleWritableTenants()
+                    && multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()
+                    && !this.isExplicitReadOnlyAnnotationPresent(mi)) {
                 logIfApplicable("Using default-tenant as multi-tenant is disabled");
                 tenantId = getDefaultTenant();
             } else if (this.isExplicitTenantIdentifierPresent(mi)) {
