@@ -48,7 +48,7 @@ public class MultiTenantDataSourceFactory {
     private Duration validationQueryTimeout;
     @NotBlank
     private String defaultTenant;
-    private boolean allowMultipleWritableTenants;
+    private boolean allowMultipleTenants;
     private boolean verboseLogging;
     private boolean readOnlyReplicaEnabled;
     private String defaultReadReplicaTenant;
@@ -87,7 +87,7 @@ public class MultiTenantDataSourceFactory {
     @ValidationMethod(message = "Tenant configuration is not valid")
     public boolean isValid() {
         return getDefaultDataSourceFactory() != null &&
-                (allowMultipleWritableTenants ? tenantDbMap.size() > 1 : getWritableTenants().size() == 1) &&
+                (allowMultipleTenants ? tenantDbMap.size() > 1 : getWritableTenants().size() == 1) &&
                 (!readOnlyReplicaEnabled || (defaultReadReplicaTenant != null && !defaultReadReplicaTenant.isEmpty()));
     }
 }

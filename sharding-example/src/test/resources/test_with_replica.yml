@@ -31,7 +31,7 @@ multiDatabase:
         org.hibernate.envers.do_not_audit_optimistic_locking_field: false
         org.hibernate.envers.audit_table_suffix: "_aud"
   verboseLogging: true
-  allowMultipleWritableTenants: true
+  allowMultipleTenants: true
   readOnlyReplicaEnabled : true
   defaultTenant: "shard1"
   defaultReadReplicaTenant : "readReplica"
