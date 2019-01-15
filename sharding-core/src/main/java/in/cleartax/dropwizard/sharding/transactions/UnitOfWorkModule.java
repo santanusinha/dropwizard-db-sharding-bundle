@@ -17,7 +17,6 @@
 
 package in.cleartax.dropwizard.sharding.transactions;
 
-import com.google.common.base.Preconditions;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
 import com.google.inject.matcher.Matchers;
@@ -27,6 +26,7 @@ import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
 import in.cleartax.dropwizard.sharding.providers.ShardKeyProvider;
 import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
 import in.cleartax.dropwizard.sharding.resolvers.shard.ShardResolver;
+import in.cleartax.dropwizard.sharding.utils.exception.Preconditions;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;

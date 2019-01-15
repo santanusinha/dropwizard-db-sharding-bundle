@@ -17,7 +17,7 @@
 
 package in.cleartax.dropwizard.sharding.hibernate;
 
-import com.google.common.base.Preconditions;
+import in.cleartax.dropwizard.sharding.utils.exception.Preconditions;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 
 import java.util.Stack;
@@ -52,6 +52,7 @@ public class DelegatingTenantResolver implements CurrentTenantIdentifierResolver
         }
     }
 
+    @SuppressWarnings("unused")
     public boolean hasTenantIdentifier() {
         return !delegate.get().isEmpty();
     }
@@ -59,14 +60,12 @@ public class DelegatingTenantResolver implements CurrentTenantIdentifierResolver
     @Override
     public String resolveCurrentTenantIdentifier() {
         Preconditions.checkArgument(!delegate.get().isEmpty(), "Did you forget to set tenantId");
-        //noinspection ConstantConditions
         return delegate.get().peek().resolveCurrentTenantIdentifier();
     }
 
     @Override
     public boolean validateExistingCurrentSessions() {
         Preconditions.checkArgument(!delegate.get().isEmpty(), "Did you forget to set tenantId");
-        //noinspection ConstantConditions
         return delegate.get().peek().validateExistingCurrentSessions();
     }
 }

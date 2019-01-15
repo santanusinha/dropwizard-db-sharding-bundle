@@ -1,5 +1,6 @@
 package in.cleartax.dropwizard.sharding.hibernate;
 
+import in.cleartax.dropwizard.sharding.utils.exception.InvalidTenantArgumentException;
 import io.dropwizard.hibernate.HibernateBundle;
 import io.dropwizard.hibernate.UnitOfWork;
 import org.hibernate.Session;
@@ -11,7 +12,7 @@ import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.Stack;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static in.cleartax.dropwizard.sharding.utils.exception.Preconditions.checkNotNull;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -46,7 +47,7 @@ public class MultiTenantUnitOfWorkAspect {
             if (unitOfWork.value().equals(HibernateBundle.DEFAULT_NAME) && sessionFactories.size() == 1) {
                 sessionFactory = sessionFactories.values().iterator().next();
             } else {
-                throw new IllegalArgumentException("Unregistered Hibernate bundle: '" + unitOfWork.value() + "'");
+                throw new InvalidTenantArgumentException("Unregistered Hibernate bundle: '" + unitOfWork.value() + "'");
             }
         }
         session = sessionFactory.openSession();
