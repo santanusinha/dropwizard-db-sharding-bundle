@@ -5,7 +5,7 @@
     <groupId>in.cleartax.dropwizard</groupId>
     <artifactId>db-sharding-bundle</artifactId>
     <packaging>pom</packaging>
-    <version>0.2.14</version>
+    <version>0.2.15-SNAPSHOT</version>
     <modules>
         <module>sharding-bom</module>
         <module>sharding-core</module>
@@ -33,7 +33,7 @@
     <scm>
         <connection>scm:git:git://github.com/ClearTax/dropwizard-db-sharding-bundle.git</connection>
         <developerConnection>scm:git:git@github.com:ClearTax/dropwizard-db-sharding-bundle.git</developerConnection>
-        <tag>db-sharding-bundle-0.2.14</tag>
+        <tag>0.1.2</tag>
         <url>https://github.com/ClearTax/dropwizard-db-sharding-bundle</url>
     </scm>
 
