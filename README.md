@@ -5,7 +5,7 @@ Make sure you're familiar with Dropwizard, dependency injection framework like [
 
 **License:** [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
 
-**Stable version:** [0.2.8](https://mvnrepository.com/artifact/in.cleartax.dropwizard/sharding-core/0.2.8)
+**Stable version:** [0.2.14](https://mvnrepository.com/artifact/in.cleartax.dropwizard/sharding-core/0.2.14)
 
 ## Why this library?
 1. Traditionally in Dropwizard, to open a database transaction ```@UnitOfWork``` is put on every [Jersey](https://jersey.github.io/)-resource method. In case ```@UnitOfWork``` is required at places, other than Jersey-resources a more verbose approach is required as mentiond [here](https://github.com/dropwizard/dropwizard/pull/1361).

@@ -2,6 +2,7 @@ package in.cleartax.dropwizard.sharding.utils.metrics;
 
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
+import in.cleartax.dropwizard.sharding.utils.exception.InvalidTenantArgumentException;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
@@ -46,7 +47,7 @@ public abstract class MultiTenantMetricsSet implements MetricSet {
                 })
                 .flatMap(map -> map.entrySet().stream())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> {
-                    throw new IllegalArgumentException("Metric key on different tenants cannot be same");
+                    throw new InvalidTenantArgumentException("Metric key on different tenants cannot be same");
                 }));
     }
 
