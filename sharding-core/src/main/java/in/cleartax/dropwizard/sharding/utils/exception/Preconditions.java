@@ -38,4 +38,20 @@ public class Preconditions {
         }
         return reference;
     }
+
+    /**
+     * Ensures the truth of an expression involving the state of the calling instance, but not
+     * involving any parameters to the calling method.
+     *
+     * @param expression   a boolean expression
+     * @param errorMessage the exception message to use if the check fails; will be converted to a
+     *                     string using {@link String#valueOf(Object)}
+     * @throws InvalidTenantStateException if {@code expression} is false
+     * @see Verify#verify Verify.verify()
+     */
+    public static void checkState(boolean expression, @Nullable Object errorMessage) {
+        if (!expression) {
+            throw new InvalidTenantStateException(String.valueOf(errorMessage));
+        }
+    }
 }

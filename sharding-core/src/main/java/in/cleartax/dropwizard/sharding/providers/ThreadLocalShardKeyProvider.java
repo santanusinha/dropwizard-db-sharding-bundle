@@ -17,7 +17,7 @@
 
 package in.cleartax.dropwizard.sharding.providers;
 
-import jersey.repackaged.com.google.common.base.Preconditions;
+import in.cleartax.dropwizard.sharding.utils.exception.Preconditions;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
