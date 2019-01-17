@@ -21,24 +21,30 @@ import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
 import in.cleartax.dropwizard.sharding.hibernate.DelegatingTenantResolver;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAspect;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantUnitOfWorkAwareProxyFactory;
+import in.cleartax.dropwizard.sharding.transactions.listeners.TransactionRunnerListener;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
 import org.hibernate.context.internal.ManagedSessionContext;
 
-@AllArgsConstructor
+import javax.annotation.Nullable;
+
+@RequiredArgsConstructor
 @Slf4j
 public abstract class TransactionRunner<T> {
-    private MultiTenantUnitOfWorkAwareProxyFactory proxyFactory;
-    private SessionFactory sessionFactory;
-    private ConstTenantIdentifierResolver tenantIdentifierResolver;
-
+    private final MultiTenantUnitOfWorkAwareProxyFactory proxyFactory;
+    private final SessionFactory sessionFactory;
+    private final ConstTenantIdentifierResolver tenantIdentifierResolver;
+    @Nullable
+    @Setter
+    private TransactionRunnerListener listener;
 
     public T start(boolean reUseSession, UnitOfWork unitOfWork) throws Throwable {
         return start(reUseSession, unitOfWork, "unnamed-context");
     }
-
 
     public T start(boolean reUseSession, UnitOfWork unitOfWork, String context) throws Throwable {
         if (reUseSession && ManagedSessionContext.hasBind(sessionFactory) &&
@@ -52,6 +58,7 @@ public abstract class TransactionRunner<T> {
         T result = null;
         long startTime = System.currentTimeMillis();
         try {
+            invokeStartListener(unitOfWork);
             aspect.beforeStart(unitOfWork);
             result = run();
             aspect.afterEnd();
@@ -63,12 +70,25 @@ public abstract class TransactionRunner<T> {
             log.trace("[DATABASE] transaction={} error={} context={} time-elapsed={}",
                     unitOfWork.transactional(), ex != null, context, System.currentTimeMillis() - startTime);
             DelegatingTenantResolver.getInstance().setDelegate(null);
+            invokeFinishListener(ex != null, unitOfWork);
         }
 
         if (ex != null) {
             throw ex;
         }
         return result;
+    }
+
+    private void invokeStartListener(UnitOfWork unitOfWork) {
+        if (listener != null) {
+            listener.onStart(unitOfWork);
+        }
+    }
+
+    private void invokeFinishListener(boolean success, UnitOfWork unitOfWork) {
+        if (listener != null) {
+            listener.onFinish(success, unitOfWork);
+        }
     }
 
     public abstract T run() throws Throwable;
