@@ -20,15 +20,15 @@ package in.cleartax.dropwizard.sharding.hibernate;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 
 public class ConstTenantIdentifierResolver implements CurrentTenantIdentifierResolver {
-    private final String defaultTenant;
+    private final String tenantId;
 
-    public ConstTenantIdentifierResolver(String defaultTenant) {
-        this.defaultTenant = defaultTenant;
+    public ConstTenantIdentifierResolver(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        return defaultTenant;
+        return tenantId;
     }
 
     @Override

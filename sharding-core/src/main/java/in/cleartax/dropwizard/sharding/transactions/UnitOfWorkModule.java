@@ -26,6 +26,7 @@ import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
 import in.cleartax.dropwizard.sharding.providers.ShardKeyProvider;
 import in.cleartax.dropwizard.sharding.resolvers.bucket.BucketResolver;
 import in.cleartax.dropwizard.sharding.resolvers.shard.ShardResolver;
+import in.cleartax.dropwizard.sharding.transactions.listeners.TransactionRunnerListener;
 import in.cleartax.dropwizard.sharding.utils.exception.Preconditions;
 import io.dropwizard.hibernate.UnitOfWork;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 
+import javax.inject.Named;
 import java.lang.reflect.Method;
 import java.util.Objects;
 
@@ -56,6 +58,9 @@ public class UnitOfWorkModule extends AbstractModule {
         ShardKeyProvider shardKeyProvider;
         @Inject
         MultiTenantSessionSource multiTenantSessionSource;
+        @Inject(optional = true)
+        @Named("defaultTransactionListener")
+        TransactionRunnerListener listener;
 
         @Override
         public Object invoke(MethodInvocation mi) throws Throwable {
@@ -70,6 +75,7 @@ public class UnitOfWorkModule extends AbstractModule {
                     return mi.proceed();
                 }
             };
+            runner.setListener(listener);
             return runner.start(mi.getMethod().isAnnotationPresent(ReuseSession.class),
                     mi.getMethod().getAnnotation(UnitOfWork.class), resolveOperationName(mi));
         }
@@ -128,7 +134,7 @@ public class UnitOfWorkModule extends AbstractModule {
         }
 
         private String extractReadOnlyReplica() {
-            if(multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()) {
+            if (multiTenantSessionSource.getDataSourceFactory().isReadOnlyReplicaEnabled()) {
                 return multiTenantSessionSource.getDataSourceFactory().getDefaultReadReplicaTenant();
             }
             return null;
