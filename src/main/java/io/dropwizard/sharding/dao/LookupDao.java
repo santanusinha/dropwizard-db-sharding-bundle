@@ -26,8 +26,10 @@ import io.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.sharding.utils.TransactionHandler;
 import io.dropwizard.sharding.utils.Transactions;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.hibernate.LockMode;
@@ -115,6 +117,13 @@ public class LookupDao<T> {
             return list(criteria.getExecutableCriteria(currentSession()));
         }
 
+        List<T> select(SelectParamPriv selectParam) {
+            val criteria = selectParam.criteria.getExecutableCriteria(currentSession());
+            criteria.setFirstResult(selectParam.start);
+            criteria.setMaxResults(selectParam.numRows);
+            return list(criteria);
+        }
+
         /**
          * Delete an object
          */
@@ -190,6 +199,32 @@ public class LookupDao<T> {
         int shardId = ShardCalculator.shardId(shardManager, bucketIdExtractor, key);
         LookupDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, true, dao::get, key, handler);
+    }
+
+    /**
+     Get list of objects which satisifes the criteria from the shard represented by shardKey
+     */
+    public List<T> select(String parentKey, DetachedCriteria criteria) throws Exception {
+        return select(parentKey, criteria, 0, 10);
+    }
+
+    public List<T> select(String parentKey, DetachedCriteria criteria, int first, int numResults) throws Exception {
+        return select(parentKey, criteria, first, numResults, t-> t);
+    }
+
+    public<U> U select(String parentKey, DetachedCriteria criteria, Function<List<T>, U> handler) throws Exception {
+        return select(parentKey, criteria, 0, 10, handler);
+    }
+
+    public<U> U select(String parentKey, DetachedCriteria criteria, int first, int numResults, Function<List<T>, U> handler) throws Exception {
+        int shardId = ShardCalculator.shardId(shardManager, bucketIdExtractor, parentKey);
+        LookupDaoPriv dao = daos.get(shardId);
+        SelectParamPriv selectParam = SelectParamPriv.<T>builder()
+                .criteria(criteria)
+                .start(first)
+                .numRows(numResults)
+                .build();
+        return Transactions.execute(dao.sessionFactory, true, dao::select, selectParam, handler);
     }
 
     /**
@@ -478,5 +513,12 @@ public class LookupDao<T> {
             }
             return result;
         }
+    }
+
+    @Builder
+    public static class SelectParamPriv {
+        DetachedCriteria criteria;
+        int start;
+        int numRows;
     }
 }

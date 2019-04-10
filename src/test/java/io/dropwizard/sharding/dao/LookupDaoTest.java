@@ -279,4 +279,62 @@ public class LookupDaoTest {
         Assert.assertNull(lookupDao.get("testId")
                                      .orElse(null));
     }
+
+    @Test
+    public void selectTest() throws Exception {
+        TestEntity testEntity = TestEntity.builder()
+                .externalId("testId")
+                .text("Some Text")
+                .build();
+
+        lookupDao.save(testEntity);
+        DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
+                .add(Restrictions.eq("text", "Some Text"));
+        List<TestEntity> result = lookupDao.select("testId", criteria);
+        Assert.assertEquals(result.size(), 1);
+        Assert.assertEquals(result.get(0), testEntity);
+    }
+
+    @Test
+    public void selectWithNoResultTest() throws Exception {
+        TestEntity testEntity = TestEntity.builder()
+                .externalId("testId")
+                .text("Some Text")
+                .build();
+
+        lookupDao.save(testEntity);
+        DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
+                .add(Restrictions.eq("text", "Some Random Text"));
+        List<TestEntity> result = lookupDao.select("testId", criteria);
+        Assert.assertEquals(result.size(), 0);
+    }
+
+    @Test
+    public void selectWithNoResultConstraintTest() throws Exception {
+        TestEntity testEntity = TestEntity.builder()
+                .externalId("testId")
+                .text("Some Text")
+                .build();
+
+        lookupDao.save(testEntity);
+        DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
+                .add(Restrictions.eq("text", "Some Text"));
+        List<TestEntity> result = lookupDao.select("testId", criteria, 0, 0);
+        Assert.assertEquals(result.size(), 0);
+    }
+
+    @Test
+    public void selectWithConstraintTest() throws Exception {
+        TestEntity testEntity = TestEntity.builder()
+                .externalId("testId")
+                .text("Some Text")
+                .build();
+
+        lookupDao.save(testEntity);
+        DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
+                .add(Restrictions.eq("text", "Some Text"));
+        List<TestEntity> result = lookupDao.select("testId", criteria, 0, 1);
+        Assert.assertEquals(result.size(), 1);
+        Assert.assertEquals(result.get(0), testEntity);
+    }
 }
