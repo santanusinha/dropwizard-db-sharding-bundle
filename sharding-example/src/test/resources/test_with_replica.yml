@@ -20,9 +20,20 @@ multiDatabase:
         hibernate.session.events.log: false
         org.hibernate.envers.do_not_audit_optimistic_locking_field: false
         org.hibernate.envers.audit_table_suffix: "_aud"
-    readReplica:
+      readReplica:
+        isEnabled: true
+        driverClass: org.h2.Driver
+        url: READ_ONLY_DB_URL1
+        properties:
+          charSet: UTF-8
+          hibernate.dialect: org.hibernate.dialect.H2Dialect
+          hibernate.create_empty_composites.enabled: true # Don't set embeddable to NULL, when all it's fields are null
+          hibernate.session.events.log: false
+          org.hibernate.envers.do_not_audit_optimistic_locking_field: false
+          org.hibernate.envers.audit_table_suffix: "_aud"
+    shard2:
       driverClass: org.h2.Driver
-      url: READ_ONLY_DB_URL
+      url: "jdbc:h2:mem:test2;MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE" # Case insensitive comparison for text, to follow MySQL's default behaviour
       properties:
         charSet: UTF-8
         hibernate.dialect: org.hibernate.dialect.H2Dialect
@@ -30,8 +41,17 @@ multiDatabase:
         hibernate.session.events.log: false
         org.hibernate.envers.do_not_audit_optimistic_locking_field: false
         org.hibernate.envers.audit_table_suffix: "_aud"
+      readReplica:
+        isEnabled: true
+        driverClass: org.h2.Driver
+        url: READ_ONLY_DB_URL2
+        properties:
+          charSet: UTF-8
+          hibernate.dialect: org.hibernate.dialect.H2Dialect
+          hibernate.create_empty_composites.enabled: true # Don't set embeddable to NULL, when all it's fields are null
+          hibernate.session.events.log: false
+          org.hibernate.envers.do_not_audit_optimistic_locking_field: false
+          org.hibernate.envers.audit_table_suffix: "_aud"
   verboseLogging: true
   allowMultipleTenants: true
-  readOnlyReplicaEnabled : true
   defaultTenant: "shard1"
-  defaultReadReplicaTenant : "readReplica"

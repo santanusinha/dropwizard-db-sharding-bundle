@@ -1,8 +1,10 @@
 package in.cleartax.dropwizard.sharding.test.sampleapp;
 
+import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
 import in.cleartax.dropwizard.sharding.application.TestConfig;
 import in.cleartax.dropwizard.sharding.dto.OrderDto;
+import in.cleartax.dropwizard.sharding.hibernate.ExtendedDataSourceFactory;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantManagedDataSource;
 import io.dropwizard.client.JerseyClientBuilder;
 import io.dropwizard.client.JerseyClientConfiguration;
@@ -10,6 +12,8 @@ import io.dropwizard.db.ManagedDataSource;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import io.dropwizard.util.Duration;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.HttpStatus;
 import org.h2.tools.RunScript;
 
@@ -24,6 +28,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,16 +42,25 @@ public class TestHelper {
     public static Client onSuiteRun(DropwizardAppRule<TestConfig> rule)
             throws Exception {
 
-        if(rule.getConfiguration().getMultiTenantDataSourceFactory().isReadOnlyReplicaEnabled()) {
-            PrepareReadOnlyTestDB.generateReplicaDB();
+        int i = 1;
+        List<Pair<String, String>> dbNames = Lists.newArrayList();
+        for (Map.Entry<String, ExtendedDataSourceFactory> entry :
+                rule.getConfiguration().getMultiTenantDataSourceFactory().getTenantDbMap().entrySet()) {
+            if (entry.getValue().getReadReplica() != null && entry.getValue().getReadReplica().isEnabled()) {
+                dbNames.add(ImmutablePair.of("read_replica_" + i, String.format("init_read_replica%s.sql", i)));
+            }
+            i++;
         }
+        PrepareReadOnlyTestDB.generateReplicaDB(dbNames);
 
         MultiTenantManagedDataSource multiTenantManagedDataSource =
                 rule.getConfiguration().getMultiTenantDataSourceFactory()
                         .build(rule.getEnvironment().metrics(), "migrations");
 
-        for(Map.Entry<String, ManagedDataSource> entry : multiTenantManagedDataSource.getTenantDataSourceMap().entrySet()) {
-            if(rule.getConfiguration().getMultiTenantDataSourceFactory().getWritableTenants().containsKey(entry.getKey())) {
+        for (Map.Entry<String, ManagedDataSource> entry :
+                multiTenantManagedDataSource.getTenantDataSourceMap().entrySet()) {
+            if (rule.getConfiguration().getMultiTenantDataSourceFactory()
+                    .getWritableTenants().containsKey(entry.getKey())) {
                 initDb("init_db.sql", entry.getValue());
             }
         }
@@ -95,8 +109,8 @@ public class TestHelper {
     }
 
     public static OrderDto createOrderOnReplica(OrderDto order, Client client, String host,
-                                       String authToken) throws Exception {
-       Response response = client.target(
+                                                String authToken) throws Exception {
+        Response response = client.target(
                 String.format("%s/v0.1/orders/replica", host))
                 .request()
                 .header(authToken, order.getCustomerId())
@@ -117,7 +131,7 @@ public class TestHelper {
     }
 
     public static OrderDto getOrderFromReplica(long id, String customerId, Client client, String host,
-                                    String authToken) {
+                                               String authToken) {
         Response response = client.target(
                 String.format("%s/v0.1/orders/replica/%d", host, id))
                 .request()

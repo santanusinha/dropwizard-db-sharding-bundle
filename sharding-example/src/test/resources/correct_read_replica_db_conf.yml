@@ -9,18 +9,17 @@ tenantDbMap:
       hibernate.session.events.log: false
       org.hibernate.envers.do_not_audit_optimistic_locking_field: false
       org.hibernate.envers.audit_table_suffix: "_aud"
-  readReplica:
-    driverClass: org.h2.Driver
-    url: READ_ONLY_DB_URL
-    properties:
-      charSet: UTF-8
-      hibernate.dialect: org.hibernate.dialect.H2Dialect
-      hibernate.create_empty_composites.enabled: true # Don't set embeddable to NULL, when all it's fields are null
-      hibernate.session.events.log: false
-      org.hibernate.envers.do_not_audit_optimistic_locking_field: false
-      org.hibernate.envers.audit_table_suffix: "_aud"
+    readReplica:
+      isEnabled: true
+      driverClass: org.h2.Driver
+      url: READ_ONLY_DB_URL
+      properties:
+        charSet: UTF-8
+        hibernate.dialect: org.hibernate.dialect.H2Dialect
+        hibernate.create_empty_composites.enabled: true # Don't set embeddable to NULL, when all it's fields are null
+        hibernate.session.events.log: false
+        org.hibernate.envers.do_not_audit_optimistic_locking_field: false
+        org.hibernate.envers.audit_table_suffix: "_aud"
 verboseLogging: false
 allowMultipleTenants: false
-readOnlyReplicaEnabled : true
 defaultTenant: "shard1"
-defaultReadReplicaTenant : "readReplica"

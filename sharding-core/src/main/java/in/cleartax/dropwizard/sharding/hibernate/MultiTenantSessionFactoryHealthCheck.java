@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutorService;
  */
 public class MultiTenantSessionFactoryHealthCheck extends HealthCheck {
     @NotEmpty
-    private final List<String> tenantIdentifiers;
+    private final List<String> tenantIdentifiers; // TODO : Add support for read-replica
     private final MultiTenantUnitOfWorkAwareProxyFactory proxyFactory;
     private final SessionFactory sessionFactory;
     private final String validationQuery;

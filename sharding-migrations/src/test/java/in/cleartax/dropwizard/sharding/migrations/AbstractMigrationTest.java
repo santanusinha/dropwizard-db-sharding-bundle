@@ -1,7 +1,7 @@
 package in.cleartax.dropwizard.sharding.migrations;
 
+import in.cleartax.dropwizard.sharding.hibernate.ExtendedDataSourceFactory;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
-import io.dropwizard.db.DataSourceFactory;
 import net.sourceforge.argparse4j.ArgumentParsers;
 import net.sourceforge.argparse4j.inf.Subparser;
 import org.assertj.core.util.Maps;
@@ -27,13 +27,13 @@ public class AbstractMigrationTest {
     }
 
     protected static TestMigrationConfiguration createConfiguration(String databaseUrl) {
-        final DataSourceFactory dataSource = new DataSourceFactory();
+        final ExtendedDataSourceFactory dataSource = new ExtendedDataSourceFactory();
         dataSource.setDriverClass("org.h2.Driver");
         dataSource.setUser("sa");
         dataSource.setUrl(databaseUrl);
         MultiTenantDataSourceFactory multiTenantDataSourceFactory = new MultiTenantDataSourceFactory();
         multiTenantDataSourceFactory.setDefaultTenant("shard1");
-        Map<String, DataSourceFactory> tenantDbMap = Maps.newHashMap("shard1", dataSource);
+        Map<String, ExtendedDataSourceFactory> tenantDbMap = Maps.newHashMap("shard1", dataSource);
         multiTenantDataSourceFactory.setTenantDbMap(tenantDbMap);
         return new TestMigrationConfiguration(multiTenantDataSourceFactory);
     }

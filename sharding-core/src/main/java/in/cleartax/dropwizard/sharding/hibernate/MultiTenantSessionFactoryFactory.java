@@ -18,6 +18,7 @@
 package in.cleartax.dropwizard.sharding.hibernate;
 
 import com.google.common.collect.Maps;
+import in.cleartax.dropwizard.sharding.utils.exception.Preconditions;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.setup.Environment;
 import org.hibernate.SessionFactory;
@@ -33,6 +34,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.util.*;
+
+import static in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory.REPLICA;
 
 public class MultiTenantSessionFactoryFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(MultiTenantSessionFactoryFactory.class);
@@ -73,8 +76,24 @@ public class MultiTenantSessionFactoryFactory {
             MultiTenantManagedDataSource multiTenantDataSource, MultiTenantDataSourceFactory dbConfig) {
         Map<String, ConnectionProvider> connectionProviderMap = new HashMap<>();
         multiTenantDataSource.getTenantDataSourceMap().forEach(
-                (tenantKey, ds) -> connectionProviderMap.put(tenantKey,
-                        buildConnectionProvider(ds, dbConfig.getTenantDbMap().get(tenantKey).getProperties())));
+                (tenantKey, ds) -> {
+                    // tenant id = shard1 or shard1_replica (in case of read-replica)
+                    if (dbConfig.getTenantDbMap().containsKey(tenantKey)) {
+                        // Regular shard
+                        connectionProviderMap.put(tenantKey,
+                                buildConnectionProvider(ds, dbConfig.getTenantDbMap().get(tenantKey).getProperties()));
+                    } else {
+                        // It's a replica
+                        String ownerTenantKey = tenantKey.substring(0, tenantKey.indexOf(REPLICA));
+                        ExtendedDataSourceFactory dsf = dbConfig.getTenantDbMap().get(ownerTenantKey);
+                        Preconditions.checkNotNull(dsf);
+                        Preconditions.checkState(dsf.getReadReplica() != null &&
+                                dsf.getReadReplica().isEnabled(),
+                                "No read-replica is enabled for tenant " + tenantKey);
+                        connectionProviderMap.put(tenantKey,
+                                buildConnectionProvider(ds, dsf.getReadReplica().getProperties()));
+                    }
+                });
         return new ConfigurableMultiTenantConnectionProvider(connectionProviderMap);
     }
 

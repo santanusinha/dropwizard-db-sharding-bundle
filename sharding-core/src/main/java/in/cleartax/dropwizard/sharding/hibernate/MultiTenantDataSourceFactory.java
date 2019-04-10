@@ -19,7 +19,8 @@ package in.cleartax.dropwizard.sharding.hibernate;
 
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.dropwizard.db.DataSourceFactory;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import io.dropwizard.db.ManagedDataSource;
 import io.dropwizard.util.Duration;
 import io.dropwizard.validation.MinDuration;
@@ -30,16 +31,18 @@ import org.hibernate.validator.constraints.NotBlank;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.validation.constraints.NotNull;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Getter
 @Setter
 public class MultiTenantDataSourceFactory {
 
+    public static final String REPLICA = "_replica";
+
     @NotEmpty
-    private Map<String, DataSourceFactory> tenantDbMap;
+    private Map<String, ExtendedDataSourceFactory> tenantDbMap;
 
     private boolean autoCommentsEnabled = true;
     @NotNull
@@ -50,8 +53,6 @@ public class MultiTenantDataSourceFactory {
     private String defaultTenant;
     private boolean allowMultipleTenants;
     private boolean verboseLogging;
-    private boolean readOnlyReplicaEnabled;
-    private String defaultReadReplicaTenant;
 
     public boolean isAutoCommentsEnabled() {
         return autoCommentsEnabled;
@@ -63,31 +64,30 @@ public class MultiTenantDataSourceFactory {
     }
 
     public MultiTenantManagedDataSource build(MetricRegistry metricRegistry, String name) {
-        Map<String, ManagedDataSource> tenantDataSourceMap = tenantDbMap.entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey,
-                        e -> e.getValue().build(metricRegistry, name + "-" + e.getKey())));
+        Map<String, ManagedDataSource> tenantDataSourceMap = Maps.newHashMap();
+        for (Map.Entry<String, ExtendedDataSourceFactory> tenantDataSourceEntry : tenantDbMap.entrySet()) {
+            ExtendedDataSourceFactory dataSourceFactory = tenantDataSourceEntry.getValue();
+            tenantDataSourceMap.put(tenantDataSourceEntry.getKey(), dataSourceFactory.build(metricRegistry,
+                    name + "-" + tenantDataSourceEntry.getKey()));
+            if (dataSourceFactory.getReadReplica() != null && dataSourceFactory.getReadReplica().isEnabled()) {
+                tenantDataSourceMap.put(tenantDataSourceEntry.getKey() + REPLICA,
+                        dataSourceFactory.getReadReplica().build(metricRegistry,
+                                name + "-" + tenantDataSourceEntry.getKey() + REPLICA));
+            }
+        }
         return new MultiTenantManagedDataSource(tenantDataSourceMap);
     }
 
-    public DataSourceFactory getDefaultDataSourceFactory() {
+    public ExtendedDataSourceFactory getDefaultDataSourceFactory() {
         return tenantDbMap.get(defaultTenant);
     }
 
-    public boolean isReadReplicaAvailable() {
-        return readOnlyReplicaEnabled && defaultReadReplicaTenant != null
-                && !defaultReadReplicaTenant.isEmpty() && !getWritableTenants().containsKey(defaultReadReplicaTenant);
-    }
-
-    public Map<String, DataSourceFactory> getWritableTenants() {
-        if(defaultReadReplicaTenant == null || defaultReadReplicaTenant.isEmpty()) { return tenantDbMap; }
-        return tenantDbMap.entrySet().stream().filter(t -> !t.getKey().equals(defaultReadReplicaTenant))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    public Map<String, ExtendedDataSourceFactory> getWritableTenants() {
+        return tenantDbMap;
     }
 
     @ValidationMethod(message = "Tenant configuration is not valid")
     public boolean isValid() {
-        return getDefaultDataSourceFactory() != null &&
-                (allowMultipleTenants ? tenantDbMap.size() > 1 : getWritableTenants().size() == 1) &&
-                (!readOnlyReplicaEnabled || (defaultReadReplicaTenant != null && !defaultReadReplicaTenant.isEmpty()));
+        return getDefaultDataSourceFactory() != null && tenantDbMap != null && !tenantDbMap.isEmpty();
     }
 }
