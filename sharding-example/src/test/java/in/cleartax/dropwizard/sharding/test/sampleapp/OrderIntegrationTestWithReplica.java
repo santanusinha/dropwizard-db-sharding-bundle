@@ -46,14 +46,15 @@ public class OrderIntegrationTestWithReplica {
     @ClassRule
     public static final DropwizardAppRule<TestConfig> RULE = TestSuiteWithReplicaEnabled.RULE;
     private static final String AUTH_TOKEN = "X-Auth-Token";
-    private static final List<String> shards = ImmutableList.of("readReplica", "shard1");
+    private static final List<String> shards = ImmutableList.of("shard1_replica", "shard2_replica");
     private static Client client;
     private static String host;
     private final ImmutablePair<Integer, ImmutablePair<String, String > > orderIdAndCustomerIdTenantIdMap; // {orderId, (customerId, shardId)}
 
     @Parameterized.Parameters
     public static List<ImmutablePair<Integer, ImmutablePair<String, String> > > customerIds() {
-        return Lists.newArrayList(ImmutablePair.of(1, ImmutablePair.of("1", "readReplica")));
+        return Lists.newArrayList(ImmutablePair.of(1, ImmutablePair.of("1", "shard1_replica")),
+                ImmutablePair.of(2, ImmutablePair.of("3", "shard2_replica")));
     }
 
     @BeforeClass

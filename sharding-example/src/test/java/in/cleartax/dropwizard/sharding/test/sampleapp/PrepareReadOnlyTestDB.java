@@ -5,6 +5,8 @@ package in.cleartax.dropwizard.sharding.test.sampleapp;
  */
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.h2.store.fs.FileUtils;
 import org.h2.tools.Backup;
 import org.h2.tools.DeleteDbFiles;
@@ -12,6 +14,7 @@ import org.h2.tools.DeleteDbFiles;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.util.List;
 
 /**
  * This sample application shows how to create and use a read-only database in a
@@ -24,14 +27,20 @@ public class PrepareReadOnlyTestDB {
 
     static final String TEMP_DIR_PATH = System.getProperty("java.io.tmpdir");
     static final String TEMP_DB_SUBDIRECTORY = "readOnly";
-    static final String TEMP_DB_NAME = "readonly_test";
 
-    public static String generateReplicaDB() throws Exception {
-
-        String readOnlyDbDirectoryPath = Paths.get(TEMP_DIR_PATH, TEMP_DB_SUBDIRECTORY).toString();
-        String readOnlyDbFile = Paths.get(readOnlyDbDirectoryPath, TEMP_DB_NAME).toString();
-        String readOnlyDbFileZip = readOnlyDbFile + ".zip";
+    public static void generateReplicaDB(List<Pair<String, String>> dbNameAndMigrationFileName) throws Exception {
+        String readOnlyDbDirectoryPath = getReadOnlyDbDirectoryPath();
         FileUtils.deleteRecursive(readOnlyDbDirectoryPath, false);
+        for (Pair<String, String> pair : dbNameAndMigrationFileName) {
+            generateReplicaDB(pair.getKey(), pair.getValue(), readOnlyDbDirectoryPath);
+        }
+    }
+
+    private static void generateReplicaDB(String dbName, String migrationFileName,
+                                          String readOnlyDbDirectoryPath) throws Exception {
+
+        String readOnlyDbFile = getReadOnlyDbFile(readOnlyDbDirectoryPath, dbName);
+        String readOnlyDbFileZip = getReadOnlyDbFileZip(readOnlyDbFile);
 
 
         Connection conn;
@@ -48,22 +57,35 @@ public class PrepareReadOnlyTestDB {
 
         try {
             log.info("adding test data...");
-            TestHelper.initDb("init_read_replica.sql", conn);
+            TestHelper.initDb(migrationFileName, conn);
             log.info("create the zip file...");
             Backup.execute(readOnlyDbFileZip, readOnlyDbDirectoryPath, "", true);
-            String readOnlyDBUrl = "jdbc:h2:split:zip:" + readOnlyDbFileZip + "!/" + TEMP_DB_NAME + ";MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE;";
-
             // delete the old database files
-            DeleteDbFiles.execute("split:"+readOnlyDbDirectoryPath, TEMP_DB_NAME, true);
-            return readOnlyDBUrl;
-        }
-        catch (Exception e) {
+            DeleteDbFiles.execute("split:" + readOnlyDbDirectoryPath, dbName, true);
+        } catch (Exception e) {
             log.debug("Unable to create readOnly DB", e);
-        }
-        finally {
+        } finally {
             conn.close();
         }
-        return null;
     }
 
+    public static String getReplicaDbUrl(String dbName) {
+        String readOnlyDbDirectoryPath = getReadOnlyDbDirectoryPath();
+        String readOnlyDbFile = getReadOnlyDbFile(readOnlyDbDirectoryPath, dbName);
+        String readOnlyDbFileZip = getReadOnlyDbFileZip(readOnlyDbFile);
+        return "jdbc:h2:split:zip:" + readOnlyDbFileZip + "!/" + dbName +
+                ";MODE=MySQL;DATABASE_TO_UPPER=false;IGNORECASE=TRUE;";
+    }
+
+    private static String getReadOnlyDbDirectoryPath() {
+        return Paths.get(TEMP_DIR_PATH, TEMP_DB_SUBDIRECTORY).toString();
+    }
+
+    private static String getReadOnlyDbFile(String readOnlyDbDirectoryPath, String dbName) {
+        return Paths.get(readOnlyDbDirectoryPath, dbName).toString();
+    }
+
+    private static String getReadOnlyDbFileZip(String readOnlyDbFile) {
+        return readOnlyDbFile + ".zip";
+    }
 }
