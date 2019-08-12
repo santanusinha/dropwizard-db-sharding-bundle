@@ -29,7 +29,7 @@ public class AssertionUtil {
                 .getInstance(MultiTenantSessionSource.class);
         for (final String eachShard : shards) {
             new TransactionRunner<Order>(multiTenantSessionSource.getUnitOfWorkAwareProxyFactory(),
-                    multiTenantSessionSource.getSessionFactory(), new ConstTenantIdentifierResolver(eachShard)) {
+                    multiTenantSessionSource.getSessionFactory(), new ConstTenantIdentifierResolver(eachShard), AssertionUtil.class.getEnclosingMethod()) {
                 @Override
                 public Order run() {
                     Order order = orderDao.get(orderDto.getId());
@@ -49,7 +49,7 @@ public class AssertionUtil {
                     }
                     return order;
                 }
-            }.start(false, new DefaultUnitOfWorkImpl(), "AssertionUtil#assertOrderPresentOnShard");
+            }.start(false, new DefaultUnitOfWorkImpl());
         }
     }
 }

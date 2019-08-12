@@ -35,7 +35,6 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.inject.Named;
-import java.lang.reflect.Method;
 import java.util.Objects;
 
 @Slf4j
@@ -69,15 +68,16 @@ public class UnitOfWorkModule extends AbstractModule {
 
             TransactionRunner runner = new TransactionRunner(multiTenantSessionSource.getUnitOfWorkAwareProxyFactory(),
                     multiTenantSessionSource.getSessionFactory(),
-                    new ConstTenantIdentifierResolver(tenantId)) {
+                    new ConstTenantIdentifierResolver(tenantId), mi.getMethod()) {
                 @Override
                 public Object run() throws Throwable {
                     return mi.proceed();
                 }
             };
+
             runner.setListener(listener);
             return runner.start(mi.getMethod().isAnnotationPresent(ReuseSession.class),
-                    mi.getMethod().getAnnotation(UnitOfWork.class), resolveOperationName(mi));
+                    mi.getMethod().getAnnotation(UnitOfWork.class));
         }
 
         private String getTenantIdentifier(MethodInvocation mi) {
@@ -146,13 +146,5 @@ public class UnitOfWorkModule extends AbstractModule {
             }
         }
 
-        private String resolveOperationName(MethodInvocation methodInvocation) {
-
-            if (Objects.nonNull(methodInvocation) && Objects.nonNull(methodInvocation.getMethod())) {
-                Method method = methodInvocation.getMethod();
-                return String.format("%s#%s", method.getDeclaringClass().getName(), method.getName());
-            }
-            return null;
-        }
     }
 }

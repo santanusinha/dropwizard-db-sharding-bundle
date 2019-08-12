@@ -79,13 +79,13 @@ public class MultiTenantSessionFactoryHealthCheck extends HealthCheck {
         try {
             for (String eachTenantId : tenantIdentifiers) {
                 new TransactionRunner<Void>(proxyFactory, sessionFactory,
-                        new ConstTenantIdentifierResolver(eachTenantId)) {
+                        new ConstTenantIdentifierResolver(eachTenantId), this.getClass().getEnclosingMethod()) {
                     @Override
                     public Void run() {
                         sessionFactory.getCurrentSession().createNativeQuery(validationQuery).list();
                         return null;
                     }
-                }.start(false, new DefaultUnitOfWorkImpl(), "healthCheck");
+                }.start(false, new DefaultUnitOfWorkImpl());
             }
         } catch (Throwable t) {
             throw new RuntimeException(t);
