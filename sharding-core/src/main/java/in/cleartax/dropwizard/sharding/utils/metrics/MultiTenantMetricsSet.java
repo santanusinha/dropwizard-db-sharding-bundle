@@ -2,6 +2,7 @@ package in.cleartax.dropwizard.sharding.utils.metrics;
 
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
+import in.cleartax.dropwizard.sharding.transactions.TransactionContext;
 import in.cleartax.dropwizard.sharding.utils.exception.InvalidTenantArgumentException;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantDataSourceFactory;
@@ -34,13 +35,13 @@ public abstract class MultiTenantMetricsSet implements MetricSet {
                 .map(tenantId -> {
                     try {
                         return new TransactionRunner<Map<String, Metric>>(proxyFactory, sessionFactory,
-                                new ConstTenantIdentifierResolver(tenantId)) {
+                                new ConstTenantIdentifierResolver(tenantId), TransactionContext.create(this.getClass().getEnclosingMethod())) {
 
                             @Override
                             public Map<String, Metric> run() {
                                 return runOnTenant(tenantId);
                             }
-                        }.start(false, new DefaultUnitOfWorkImpl(), "MultiTenantMetricsSet#getMetrics");
+                        }.start(false, new DefaultUnitOfWorkImpl());
                     } catch (Throwable t) {
                         throw new RuntimeException(t);
                     }

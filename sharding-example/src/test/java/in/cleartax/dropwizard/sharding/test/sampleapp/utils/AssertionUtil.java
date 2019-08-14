@@ -8,6 +8,7 @@ import in.cleartax.dropwizard.sharding.entities.Order;
 import in.cleartax.dropwizard.sharding.hibernate.ConstTenantIdentifierResolver;
 import in.cleartax.dropwizard.sharding.hibernate.MultiTenantSessionSource;
 import in.cleartax.dropwizard.sharding.transactions.DefaultUnitOfWorkImpl;
+import in.cleartax.dropwizard.sharding.transactions.TransactionContext;
 import in.cleartax.dropwizard.sharding.transactions.TransactionRunner;
 import io.dropwizard.testing.junit.DropwizardAppRule;
 import ru.vyarus.dropwizard.guice.GuiceBundle;
@@ -29,7 +30,7 @@ public class AssertionUtil {
                 .getInstance(MultiTenantSessionSource.class);
         for (final String eachShard : shards) {
             new TransactionRunner<Order>(multiTenantSessionSource.getUnitOfWorkAwareProxyFactory(),
-                    multiTenantSessionSource.getSessionFactory(), new ConstTenantIdentifierResolver(eachShard)) {
+                    multiTenantSessionSource.getSessionFactory(), new ConstTenantIdentifierResolver(eachShard), TransactionContext.create(AssertionUtil.class.getEnclosingMethod())) {
                 @Override
                 public Order run() {
                     Order order = orderDao.get(orderDto.getId());
@@ -49,7 +50,7 @@ public class AssertionUtil {
                     }
                     return order;
                 }
-            }.start(false, new DefaultUnitOfWorkImpl(), "AssertionUtil#assertOrderPresentOnShard");
+            }.start(false, new DefaultUnitOfWorkImpl());
         }
     }
 }
