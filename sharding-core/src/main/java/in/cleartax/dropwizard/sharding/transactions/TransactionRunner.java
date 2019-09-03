@@ -68,10 +68,11 @@ public abstract class TransactionRunner<T> {
             aspect.onError();
         } finally {
             aspect.onFinish();
+            long timeElapsed = System.currentTimeMillis() - startTime;
             log.trace("[DATABASE] transaction={} error={} context={} time-elapsed={}",
-                    unitOfWork.transactional(), ex != null, resolveOperationName(transactionContext.getMethodOfInvocation()), System.currentTimeMillis() - startTime);
+                    unitOfWork.transactional(), ex != null, resolveOperationName(transactionContext.getMethodOfInvocation()), timeElapsed);
             DelegatingTenantResolver.getInstance().setDelegate(null);
-            invokeFinishListener(ex != null, unitOfWork);
+            invokeFinishListener(ex != null, unitOfWork, timeElapsed);
         }
 
         if (ex != null) {
@@ -86,9 +87,9 @@ public abstract class TransactionRunner<T> {
         }
     }
 
-    private void invokeFinishListener(boolean success, UnitOfWork unitOfWork) {
+    private void invokeFinishListener(boolean success, UnitOfWork unitOfWork, long timeElapsed) {
         if (listener != null) {
-            listener.onFinish(success, unitOfWork, transactionContext);
+            listener.onFinish(success, unitOfWork, transactionContext, timeElapsed);
         }
     }
 
