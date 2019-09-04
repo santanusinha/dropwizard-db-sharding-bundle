@@ -11,5 +11,5 @@ import java.lang.reflect.Method;
 public interface TransactionRunnerListener {
     void onStart(UnitOfWork unitOfWork, TransactionContext transactionContext);
 
-    void onFinish(boolean success, UnitOfWork unitOfWork, TransactionContext transactionContext);
+    void onFinish(boolean success, UnitOfWork unitOfWork, TransactionContext transactionContext, long timeElapsed);
 }
