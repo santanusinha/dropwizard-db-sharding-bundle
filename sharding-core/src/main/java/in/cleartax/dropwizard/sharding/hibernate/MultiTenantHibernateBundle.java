@@ -35,6 +35,15 @@ public abstract class MultiTenantHibernateBundle<T extends Configuration> implem
     private final MultiTenantSessionFactoryFactory sessionFactoryFactory;
     private SessionFactory sessionFactory;
     private boolean lazyLoadingEnabled = true;
+    private boolean hibernateHealthCheckRegisterEnabled = false;
+
+    public boolean isHibernateHealthCheckRegisterEnabled() {
+        return hibernateHealthCheckRegisterEnabled;
+    }
+
+    public void setHibernateHealthCheckRegisterEnabled(boolean hibernateHealthCheckRegisterEnabled) {
+        this.hibernateHealthCheckRegisterEnabled = hibernateHealthCheckRegisterEnabled;
+    }
 
     protected MultiTenantHibernateBundle(Class<?> entity, Class<?>... entities) {
         this(ImmutableList.<Class<?>>builder().add(entity).add(entities).build(),
@@ -77,14 +86,16 @@ public abstract class MultiTenantHibernateBundle<T extends Configuration> implem
     public final void run(T configuration, Environment environment) {
         final MultiTenantDataSourceFactory dbConfig = getDataSourceFactory(configuration);
         this.sessionFactory = sessionFactoryFactory.build(this, environment, dbConfig, entities, name());
-        environment.healthChecks().register(name(),
-                new MultiTenantSessionFactoryHealthCheck(
-                        environment.getHealthCheckExecutorService(),
-                        dbConfig.getValidationQueryTimeout().orElse(Duration.seconds(5)),
-                        sessionFactory,
-                        new MultiTenantUnitOfWorkAwareProxyFactory(this),
-                        Lists.newArrayList(dbConfig.getTenantDbMap().keySet()),
-                        dbConfig.getValidationQuery()));
+        if(hibernateHealthCheckRegisterEnabled) {
+            environment.healthChecks().register(name(),
+                    new MultiTenantSessionFactoryHealthCheck(
+                            environment.getHealthCheckExecutorService(),
+                            dbConfig.getValidationQueryTimeout().orElse(Duration.seconds(5)),
+                            sessionFactory,
+                            new MultiTenantUnitOfWorkAwareProxyFactory(this),
+                            Lists.newArrayList(dbConfig.getTenantDbMap().keySet()),
+                            dbConfig.getValidationQuery()));
+        }
     }
 
     public boolean isLazyLoadingEnabled() {
