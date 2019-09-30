@@ -358,7 +358,12 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
     public List<T> select(String parentKey, DetachedCriteria criteria, int first, int numResults) throws Exception {
-        return select(parentKey, criteria, first, numResults, t-> t);
+        List<T> select = select(parentKey, criteria, first, numResults, t -> t);
+        if (select.size() > 100){
+            log.debug("More than 100 rows fetched from DB entity: {} parentKey: {} rows: {}",
+                    entityClass.getName(), parentKey, select.size());
+        }
+        return select;
     }
 
     public<U> U select(String parentKey, DetachedCriteria criteria, int first, int numResults, Function<List<T>, U> handler) throws Exception {
