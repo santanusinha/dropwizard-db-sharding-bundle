@@ -85,8 +85,6 @@ abstract class DBShardingBundleBase<T extends Configuration> implements Configur
             Class<?> entity,
             Class<?>... entities) {
         this.dbNamespace = dbNamespace;
-        this.shardInfoProvider = new ShardInfoProvider(dbNamespace);
-        this.healthCheckManager = new HealthCheckManager(dbNamespace, shardManager, shardInfoProvider);
         val inEntities = ImmutableList.<Class<?>>builder().add(entity).add(entities).build();
         init(inEntities);
     }
@@ -117,7 +115,7 @@ abstract class DBShardingBundleBase<T extends Configuration> implements Configur
         val blacklistingStore = getBlacklistingStore();
         this.shardManager = createShardManager(numShards, blacklistingStore);
         this.shardInfoProvider = new ShardInfoProvider(dbNamespace);
-        this.healthCheckManager = new HealthCheckManager(dbNamespace, shardManager, shardInfoProvider);
+        this.healthCheckManager = new HealthCheckManager(dbNamespace, shardInfoProvider, blacklistingStore);
 
         IntStream.range(0, numShards).forEach(
                 shard -> shardBundles.add(new HibernateBundle<T>(inEntities, new SessionFactoryFactory()) {
