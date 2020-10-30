@@ -45,14 +45,12 @@ import io.dropwizard.setup.Environment;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.hibernate.Interceptor;
 import org.hibernate.SessionFactory;
 import org.reflections.Reflections;
 
 import javax.persistence.Entity;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -86,7 +84,17 @@ abstract class DBShardingBundleBase<T extends Configuration> implements Configur
             Class<?>... entities) {
         this.dbNamespace = dbNamespace;
         val inEntities = ImmutableList.<Class<?>>builder().add(entity).add(entities).build();
-        init(inEntities);
+        init(inEntities, null);
+    }
+
+    protected DBShardingBundleBase(
+            String dbNamespace,
+            SessionFactoryFactory sessionFactoryFactory,
+            Class<?> entity,
+            Class<?>... entities) {
+        this.dbNamespace = dbNamespace;
+        val inEntities = ImmutableList.<Class<?>>builder().add(entity).add(entities).build();
+        init(inEntities, sessionFactoryFactory);
     }
 
     protected DBShardingBundleBase(String dbNamespace, List<String> classPathPrefixList) {
@@ -94,11 +102,11 @@ abstract class DBShardingBundleBase<T extends Configuration> implements Configur
         Set<Class<?>> entities = new Reflections(classPathPrefixList).getTypesAnnotatedWith(Entity.class);
         Preconditions.checkArgument(!entities.isEmpty(), String.format("No entity class found at %s", String.join(",", classPathPrefixList)));
         val inEntities = ImmutableList.<Class<?>>builder().addAll(entities).build();
-        init(inEntities);
+        init(inEntities, null);
     }
 
     protected DBShardingBundleBase(Class<?> entity, Class<?>... entities) {
-        this(DEFAULT_NAMESPACE, entity, entities);
+        this(DEFAULT_NAMESPACE, null, entity, entities);
     }
 
     protected DBShardingBundleBase(String... classPathPrefixes) {
@@ -107,17 +115,17 @@ abstract class DBShardingBundleBase<T extends Configuration> implements Configur
 
     protected abstract ShardManager createShardManager(int numShards, ShardBlacklistingStore blacklistingStore);
 
-    private void init(final ImmutableList<Class<?>> inEntities) {
+    private void init(final ImmutableList<Class<?>> inEntities, SessionFactoryFactory sessionFactoryFactoryy) {
         String numShardsEnv = System.getProperty(String.join(".", dbNamespace, DEFAULT_NAMESPACE),
                 System.getProperty(SHARD_ENV, DEFAULT_SHARDS));
-
+        SessionFactoryFactory sessionFactoryFactory = sessionFactoryFactoryy != null ? sessionFactoryFactoryy : new SessionFactoryFactory();
         this.numShards = Integer.parseInt(numShardsEnv);
         val blacklistingStore = getBlacklistingStore();
         this.shardManager = createShardManager(numShards, blacklistingStore);
         this.shardInfoProvider = new ShardInfoProvider(dbNamespace);
         this.healthCheckManager = new HealthCheckManager(dbNamespace, shardInfoProvider, blacklistingStore, shardManager);
         IntStream.range(0, numShards).forEach(
-                shard -> shardBundles.add(new HibernateBundle<T>(inEntities, new SessionFactoryFactory()) {
+                shard -> shardBundles.add(new HibernateBundle<T>(inEntities, sessionFactoryFactory) {
                     @Override
                     protected String name() {
                         return shardInfoProvider.shardName(shard);
@@ -232,7 +240,6 @@ abstract class DBShardingBundleBase<T extends Configuration> implements Configur
                                                               RelationalCache<EntityType> cacheManager) {
         return new CacheableRelationalDao<>(this.sessionFactories, clazz, new ShardCalculator<>(this.shardManager, bucketIdExtractor), cacheManager);
     }
-
 
     public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
     WrapperDao<EntityType, DaoType> createWrapperDao(Class<DaoType> daoTypeClass) {
