@@ -69,7 +69,7 @@
         <guava.version>28.0-jre</guava.version>
         <guava-retrying.version>2.0.0</guava-retrying.version>
         <caffeine.version>2.6.2</caffeine.version>
-        <junit.version>4.12</junit.version>
+        <junit.version>5.7.0</junit.version>
         <h2.version>1.4.196</h2.version>
         <mockito.version>3.6.28</mockito.version>
     </properties>
@@ -118,12 +118,14 @@
             <artifactId>caffeine</artifactId>
             <version>${caffeine.version}</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-api -->
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
