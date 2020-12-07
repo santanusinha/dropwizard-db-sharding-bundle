@@ -17,12 +17,13 @@
 
 package io.appform.dropwizard.sharding.admin;
 
-import com.google.common.collect.ImmutableMultimap;
 import io.dropwizard.servlets.tasks.Task;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.PrintWriter;
+import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -37,7 +38,7 @@ public class BlacklistShardTask extends Task {
     }
 
     @Override
-    public void execute(ImmutableMultimap<String, String> params, PrintWriter out) throws Exception {
+    public void execute(Map<String, List<String>> params, PrintWriter out) throws Exception {
         int shard = TaskUtils.parseShardParam(params);
         shardManager.blacklistShard(shard);
     }
