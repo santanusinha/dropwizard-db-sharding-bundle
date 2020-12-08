@@ -17,42 +17,49 @@
 
 package io.appform.dropwizard.sharding.sharding;
 
-import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class LegacyShardManagerTest {
 
-   @Test(expected = IllegalArgumentException.class)
+   @Test
     public void testShardForBucket() throws Exception {
-        LegacyShardManager shardManager = new LegacyShardManager(5);
+       Assertions.assertThrows(IllegalArgumentException.class,() -> {
+           LegacyShardManager shardManager = new LegacyShardManager(5);
+       });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testShardForOddBucket() throws Exception {
-        LegacyShardManager shardManager = new LegacyShardManager(9);
+        Assertions.assertThrows(IllegalArgumentException.class,() -> {
+            LegacyShardManager shardManager = new LegacyShardManager(9);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testShardForEvenNon2PowerBucket() throws Exception {
-        LegacyShardManager shardManager = new LegacyShardManager(40);
+       Assertions.assertThrows(IllegalArgumentException.class,() -> {
+           LegacyShardManager shardManager = new LegacyShardManager(40);
+       });
+
     }
 
     @Test
     public void testShardFor64Bucket() throws Exception {
         LegacyShardManager shardManager = new LegacyShardManager(64);
-        assertEquals(63, shardManager.shardForBucket(999));
+        Assertions.assertEquals(63, shardManager.shardForBucket(999));
     }
 
     @Test
     public void testShardFor32Bucket() throws Exception {
         LegacyShardManager shardManager = new LegacyShardManager(32);
-        assertEquals(31, shardManager.shardForBucket(999));
+        Assertions.assertEquals(31, shardManager.shardForBucket(999));
     }
 
     @Test
     public void testShardFor16Bucket() throws Exception {
         LegacyShardManager shardManager = new LegacyShardManager(16);
-        assertEquals(15, shardManager.shardForBucket(999));
+        Assertions.assertEquals(15, shardManager.shardForBucket(999));
     }
 }

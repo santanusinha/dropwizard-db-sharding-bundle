@@ -18,33 +18,31 @@
 package io.appform.dropwizard.sharding.sharding;
 
 import io.appform.dropwizard.sharding.exceptions.ShardBlacklistedException;
-import org.junit.Assert;
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class ShardManagerTest {
 
    @Test
     public void testShardForBucket() throws Exception {
         ShardManager shardManager = new LegacyShardManager(8);
-        assertEquals(0, shardManager.shardForBucket(100));
+        Assertions.assertEquals(0, shardManager.shardForBucket(100));
     }
 
     @Test
     public void testBlacklisting() throws Exception {
         ShardManager shardManager = new LegacyShardManager(8);
-        assertEquals(0, shardManager.shardForBucket(100));
+        Assertions.assertEquals(0, shardManager.shardForBucket(100));
         shardManager.blacklistShard(0);
         Thread.sleep(5000); //Sleeping for 5 seconds
         try {
             shardManager.shardForBucket(100);
-            Assert.fail("Should have errored out");
+            Assertions.fail("Should have errored out");
         } catch (ShardBlacklistedException e) {
 
         }
         shardManager.unblacklistShard(0);
         Thread.sleep(5000); //Sleeping for 5 seconds
-        assertEquals(0, shardManager.shardForBucket(100));
+        Assertions.assertEquals(0, shardManager.shardForBucket(100));
     }
 }

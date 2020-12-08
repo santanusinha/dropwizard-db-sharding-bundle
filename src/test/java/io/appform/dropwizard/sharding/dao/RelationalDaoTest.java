@@ -30,15 +30,15 @@ import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.criterion.DetachedCriteria;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 public class RelationalDaoTest {
 
@@ -63,7 +63,7 @@ public class RelationalDaoTest {
         return configuration.buildSessionFactory(serviceRegistry);
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         for (int i = 0; i < 16; i++) {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
@@ -75,7 +75,7 @@ public class RelationalDaoTest {
                                                                   new ConsistentHashBucketIdExtractor<>(shardManager)));
     }
 
-    @After
+    @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
     }
@@ -96,7 +96,7 @@ public class RelationalDaoTest {
                                                                DetachedCriteria.forClass(RelationalEntity.class),
                                                                0,
                                                                10);
-        assertEquals(2, entities.size());
+        Assertions.assertEquals(2, entities.size());
 
     }
 
@@ -134,15 +134,15 @@ public class RelationalDaoTest {
                                 "value", newValue))
                         .build()
         );
-        assertEquals(2, rowsUpdated);
+        Assertions.assertEquals(2, rowsUpdated);
 
         val persistedEntityTwo = relationalDao.get(relationalKey, "2").orElse(null);
-        assertNotNull(persistedEntityTwo);
-        assertEquals(newValue, persistedEntityTwo.getValue());
+        Assertions.assertNotNull(persistedEntityTwo);
+        Assertions.assertEquals(newValue, persistedEntityTwo.getValue());
 
         val persistedEntityThree = relationalDao.get(relationalKey, "3").orElse(null);
-        assertNotNull(persistedEntityThree);
-        assertEquals(newValue, persistedEntityThree.getValue());
+        Assertions.assertNotNull(persistedEntityThree);
+        Assertions.assertEquals(newValue, persistedEntityThree.getValue());
 
 
     }
@@ -181,19 +181,19 @@ public class RelationalDaoTest {
                                 "value", newValue))
                         .build()
         );
-        assertEquals(0, rowsUpdated);
+        Assertions.assertEquals(0, rowsUpdated);
 
 
         val persistedEntityOne = relationalDao.get(relationalKey, "1").orElse(null);
-        assertNotNull(persistedEntityOne);
-        assertEquals(entityOne.getValue(), persistedEntityOne.getValue());
+        Assertions.assertNotNull(persistedEntityOne);
+        Assertions.assertEquals(entityOne.getValue(), persistedEntityOne.getValue());
 
         val persistedEntityTwo = relationalDao.get(relationalKey, "2").orElse(null);
-        assertNotNull(persistedEntityTwo);
-        assertEquals(entityTwo.getValue(), persistedEntityTwo.getValue());
+        Assertions.assertNotNull(persistedEntityTwo);
+        Assertions.assertEquals(entityTwo.getValue(), persistedEntityTwo.getValue());
 
         val persistedEntityThree = relationalDao.get(relationalKey, "3").orElse(null);
-        assertNotNull(persistedEntityThree);
-        assertEquals(entityThree.getValue(), persistedEntityThree.getValue());
+        Assertions.assertNotNull(persistedEntityThree);
+        Assertions.assertEquals(entityThree.getValue(), persistedEntityThree.getValue());
     }
 }
