@@ -17,9 +17,11 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Audit;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Phone;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
@@ -86,10 +88,11 @@ public class LookupDaoTest {
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
                                                                               new ConsistentHashBucketIdExtractor<>(
                                                                                       shardManager));
-        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator);
-        phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator);
-        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator);
-        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator);
+        ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
+        lookupDao = new LookupDao<>(new MetricRegistry(), shardInfoProvider,sessionFactories, TestEntity.class, shardCalculator);
+        phoneDao = new LookupDao<>(new MetricRegistry(), shardInfoProvider,sessionFactories, Phone.class, shardCalculator);
+        transactionDao = new RelationalDao<>(new MetricRegistry(), shardInfoProvider, sessionFactories, Transaction.class, shardCalculator);
+        auditDao = new RelationalDao<>(new MetricRegistry(), shardInfoProvider, sessionFactories, Audit.class, shardCalculator);
     }
 
     @After

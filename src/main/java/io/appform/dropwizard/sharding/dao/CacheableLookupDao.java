@@ -17,6 +17,8 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import com.codahale.metrics.MetricRegistry;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.LookupCache;
 import io.appform.dropwizard.sharding.exceptions.DaoFwdException;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
@@ -41,10 +43,12 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
 
     private LookupCache<T> cache;
 
-    public CacheableLookupDao(List<SessionFactory> sessionFactories,
+    public CacheableLookupDao(MetricRegistry metricRegistry,
+                              ShardInfoProvider shardInfoProvider,
+                              List<SessionFactory> sessionFactories,
                               Class<T> entityClass,
                               ShardCalculator<String> shardCalculator, LookupCache<T> cache) {
-        super(sessionFactories, entityClass, shardCalculator);
+        super(metricRegistry, shardInfoProvider, sessionFactories, entityClass, shardCalculator);
         this.cache = cache;
     }
 
