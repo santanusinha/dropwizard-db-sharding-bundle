@@ -35,16 +35,17 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Restrictions;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.Assert.*;
+
 
 public class LookupDaoTest {
 
@@ -77,7 +78,7 @@ public class LookupDaoTest {
         return configuration.buildSessionFactory(serviceRegistry);
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         for (int i = 0; i < 2; i++) {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
@@ -92,7 +93,7 @@ public class LookupDaoTest {
         auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator);
     }
 
-    @After
+    @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
     }
@@ -105,17 +106,17 @@ public class LookupDaoTest {
                 .build();
         lookupDao.save(testEntity);
 
-        assertEquals(true, lookupDao.exists("testId"));
-        assertEquals(false, lookupDao.exists("testId1"));
+        Assertions.assertEquals(true, lookupDao.exists("testId"));
+        Assertions.assertEquals(false, lookupDao.exists("testId1"));
         Optional<TestEntity> result = lookupDao.get("testId");
-        assertEquals("Some Text",
+        Assertions.assertEquals("Some Text",
                      result.get()
                              .getText());
 
         testEntity.setText("Some New Text");
         lookupDao.save(testEntity);
         result = lookupDao.get("testId");
-        assertEquals("Some New Text",
+        Assertions.assertEquals("Some New Text",
                      result.get()
                              .getText());
 
@@ -128,9 +129,9 @@ public class LookupDaoTest {
             return null;
         });
 
-        assertTrue(updateStatus);
+        Assertions.assertTrue(updateStatus);
         result = lookupDao.get("testId");
-        assertEquals("Updated text",
+        Assertions.assertEquals("Updated text",
                      result.get()
                              .getText());
 
@@ -143,14 +144,14 @@ public class LookupDaoTest {
             return null;
         });
 
-        assertFalse(updateStatus);
+        Assertions.assertFalse(updateStatus);
     }
 
     @Test
     public void testScatterGather() throws Exception {
         List<TestEntity> results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
                                                                    .add(Restrictions.eq("externalId", "testId")));
-        assertTrue(results.isEmpty());
+        Assertions.assertTrue(results.isEmpty());
 
         TestEntity testEntity = TestEntity.builder()
                 .externalId("testId")
@@ -159,8 +160,8 @@ public class LookupDaoTest {
         lookupDao.save(testEntity);
         results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
                                                   .add(Restrictions.eq("externalId", "testId")));
-        assertFalse(results.isEmpty());
-        assertEquals("Some Text",
+        Assertions.assertFalse(results.isEmpty());
+        Assertions.assertEquals("Some Text",
                      results.get(0)
                              .getText());
     }
@@ -170,7 +171,7 @@ public class LookupDaoTest {
         List<String> lookupKeys = Lists.newArrayList();
         lookupKeys.add("testId1");
         List<TestEntity> results = lookupDao.get(lookupKeys);
-        assertTrue(results.isEmpty());
+        Assertions.assertTrue(results.isEmpty());
 
         TestEntity testEntity1 = TestEntity.builder()
                 .externalId("testId1")
@@ -178,9 +179,9 @@ public class LookupDaoTest {
                 .build();
         lookupDao.save(testEntity1);
         results = lookupDao.get(lookupKeys);
-        assertFalse(results.isEmpty());
-        assertEquals(1, results.size());
-        assertEquals("Some Text 1",
+        Assertions.assertFalse(results.isEmpty());
+        Assertions.assertEquals(1, results.size());
+        Assertions.assertEquals("Some Text 1",
                      results.get(0)
                              .getText());
 
@@ -191,8 +192,8 @@ public class LookupDaoTest {
         lookupDao.save(testEntity2);
         lookupKeys.add("testId2");
         results = lookupDao.get(lookupKeys);
-        assertFalse(results.isEmpty());
-        assertEquals(2, results.size());
+        Assertions.assertFalse(results.isEmpty());
+        Assertions.assertEquals(2, results.size());
     }
 
     @Test
@@ -210,11 +211,11 @@ public class LookupDaoTest {
                 .params(ImmutableMap.of("externalId", id,
                         "text", newText))
                 .build());
-        assertEquals(1, rowsUpdated);
+        Assertions.assertEquals(1, rowsUpdated);
 
         val persistedEntity = lookupDao.get(id).orElse(null);
-        assertNotNull(persistedEntity);
-        assertEquals(newText, persistedEntity.getText());
+        Assertions.assertNotNull(persistedEntity);
+        Assertions.assertEquals(newText, persistedEntity.getText());
     }
 
     @Test
@@ -232,11 +233,11 @@ public class LookupDaoTest {
                 .params(ImmutableMap.of("externalId", UUID.randomUUID().toString(),
                         "text", newText))
                 .build());
-        assertEquals(0, rowsUpdated);
+        Assertions.assertEquals(0, rowsUpdated);
 
         val persistedEntity = lookupDao.get(id).orElse(null);
-        assertNotNull(persistedEntity);
-        assertEquals(testEntity.getText(), persistedEntity.getText());
+        Assertions.assertNotNull(persistedEntity);
+        Assertions.assertEquals(testEntity.getText(), persistedEntity.getText());
     }
 
     @Test
@@ -262,26 +263,26 @@ public class LookupDaoTest {
         {
             Transaction resultTx = transactionDao.get(phoneNumber, "testTxn")
                     .get();
-            assertEquals(phoneNumber,
+            Assertions.assertEquals(phoneNumber,
                          resultTx.getPhone()
                                  .getPhone());
-            assertTrue(transactionDao.exists(phoneNumber, "testTxn"));
-            assertFalse(transactionDao.exists(phoneNumber, "testTxn1"));
+            Assertions.assertTrue(transactionDao.exists(phoneNumber, "testTxn"));
+            Assertions.assertFalse(transactionDao.exists(phoneNumber, "testTxn1"));
         }
         {
             Optional<Transaction> resultTx = transactionDao.get(phoneNumber, "testTxn1");
-            assertFalse(resultTx.isPresent());
+            Assertions.assertFalse(resultTx.isPresent());
         }
         saveAudit(phoneNumber, "testTxn", "Started");
         saveAudit(phoneNumber, "testTxn", "Underway");
         saveAudit(phoneNumber, "testTxn", "Completed");
 
-        assertEquals(3, auditDao.count(phoneNumber, DetachedCriteria.forClass(Audit.class)
+        Assertions.assertEquals(3, auditDao.count(phoneNumber, DetachedCriteria.forClass(Audit.class)
                 .add(Restrictions.eq("transaction.transactionId", "testTxn"))));
 
         List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
                 .add(Restrictions.eq("transaction.transactionId", "testTxn")), 0, 10);
-        assertEquals("Started",
+        Assertions.assertEquals("Started",
                      audits.get(0)
                              .getText());
 
@@ -305,10 +306,10 @@ public class LookupDaoTest {
         List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
                 .add(Restrictions.eq("transaction.transactionId", "newTxn-" + phoneNumber)), 0, 10);
 
-        assertEquals(2, audits.size());
+        Assertions.assertEquals(2, audits.size());
 
         List<Audit> allAudits = auditDao.scatterGather(DetachedCriteria.forClass(Audit.class), 0, 10);
-        assertEquals(4, allAudits.size());
+        Assertions.assertEquals(4, allAudits.size());
     }
 
 
@@ -342,10 +343,10 @@ public class LookupDaoTest {
                 .text("Some Text")
                 .build();
         lookupDao.save(testEntity);
-        Assert.assertNotNull(lookupDao.get("testId")
+        Assertions.assertNotNull(lookupDao.get("testId")
                                      .orElse(null));
-        Assert.assertTrue(lookupDao.delete("testId"));
-        Assert.assertNull(lookupDao.get("testId")
+        Assertions.assertTrue(lookupDao.delete("testId"));
+        Assertions.assertNull(lookupDao.get("testId")
                                   .orElse(null));
     }
 
@@ -354,7 +355,7 @@ public class LookupDaoTest {
         DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
                 .add(Restrictions.eq("text", "TEST_TYPE"));
 
-        Assert.assertEquals(
+        Assertions.assertEquals(
                 0L,
                 (long)lookupDao.count(criteria).stream().reduce(0L, Long::sum)
         );
@@ -368,14 +369,14 @@ public class LookupDaoTest {
         testEntity.setExternalId("testId3");
         lookupDao.save(testEntity);
 
-        Assert.assertEquals(
+        Assertions.assertEquals(
                 2L,
                 (long)lookupDao.count(criteria).stream().reduce(0L, Long::sum)
         );
 
 
         lookupDao.delete("testId2");
-        Assert.assertEquals(
+        Assertions.assertEquals(
                 1L,
                 (long)lookupDao.count(criteria).stream().reduce(0L, Long::sum)
         );

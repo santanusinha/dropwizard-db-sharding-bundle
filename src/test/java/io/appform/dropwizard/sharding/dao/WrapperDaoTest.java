@@ -30,13 +30,14 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
 
 public class WrapperDaoTest {
 
@@ -61,7 +62,7 @@ public class WrapperDaoTest {
         return configuration.buildSessionFactory(serviceRegistry);
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         for (int i = 0; i < 2; i++) {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
@@ -72,7 +73,7 @@ public class WrapperDaoTest {
 
     }
 
-    @After
+    @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
     }
@@ -103,7 +104,7 @@ public class WrapperDaoTest {
 
         Order result = dao.forParent(customer).get(saveId);
 
-        assertEquals(saveResult.getId(), result.getId());
-        assertEquals(saveResult.getId(), result.getId());
+        Assertions.assertEquals(saveResult.getId(), result.getId());
+        Assertions.assertEquals(saveResult.getId(), result.getId());
     }
 }

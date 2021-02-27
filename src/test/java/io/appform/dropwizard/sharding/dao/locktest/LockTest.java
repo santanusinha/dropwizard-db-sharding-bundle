@@ -35,16 +35,13 @@ import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.exception.ConstraintViolationException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /**
  * Test locking behavior
@@ -71,7 +68,7 @@ public class LockTest {
         return configuration.buildSessionFactory(serviceRegistry);
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         for (int i = 0; i < 2; i++) {
             SessionFactory sessionFactory = buildSessionFactory(String.format("db_%d", i));
@@ -107,30 +104,33 @@ public class LockTest {
                 .mutate(parent -> parent.setName("Changed"))
                 .execute();
 
-        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
-        Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
-        Assert.assertEquals(6, relationDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class), 0, 10).size());
-        Assert.assertEquals("Hello",relationDao.get("0", 1L).get().getValue());
+        Assertions.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        Assertions.assertEquals("Changed", lookupDao.get("0").get().getName());
+        Assertions.assertEquals(6, relationDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class), 0, 10).size());
+        Assertions.assertEquals("Hello",relationDao.get("0", 1L).get().getValue());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testLockingFail() throws Exception {
-        SomeLookupObject p1 = SomeLookupObject.builder()
-                                .myId("0")
-                                .build();
-        lookupDao.save(p1);
-        lookupDao.lockAndGetExecutor("0")
-                .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> {
-                    SomeOtherObject result = SomeOtherObject.builder()
-                            .myId(parent.getMyId())
-                            .value("Hello")
+        Assertions.assertThrows(IllegalArgumentException.class,() -> {
+                    SomeLookupObject p1 = SomeLookupObject.builder()
+                            .myId("0")
                             .build();
-                    parent.setName("Changed");
-                    return result;
-                })
-                .mutate(parent -> parent.setName("Changed"))
-                .execute();
+                    lookupDao.save(p1);
+                    lookupDao.lockAndGetExecutor("0")
+                            .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
+                            .save(relationDao, parent -> {
+                                SomeOtherObject result = SomeOtherObject.builder()
+                                        .myId(parent.getMyId())
+                                        .value("Hello")
+                                        .build();
+                                parent.setName("Changed");
+                                return result;
+                            })
+                            .mutate(parent -> parent.setName("Changed"))
+                            .execute();
+                });
+
 
     }
 
@@ -150,8 +150,8 @@ public class LockTest {
                 .mutate(parent -> parent.setName("Changed"))
                 .execute();
 
-        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
-        Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
+        Assertions.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        Assertions.assertEquals("Changed", lookupDao.get("0").get().getName());
     }
 
     @Test
@@ -176,9 +176,9 @@ public class LockTest {
                 .mutate(parent -> parent.setName("Changed"))
                 .execute();
 
-        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
-        Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
-        Assert.assertEquals("Hello Changed",relationDao.get("0", 1L).get().getValue());
+        Assertions.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        Assertions.assertEquals("Changed", lookupDao.get("0").get().getName());
+        Assertions.assertEquals("Hello Changed",relationDao.get("0", 1L).get().getValue());
     }
 
     @Test
@@ -203,35 +203,37 @@ public class LockTest {
                 .mutate(parent -> parent.setName("Changed"))
                 .execute();
 
-        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
-        Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
-        Assert.assertEquals("Hello Changed",relationDao.get("0", 1L).get().getValue());
+        Assertions.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        Assertions.assertEquals("Changed", lookupDao.get("0").get().getName());
+        Assertions.assertEquals("Hello Changed",relationDao.get("0", 1L).get().getValue());
     }
 
-    @Test(expected = ConstraintViolationException.class)
+    @Test
     public void testPersist_alreadyExistingDifferent() throws Exception {
         SomeLookupObject p1 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Parent 1")
                 .build();
 
-        lookupDao.save(p1);
-
         SomeLookupObject p2 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Changed")
                 .build();
 
-        lookupDao.saveAndGetExecutor(p2)
-                .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> SomeOtherObject.builder()
-                        .myId(parent.getMyId())
-                        .value("Hello")
-                        .build())
-                .execute();
+        Assertions.assertThrows(ConstraintViolationException.class,()->{
+            lookupDao.save(p1);
 
-        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
-        Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
+            lookupDao.saveAndGetExecutor(p2)
+                    .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
+                    .save(relationDao, parent -> SomeOtherObject.builder()
+                            .myId(parent.getMyId())
+                            .value("Hello")
+                            .build())
+                    .execute();
+        });
+
+        Assertions.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        Assertions.assertEquals("Changed", lookupDao.get("0").get().getName());
     }
 
     @Test
@@ -252,8 +254,8 @@ public class LockTest {
                 .mutate(parent -> parent.setName("Changed"))
                 .execute();
 
-        Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
-        Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
+        Assertions.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        Assertions.assertEquals("Changed", lookupDao.get("0").get().getName());
     }
 
     @Test
@@ -282,7 +284,7 @@ public class LockTest {
                     childObj.setValue(childModifiedValue);
                     return childObj;
                 }, () -> {
-                    Assert.fail("New Entity is getting created. It should have been updated.");
+                    Assertions.fail("New Entity is getting created. It should have been updated.");
                     return SomeOtherObject.builder()
                             .myId(parentId)
                             .value("test")
@@ -291,8 +293,8 @@ public class LockTest {
                 .mutate(parentObj -> parentObj.setName(parentModifiedValue))
                 .execute();
 
-        Assert.assertEquals(childModifiedValue,relationDao.get(parent.getMyId(), child.getId()).get().getValue());
-        Assert.assertEquals(parentModifiedValue,lookupDao.get(parentId).get().getName());
+        Assertions.assertEquals(childModifiedValue,relationDao.get(parent.getMyId(), child.getId()).get().getValue());
+        Assertions.assertEquals(parentModifiedValue,lookupDao.get(parentId).get().getName());
 
         //test non existing entity creation
         final String newChildValue = "Newly created child";
@@ -302,8 +304,8 @@ public class LockTest {
 
         lookupDao.lockAndGetExecutor(parent.getMyId())
                 .createOrUpdate(relationDao, creationCriteria, childObj -> {
-                    Assert.assertNotEquals(null, childObj);
-                    Assert.fail("New Entity is getting updated. It should have been created.");
+                    Assertions.assertNotEquals(null, childObj);
+                    Assertions.fail("New Entity is getting updated. It should have been created.");
 
                     childObj.setValue("abcd");
                     return childObj;
@@ -316,9 +318,9 @@ public class LockTest {
                 .execute();
 
         final SomeOtherObject savedChild = relationDao.select(parent.getMyId(), creationCriteria, 0, 1).stream().findFirst().get();
-        Assert.assertEquals(newChildValue, savedChild.getValue());
-        Assert.assertNotEquals(child.getId(), savedChild.getId());
-        Assert.assertEquals(newParentValue,lookupDao.get(parentId).get().getName());
+        Assertions.assertEquals(newChildValue, savedChild.getValue());
+        Assertions.assertNotEquals(child.getId(), savedChild.getId());
+        Assertions.assertEquals(newParentValue,lookupDao.get(parentId).get().getName());
     }
 
     @Test
@@ -346,8 +348,8 @@ public class LockTest {
                 .execute();
 
         val updatedChild = relationDao.get(parent.getMyId(), child.getId()).orElse(null);
-        assertNotNull(updatedChild);
-        assertEquals(childModifiedValue, updatedChild.getValue());
+        Assertions.assertNotNull(updatedChild);
+        Assertions.assertEquals(childModifiedValue, updatedChild.getValue());
     }
 
 
@@ -399,12 +401,12 @@ public class LockTest {
                 .mutate(parent -> parent.setName(parentModifiedValue))
                 .execute();
 
-        Assert.assertEquals(childModifiedValue,relationDao.get(parent1.getMyId(), child1.getId()).get().getValue());
-        Assert.assertEquals(childModifiedValue,relationDao.get(parent1.getMyId(), child2.getId()).get().getValue());
-        Assert.assertEquals(parentModifiedValue,lookupDao.get(parent1Id).get().getName());
+        Assertions.assertEquals(childModifiedValue,relationDao.get(parent1.getMyId(), child1.getId()).get().getValue());
+        Assertions.assertEquals(childModifiedValue,relationDao.get(parent1.getMyId(), child2.getId()).get().getValue());
+        Assertions.assertEquals(parentModifiedValue,lookupDao.get(parent1Id).get().getName());
 
-        Assert.assertEquals("Hello3",relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
-        Assert.assertEquals("Parent 2",lookupDao.get(parent2Id).get().getName());
+        Assertions.assertEquals("Hello3",relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
+        Assertions.assertEquals("Parent 2",lookupDao.get(parent2Id).get().getName());
 
         final boolean[] shouldUpdateNext = new boolean[1];
         shouldUpdateNext[0] = true;
@@ -425,11 +427,11 @@ public class LockTest {
                 .mutate(parent -> parent.setName(parentModifiedValue2))
                 .execute();
 
-        Assert.assertEquals(childModifiedValue2,relationDao.get(parent1Id, child1.getId()).get().getValue());
-        Assert.assertEquals(childModifiedValue,relationDao.get(parent1Id, child2.getId()).get().getValue());
-        Assert.assertEquals(parentModifiedValue2,lookupDao.get(parent1Id).get().getName());
+        Assertions.assertEquals(childModifiedValue2,relationDao.get(parent1Id, child1.getId()).get().getValue());
+        Assertions.assertEquals(childModifiedValue,relationDao.get(parent1Id, child2.getId()).get().getValue());
+        Assertions.assertEquals(parentModifiedValue2,lookupDao.get(parent1Id).get().getName());
 
-        Assert.assertEquals("Hello3",relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
-        Assert.assertEquals("Parent 2",lookupDao.get(parent2Id).get().getName());
+        Assertions.assertEquals("Hello3",relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
+        Assertions.assertEquals("Parent 2",lookupDao.get(parent2Id).get().getName());
     }
 }

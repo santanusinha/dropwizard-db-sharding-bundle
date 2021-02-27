@@ -36,16 +36,16 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Restrictions;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.Assert.*;
 
 public class CacheableLookupDaoTest {
 
@@ -77,7 +77,7 @@ public class CacheableLookupDaoTest {
     }
 
 
-    @Before
+    @BeforeEach
     public void before() {
         for (int i = 0; i < 2; i++) {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
@@ -252,7 +252,7 @@ public class CacheableLookupDaoTest {
                                                 });
     }
 
-    @After
+    @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
     }
@@ -265,17 +265,17 @@ public class CacheableLookupDaoTest {
                 .build();
         lookupDao.save(testEntity);
 
-        assertEquals(true, lookupDao.exists("testId"));
-        assertEquals(false, lookupDao.exists("testId1"));
+        Assertions.assertEquals(true, lookupDao.exists("testId"));
+        Assertions.assertEquals(false, lookupDao.exists("testId1"));
         Optional<TestEntity> result = lookupDao.get("testId");
-        assertEquals("Some Text",
+        Assertions.assertEquals("Some Text",
                      result.get()
                              .getText());
 
         testEntity.setText("Some New Text");
         lookupDao.save(testEntity);
         result = lookupDao.get("testId");
-        assertEquals("Some New Text",
+        Assertions.assertEquals("Some New Text",
                      result.get()
                              .getText());
 
@@ -288,9 +288,9 @@ public class CacheableLookupDaoTest {
             return null;
         });
 
-        assertTrue(updateStatus);
+        Assertions.assertTrue(updateStatus);
         result = lookupDao.get("testId");
-        assertEquals("Updated text",
+        Assertions.assertEquals("Updated text",
                      result.get()
                              .getText());
 
@@ -303,14 +303,14 @@ public class CacheableLookupDaoTest {
             return null;
         });
 
-        assertFalse(updateStatus);
+        Assertions.assertFalse(updateStatus);
     }
 
     @Test
     public void testScatterGather() throws Exception {
         List<TestEntity> results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
                                                                    .add(Restrictions.eq("externalId", "testId")));
-        assertTrue(results.isEmpty());
+        Assertions.assertTrue(results.isEmpty());
 
         TestEntity testEntity = TestEntity.builder()
                 .externalId("testId")
@@ -319,8 +319,8 @@ public class CacheableLookupDaoTest {
         lookupDao.save(testEntity);
         results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
                                                   .add(Restrictions.eq("externalId", "testId")));
-        assertFalse(results.isEmpty());
-        assertEquals("Some Text",
+        Assertions.assertFalse(results.isEmpty());
+        Assertions.assertEquals("Some Text",
                      results.get(0)
                              .getText());
     }
@@ -348,26 +348,26 @@ public class CacheableLookupDaoTest {
         {
             Transaction resultTx = transactionDao.get(phoneNumber, "testTxn")
                     .get();
-            assertEquals(phoneNumber,
+            Assertions.assertEquals(phoneNumber,
                          resultTx.getPhone()
                                  .getPhone());
-            assertTrue(transactionDao.exists(phoneNumber, "testTxn"));
-            assertFalse(transactionDao.exists(phoneNumber, "testTxn1"));
+            Assertions.assertTrue(transactionDao.exists(phoneNumber, "testTxn"));
+            Assertions.assertFalse(transactionDao.exists(phoneNumber, "testTxn1"));
         }
         {
             Optional<Transaction> resultTx = transactionDao.get(phoneNumber, "testTxn1");
-            assertFalse(resultTx.isPresent());
+            Assertions.assertFalse(resultTx.isPresent());
         }
         saveAudit(phoneNumber, "testTxn", "Started");
         saveAudit(phoneNumber, "testTxn", "Underway");
         saveAudit(phoneNumber, "testTxn", "Completed");
 
-        assertEquals(3, auditDao.count(phoneNumber, DetachedCriteria.forClass(Audit.class)
+        Assertions.assertEquals(3, auditDao.count(phoneNumber, DetachedCriteria.forClass(Audit.class)
                 .add(Restrictions.eq("transaction.transactionId", "testTxn"))));
 
         List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
                 .add(Restrictions.eq("transaction.transactionId", "testTxn")), 0, 10);
-        assertEquals("Started",
+        Assertions.assertEquals("Started",
                      audits.get(0)
                              .getText());
 
@@ -391,10 +391,10 @@ public class CacheableLookupDaoTest {
         List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
                 .add(Restrictions.eq("transaction.transactionId", "newTxn-" + phoneNumber)), 0, 10);
 
-        assertEquals(2, audits.size());
+        Assertions.assertEquals(2, audits.size());
 
         List<Audit> allAudits = auditDao.scatterGather(DetachedCriteria.forClass(Audit.class), 0, 10);
-        assertEquals(4, allAudits.size());
+        Assertions.assertEquals(4, allAudits.size());
     }
 
 

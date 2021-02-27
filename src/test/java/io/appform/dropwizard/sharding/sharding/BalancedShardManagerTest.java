@@ -17,42 +17,48 @@
 
 package io.appform.dropwizard.sharding.sharding;
 
-import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class BalancedShardManagerTest {
 
-   @Test(expected = IllegalArgumentException.class)
+   @Test
     public void testShardForBucket() throws Exception {
-        new BalancedShardManager(5);
+        Assertions.assertThrows(IllegalArgumentException.class,() -> {
+            new BalancedShardManager(5);
+        });
     }
 
-   @Test(expected = IllegalArgumentException.class)
+   @Test
     public void testShardForOddBucket() throws Exception {
-        new BalancedShardManager(9);
+        Assertions.assertThrows(IllegalArgumentException.class,() -> {
+            new BalancedShardManager(9);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testShardForEvenNon2PowerBucket() throws Exception {
-        new BalancedShardManager(40);
+       Assertions.assertThrows(IllegalArgumentException.class,() -> {
+           new BalancedShardManager(40);
+       });
     }
 
     @Test
     public void testShardFor64Bucket() throws Exception {
         BalancedShardManager shardManager = new BalancedShardManager(64);
-        assertEquals(63, shardManager.shardForBucket(1023));
+        Assertions.assertEquals(63, shardManager.shardForBucket(1023));
     }
 
     @Test
     public void testShardFor32Bucket() throws Exception {
         BalancedShardManager shardManager = new BalancedShardManager(32);
-        assertEquals(31, shardManager.shardForBucket(1023));
+        Assertions.assertEquals(31, shardManager.shardForBucket(1023));
     }
 
     @Test
     public void testShardFor31Bucket() throws Exception {
         BalancedShardManager shardManager = new BalancedShardManager(16);
-        assertEquals(15, shardManager.shardForBucket(1023));
+        Assertions.assertEquals(15, shardManager.shardForBucket(1023));
     }
 }

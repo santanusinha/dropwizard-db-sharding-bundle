@@ -37,16 +37,15 @@ import io.dropwizard.setup.Environment;
 import lombok.Getter;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Restrictions;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -85,7 +84,7 @@ public abstract class DBShardingBundleTestBase {
         return shard;
     }
 
-    @Before
+    @BeforeEach
     public void setup() {
         testConfig.shards.setShards(ImmutableList.of(createConfig("1"), createConfig("2")));
         when(jerseyEnvironment.getResourceConfig()).thenReturn(new DropwizardResourceConfig());
@@ -136,18 +135,18 @@ public abstract class DBShardingBundleTestBase {
 
         Order result = dao.forParent(customer).get(saveId);
 
-        assertEquals(saveResult.getId(), result.getId());
-        assertEquals(saveResult.getId(), result.getId());
+        Assertions.assertEquals(saveResult.getId(), result.getId());
+        Assertions.assertEquals(saveResult.getId(), result.getId());
 
         Optional<Order> newOrder = rDao.save("customer1", order);
 
-        assertTrue(newOrder.isPresent());
+        Assertions.assertTrue(newOrder.isPresent());
 
         long generatedId = newOrder.get().getId();
 
         Optional<Order> checkOrder = rDao.get("customer1", generatedId);
 
-        assertEquals(100, checkOrder.get().getAmount());
+        Assertions.assertEquals(100, checkOrder.get().getAmount());
 
         rDao.update("customer1", saveId, foundOrder -> {
             foundOrder.setAmount(200);
@@ -155,11 +154,11 @@ public abstract class DBShardingBundleTestBase {
         });
 
         Optional<Order> modifiedOrder = rDao.get("customer1", saveId);
-        assertEquals(200, modifiedOrder.get().getAmount());
+        Assertions.assertEquals(200, modifiedOrder.get().getAmount());
 
-        assertTrue(checkOrder.isPresent());
+        Assertions.assertTrue(checkOrder.isPresent());
 
-        assertEquals(newOrder.get().getId(), checkOrder.get().getId());
+        Assertions.assertEquals(newOrder.get().getId(), checkOrder.get().getId());
 
         Map<String, Object> blah = Maps.newHashMap();
 
@@ -172,13 +171,13 @@ public abstract class DBShardingBundleTestBase {
             return itemList;
         });
 
-        assertEquals(2, blah.get("count"));
+        Assertions.assertEquals(2, blah.get("count"));
 
         List<OrderItem> orderItems = orderItemDao.select("customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
-        assertEquals(2, orderItems.size());
+        Assertions.assertEquals(2, orderItems.size());
         orderItemDao.update("customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
@@ -193,8 +192,8 @@ public abstract class DBShardingBundleTestBase {
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
-        assertEquals(2, orderItems.size());
-        assertEquals("Item AA", orderItems.get(0).getName());
+        Assertions.assertEquals(2, orderItems.size());
+        Assertions.assertEquals("Item AA", orderItems.get(0).getName());
     }
 
     @Test
@@ -206,7 +205,7 @@ public abstract class DBShardingBundleTestBase {
         bundle.run(testConfig, environment);
         bundle.getShardManager().blacklistShard(1);
 
-        assertTrue(bundle.healthStatus()
+        Assertions.assertTrue(bundle.healthStatus()
                 .values()
                 .stream()
                 .allMatch(status -> status));
