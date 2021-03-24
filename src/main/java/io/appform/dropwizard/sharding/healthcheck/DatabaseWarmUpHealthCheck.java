@@ -1,5 +1,6 @@
 package io.appform.dropwizard.sharding.healthcheck;
 
+import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Slf4jReporter;
 import com.codahale.metrics.Timer;
@@ -26,6 +27,7 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
 
     private static final String DB_HEALTHY_MESSAGE = "Database is successfully warmed up.";
     private static final String DB_UNHEALTHY_MESSAGE = "Database is still warming up.";
+    private static final MetricRegistry metricRegistry = new MetricRegistry();
 
     private enum DatabaseWarmUpState {
         INITIATED,
@@ -40,11 +42,10 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
 
     /* To capture metrics */
     private final Timer timer;
-    private final Slf4jReporter reporter;
+    private final ConsoleReporter reporter;
 
     public DatabaseWarmUpHealthCheck(final List<SessionFactory> sessionFactories,
-                                     final DatabaseWarmUpConfig databaseWarmUpConfig,
-                                     final MetricRegistry metricRegistry) {
+                                     final DatabaseWarmUpConfig databaseWarmUpConfig) {
         this.sessionFactories = sessionFactories;
         this.databaseWarmUpConfig = databaseWarmUpConfig;
         this.databaseWarmUpStateAtomicReference = databaseWarmUpConfig.isWarmUpRequired()
@@ -52,7 +53,7 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
                 : new AtomicReference<>(DatabaseWarmUpState.WARMED_UP);
         this.callCounts = databaseWarmUpConfig.getCallCounts();
         this.timer = metricRegistry.timer("DatabaseWarmUpHealthCheck-Metric");
-        this.reporter = Slf4jReporter
+        this.reporter = ConsoleReporter
                 .forRegistry(metricRegistry)
                 .convertRatesTo(TimeUnit.SECONDS)
                 .convertDurationsTo(TimeUnit.MILLISECONDS)
@@ -86,7 +87,7 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
         IntStream.range(0, callCounts).forEach(
                 count -> {
                     timer.time(() -> {
-                        log.info("[DatabaseWarmUpHealthCheck] checking the shards for {} time.", count);
+                        log.info("[DatabaseWarmUpHealthCheck] checking the shards for {} time on the thread {}.", count, Thread.currentThread().getName());
                         sessionFactories.forEach(
                                 sessionFactory -> {
                                     try (final Session session = sessionFactory.openSession()) {
