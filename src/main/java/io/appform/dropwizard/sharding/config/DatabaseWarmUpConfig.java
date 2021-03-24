@@ -24,4 +24,7 @@ public class DatabaseWarmUpConfig {
 
     @NotNull
     private String validationQuery = "SELECT 1";
+
+    @Valid
+    private int callCounts = 200;
 }
