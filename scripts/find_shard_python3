@@ -10,7 +10,7 @@ class FindShard(object):
     Utility to find shard in python 3
     """
     MIN_BUCKET = 0
-    MAX_BUCKET = 999
+    MAX_BUCKET = 1023
     NUM_BUCKETS = 16
 
     def __init__(self):
