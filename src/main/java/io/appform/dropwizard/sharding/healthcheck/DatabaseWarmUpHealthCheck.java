@@ -2,7 +2,6 @@ package io.appform.dropwizard.sharding.healthcheck;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Slf4jReporter;
 import com.codahale.metrics.Timer;
 import com.codahale.metrics.health.HealthCheck;
 import io.appform.dropwizard.sharding.config.DatabaseWarmUpConfig;
@@ -93,14 +92,14 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
                                     try (final Session session = sessionFactory.openSession()) {
                                         final Transaction txn = session.beginTransaction();
                                         try {
-                                            // log.info("[DatabaseWarmUpHealthCheck] checking the shard {} time.", count);
                                             session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
                                             txn.commit();
                                         } catch (Exception e) {
                                             if (txn.getStatus().canRollback()) {
                                                 txn.rollback();
                                             }
-                                            throw e;
+
+                                            log.error("[DatabaseWarmUpHealthCheck] error encountered while qeurying db");
                                         }
                                     }
                                 }
