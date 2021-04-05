@@ -34,6 +34,34 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
         WARMED_UP
     }
 
+    private class WarmupThread extends Thread {
+
+        private WarmupThread(final String threadName) {
+            super(threadName);
+        }
+
+        @Override
+        public void run() {
+            sessionFactories.forEach(
+                    sessionFactory -> {
+                        try (final Session session = sessionFactory.openSession()) {
+                            final Transaction txn = session.beginTransaction();
+                            try {
+                                session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
+                                txn.commit();
+                            } catch (Exception e) {
+                                if (txn.getStatus().canRollback()) {
+                                    txn.rollback();
+                                }
+
+                                log.error("[DatabaseWarmUpHealthCheck] error encountered while qeurying db");
+                            }
+                        }
+                    }
+            );
+        }
+    }
+
     private final List<SessionFactory> sessionFactories;
     private final DatabaseWarmUpConfig databaseWarmUpConfig;
     private final AtomicReference<DatabaseWarmUpState> databaseWarmUpStateAtomicReference;
@@ -85,25 +113,10 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
         // this code can work asynchronously. need to introduced executor-service here.
         IntStream.range(0, callCounts).forEach(
                 count -> {
+                    final Thread warmupThread  = new WarmupThread(String.format("WarmupThread-%s",count));
                     timer.time(() -> {
-                        log.info("[DatabaseWarmUpHealthCheck] checking the shards for {} time on the thread {}.", count, Thread.currentThread().getName());
-                        sessionFactories.forEach(
-                                sessionFactory -> {
-                                    try (final Session session = sessionFactory.openSession()) {
-                                        final Transaction txn = session.beginTransaction();
-                                        try {
-                                            session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
-                                            txn.commit();
-                                        } catch (Exception e) {
-                                            if (txn.getStatus().canRollback()) {
-                                                txn.rollback();
-                                            }
-
-                                            log.error("[DatabaseWarmUpHealthCheck] error encountered while qeurying db");
-                                        }
-                                    }
-                                }
-                        );
+                        log.info("[DatabaseWarmUpHealthCheck] checking the shards for {} time on the thread {}.", count, warmupThread.getName());
+                        warmupThread.start();
                     });
                 }
         );
