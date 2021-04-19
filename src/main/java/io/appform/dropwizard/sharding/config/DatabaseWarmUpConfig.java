@@ -23,8 +23,11 @@ public class DatabaseWarmUpConfig {
     private boolean warmUpRequired = false;
 
     @NotNull
-    private String validationQuery = "SELECT 1";
+    private String validationQuery = "SELECT 1"; // try using complex SQL query.
 
     @Valid
-    private int callCounts = 200;
+    private int callCounts = 10; // number of parallel thread count - change it according to your parallel connection.
+
+    @Valid
+    private long sleepDurationInMillis = 1000;
 }

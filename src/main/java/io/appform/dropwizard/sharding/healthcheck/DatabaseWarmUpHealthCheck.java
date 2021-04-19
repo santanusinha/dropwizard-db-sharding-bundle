@@ -48,6 +48,7 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
                             final Transaction txn = session.beginTransaction();
                             try {
                                 session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
+                                Thread.sleep(databaseWarmUpConfig.getSleepDurationInMillis());
                                 txn.commit();
                             } catch (Exception e) {
                                 if (txn.getStatus().canRollback()) {
