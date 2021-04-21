@@ -11,8 +11,10 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
@@ -42,20 +44,27 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
 
         @Override
         public void run() {
+            final AtomicInteger counter = new AtomicInteger(0);
             sessionFactories.forEach(
                     sessionFactory -> {
+                        boolean encouteredError = false;
+                        log.info("[DatabaseWarmUpHealthCheck] thread: {} trying to connect with shardId: {}.", getName(), counter.getAndIncrement());
                         try (final Session session = sessionFactory.openSession()) {
-                            final Transaction txn = session.beginTransaction();
+                            Transaction txn = null;
                             try {
+                                txn = session.beginTransaction();
                                 session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
                                 Thread.sleep(databaseWarmUpConfig.getSleepDurationInMillis());
                                 txn.commit();
                             } catch (Exception e) {
-                                if (txn.getStatus().canRollback()) {
-                                    txn.rollback();
+                                encouteredError = true;
+                                log.error("[DatabaseWarmUpHealthCheck] thread: {} encountered error while qeurying db",getName(), e);
+                            } finally {
+                                if (txn != null) {
+                                    if (encouteredError && txn.getStatus().canRollback()) {
+                                        txn.rollback();
+                                    }
                                 }
-
-                                log.error("[DatabaseWarmUpHealthCheck] error encountered while qeurying db");
                             }
                         }
                     }
@@ -111,16 +120,29 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
         log.info("[DatabaseWarmUpHealthCheck] database warm-up has started. All {} shards will be checked.", sessionFactories.size());
         this.databaseWarmUpStateAtomicReference.set(DatabaseWarmUpState.WARMING_UP);
 
-        // this code can work asynchronously. need to introduced executor-service here.
+        // [callCounts] numbers of threads will spin-up and work asynchronously.
+        final List<Thread> warmupThreads = new ArrayList<>();
         IntStream.range(0, callCounts).forEach(
                 count -> {
-                    final Thread warmupThread  = new WarmupThread(String.format("WarmupThread-%s",count));
+                    final Thread warmupThread  = new WarmupThread(String.format("WarmupThread-%s", count));
+                    warmupThreads.add(warmupThread);
                     timer.time(() -> {
-                        log.info("[DatabaseWarmUpHealthCheck] checking the shards for {} time on the thread {}.", count, warmupThread.getName());
+                        log.info("[DatabaseWarmUpHealthCheck] Thread {} spinned-up.", warmupThread.getName());
                         warmupThread.start();
                     });
                 }
         );
+
+        // holding-off further execution of code until all the threads are safely closed.
+        warmupThreads.forEach(warmupThread -> {
+            try {
+                log.info("[DatabaseWarmUpHealthCheck] waiting for {} to complete.", warmupThread.getName());
+                warmupThread.join(5 * sessionFactories.size() * databaseWarmUpConfig.getSleepDurationInMillis());
+                log.info("[DatabaseWarmUpHealthCheck] {} is complete.", warmupThread.getName());
+            } catch (InterruptedException e) {
+                log.error("[DatabaseWarmUpHealthCheck] Error encountered closing the thread : {} ", warmupThread.getName(), e);
+            }
+        });
 
         log.info("[DatabaseWarmUpHealthCheck] The warm-up reports are as follows\n");
         reporter.report();
