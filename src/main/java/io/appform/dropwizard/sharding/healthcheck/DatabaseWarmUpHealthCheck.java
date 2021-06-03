@@ -44,38 +44,41 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
 
         @Override
         public void run() {
-            final AtomicInteger counter = new AtomicInteger(0);
-            sessionFactories.forEach(
-                    sessionFactory -> {
-                        boolean encouteredError = false;
-                        log.info("[DatabaseWarmUpHealthCheck] thread: {} trying to connect with shardId: {}.", getName(), counter.getAndIncrement());
-                        try (final Session session = sessionFactory.openSession()) {
-                            Transaction txn = null;
-                            try {
-                                txn = session.beginTransaction();
-                                session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
-                                Thread.sleep(databaseWarmUpConfig.getSleepDurationInMillis());
-                                txn.commit();
-                            } catch (Exception e) {
-                                encouteredError = true;
-                                log.error("[DatabaseWarmUpHealthCheck] thread: {} encountered error while qeurying db",getName(), e);
-                            } finally {
-                                if (txn != null) {
-                                    if (encouteredError && txn.getStatus().canRollback()) {
-                                        txn.rollback();
+            IntStream.range(0, numberOfIteration).forEach( count -> {
+                log.info("[DatabaseWarmUpHealthCheck] Thread: {} is initiating {} iteration.", getName(), count);
+                final AtomicInteger counter = new AtomicInteger(0);
+                sessionFactories.forEach(
+                        sessionFactory -> {
+                            boolean encouteredError = false;
+                            log.info("[DatabaseWarmUpHealthCheck] thread: {} trying to connect with shardId: {}.", getName(), counter.getAndIncrement());
+                            try (final Session session = sessionFactory.openSession()) {
+                                Transaction txn = null;
+                                try {
+                                    txn = session.beginTransaction();
+                                    session.createNativeQuery(databaseWarmUpConfig.getValidationQuery()).list();
+                                    Thread.sleep(databaseWarmUpConfig.getSleepDurationInMillis());
+                                    txn.commit();
+                                } catch (Exception e) {
+                                    encouteredError = true;
+                                    log.error("[DatabaseWarmUpHealthCheck] thread: {} encountered error while qeurying db",getName(), e);
+                                } finally {
+                                    if (txn != null) {
+                                        if (encouteredError && txn.getStatus().canRollback()) {
+                                            txn.rollback();
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
-            );
+                        });
+            });
         }
     }
 
     private final List<SessionFactory> sessionFactories;
     private final DatabaseWarmUpConfig databaseWarmUpConfig;
     private final AtomicReference<DatabaseWarmUpState> databaseWarmUpStateAtomicReference;
-    private final int callCounts;
+    private final int numberOfThreads;
+    private final int numberOfIteration;
 
     /* To capture metrics */
     private final Timer timer;
@@ -88,7 +91,8 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
         this.databaseWarmUpStateAtomicReference = databaseWarmUpConfig.isWarmUpRequired()
                 ? new AtomicReference<>(DatabaseWarmUpState.INITIATED)
                 : new AtomicReference<>(DatabaseWarmUpState.WARMED_UP);
-        this.callCounts = databaseWarmUpConfig.getCallCounts();
+        this.numberOfThreads = databaseWarmUpConfig.getNumberOfThreads();
+        this.numberOfIteration = databaseWarmUpConfig.getNumberOfIteration();
         this.timer = metricRegistry.timer("DatabaseWarmUpHealthCheck-Metric");
         this.reporter = ConsoleReporter
                 .forRegistry(metricRegistry)
@@ -120,9 +124,9 @@ public class DatabaseWarmUpHealthCheck extends HealthCheck implements Managed {
         log.info("[DatabaseWarmUpHealthCheck] database warm-up has started. All {} shards will be checked.", sessionFactories.size());
         this.databaseWarmUpStateAtomicReference.set(DatabaseWarmUpState.WARMING_UP);
 
-        // [callCounts] numbers of threads will spin-up and work asynchronously.
+        // [numberOfThreads] numbers of threads will spin-up and work asynchronously.
         final List<Thread> warmupThreads = new ArrayList<>();
-        IntStream.range(0, callCounts).forEach(
+        IntStream.range(0, numberOfThreads).forEach(
                 count -> {
                     final Thread warmupThread  = new WarmupThread(String.format("WarmupThread-%s", count));
                     warmupThreads.add(warmupThread);
