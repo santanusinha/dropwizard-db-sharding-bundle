@@ -204,6 +204,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     public <U> U get(String key, Function<T, U> handler) throws Exception {
         int shardId = shardCalculator.shardId(key);
+        log.info("[TESTING] Getting entity of type: {} with key: {} to shardId: {}", entityClass.getSimpleName(), key, shardId);
         LookupDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, true, dao::get, key, handler);
     }
@@ -244,8 +245,8 @@ public class LookupDao<T> implements ShardedDao<T> {
     public <U> U save(T entity, Function<T, U> handler) throws Exception {
         final String key = keyField.get(entity).toString();
         int shardId = shardCalculator.shardId(key);
-        log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key, shardId);
         LookupDaoPriv dao = daos.get(shardId);
+        log.info("[TESTING] Saving entity of type: {} with key: {} to shardId: {} ", entityClass.getSimpleName(), key, shardId);
         return Transactions.execute(dao.sessionFactory, false, dao::save, entity, handler);
     }
 
