@@ -17,11 +17,14 @@
 
 package io.appform.dropwizard.sharding.utils;
 
+import com.codahale.metrics.Timer;
+import com.codahale.metrics.MetricRegistry;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Utility functional class for running transactions.
@@ -80,6 +83,20 @@ public class Transactions {
         } catch (Exception e) {
             transactionHandler.onError();
             throw e;
+        }
+    }
+
+    public static <T> T executeTracked(MetricRegistry metricRegistry, Supplier<T> t, String metricName){
+        Timer.Context time = metricRegistry.timer(metricName).time();
+        try {
+            return t.get();
+        }
+        catch (Exception e){
+            metricRegistry.meter(metricName + ".exceptions").mark();
+            throw e;
+        }
+        finally {
+            time.stop();
         }
     }
 }

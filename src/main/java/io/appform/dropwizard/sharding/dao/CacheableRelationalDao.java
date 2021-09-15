@@ -17,6 +17,8 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import com.codahale.metrics.MetricRegistry;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import org.hibernate.SessionFactory;
@@ -32,10 +34,13 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
 
     private RelationalCache<T> cache;
 
-    public CacheableRelationalDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
+    public CacheableRelationalDao(MetricRegistry metricRegistry,
+                                  ShardInfoProvider shardInfoProvider,
+                                  List<SessionFactory> sessionFactories,
+                                  Class<T> entityClass,
                                   ShardCalculator<String> shardCalculator,
                                   RelationalCache<T> cache) {
-        super(sessionFactories, entityClass, shardCalculator);
+        super(metricRegistry, shardInfoProvider, sessionFactories, entityClass, shardCalculator);
         this.cache = cache;
     }
 

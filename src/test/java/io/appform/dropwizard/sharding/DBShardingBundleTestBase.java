@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding;
 
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -93,6 +94,7 @@ public abstract class DBShardingBundleTestBase {
         when(environment.lifecycle()).thenReturn(lifecycleEnvironment);
         when(environment.healthChecks()).thenReturn(healthChecks);
         when(environment.admin()).thenReturn(adminEnvironment);
+        when(environment.metrics()).thenReturn(new MetricRegistry());
         when(bootstrap.getHealthCheckRegistry()).thenReturn(mock(HealthCheckRegistry.class));
     }
 
