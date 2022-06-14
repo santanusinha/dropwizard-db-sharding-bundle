@@ -18,13 +18,16 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import io.appform.dropwizard.sharding.utils.Transactions;
 import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import lombok.var;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.hibernate.*;
 import org.hibernate.criterion.DetachedCriteria;
@@ -158,6 +161,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }
     }
 
+    public ReadOnlyContext<T> readOnlyExecutor(String shardingKey,
+                                               DetachedCriteria criteria,
+                                               int first,
+                                               int numResults) {
+        int shardId = shardCalculator.shardId(shardingKey);
+        RelationalDaoPriv dao = daos.get(shardId);
+        return new ReadOnlyContext<>(this, shardId, dao.sessionFactory, criteria, first, numResults);
+    }
 
     public Optional<T> get(String parentKey, Object key) throws Exception {
         return Optional.ofNullable(get(parentKey, key, t-> t));
@@ -238,6 +249,16 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
     <U> List<T> select(LookupDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
+        final RelationalDaoPriv dao = daos.get(context.getShardId());
+        SelectParamPriv selectParam = SelectParamPriv.builder()
+                .criteria(criteria)
+                .start(first)
+                .numRows(numResults)
+                .build();
+        return Transactions.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false);
+    }
+
+    <U> List<T> select(ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
         SelectParamPriv selectParam = SelectParamPriv.builder()
                 .criteria(criteria)
@@ -450,4 +471,56 @@ public class RelationalDao<T> implements ShardedDao<T> {
     protected Field getKeyField() {
         return this.keyField;
     }
+
+    @Getter
+    public static class ReadOnlyContext<T> {
+        private final int shardId;
+        private final SessionFactory sessionFactory;
+        private final boolean skipTransaction;
+        private Supplier<List<T>> reader;
+
+        public ReadOnlyContext(
+                RelationalDao<T> relationalDao,
+                int shardId,
+                SessionFactory sessionFactory,
+                DetachedCriteria criteria,
+                int first,
+                int numResults) {
+            this.shardId = shardId;
+            this.sessionFactory = sessionFactory;
+            this.reader = () -> {
+                try {
+                    return relationalDao.select(this, criteria, first, numResults);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            };
+            val skipFlag = System.getProperty("lookup.ro.skipTxn");
+            this.skipTransaction = null != skipFlag && (skipFlag.isEmpty() || Boolean.parseBoolean(skipFlag));
+        }
+
+        public List<T> execute() {
+            var result = executeImpl();
+            if (null == result)
+                return Lists.newArrayList();
+
+            return result;
+        }
+
+        private List<T> executeImpl() {
+            TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true, this.skipTransaction);
+            transactionHandler.beforeStart();
+            try {
+                return reader.get();
+            }
+            catch (Exception e) {
+                transactionHandler.onError();
+                throw e;
+            }
+            finally {
+                transactionHandler.afterEnd();
+            }
+        }
+    }
+
 }
