@@ -495,7 +495,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
                     throw new RuntimeException(e);
                 }
             };
-            val skipFlag = System.getProperty("lookup.ro.skipTxn");
+            val skipFlag = System.getProperty("ro.skipTxn");
             this.skipTransaction = null != skipFlag && (skipFlag.isEmpty() || Boolean.parseBoolean(skipFlag));
         }
 

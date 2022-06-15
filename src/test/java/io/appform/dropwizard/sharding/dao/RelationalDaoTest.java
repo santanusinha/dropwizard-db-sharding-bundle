@@ -30,15 +30,16 @@ import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.criterion.DetachedCriteria;
+import org.hibernate.criterion.Restrictions;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
 public class RelationalDaoTest {
 
@@ -195,5 +196,55 @@ public class RelationalDaoTest {
         val persistedEntityThree = relationalDao.get(relationalKey, "3").orElse(null);
         assertNotNull(persistedEntityThree);
         assertEquals(entityThree.getValue(), persistedEntityThree.getValue());
+    }
+
+    @Test
+    public void testReadSkipsTransaction() throws Exception {
+        System.setProperty("ro.skipTxn", "true");
+
+        val relationalKey = UUID.randomUUID().toString();
+
+        val entityOne = RelationalEntity.builder()
+                .key("1")
+                .keyTwo("1")
+                .value(UUID.randomUUID().toString())
+                .build();
+        relationalDao.save(relationalKey, entityOne);
+
+        val readOnlyContext = relationalDao.readOnlyExecutor(relationalKey,
+                DetachedCriteria.forClass(RelationalEntity.class)
+                        .add(Restrictions.eq("keyTwo", "1"))
+                , 0, 1);
+
+        assertTrue(readOnlyContext.isSkipTransaction());
+
+        List<RelationalEntity> entities = readOnlyContext.execute();
+        assertEquals(entities.size(), 1);
+        assertEquals(entityOne, entities.get(0));
+    }
+
+    @Test
+    public void testReadUsesTransaction() throws Exception {
+        System.setProperty("ro.skipTxn", "false");
+
+        val relationalKey = UUID.randomUUID().toString();
+
+        val entityOne = RelationalEntity.builder()
+                .key("1")
+                .keyTwo("1")
+                .value(UUID.randomUUID().toString())
+                .build();
+        relationalDao.save(relationalKey, entityOne);
+
+        val readOnlyContext = relationalDao.readOnlyExecutor(relationalKey,
+                DetachedCriteria.forClass(RelationalEntity.class)
+                        .add(Restrictions.eq("keyTwo", "1"))
+                , 0, 1);
+
+        assertFalse(readOnlyContext.isSkipTransaction());
+
+        List<RelationalEntity> entities = readOnlyContext.execute();
+        assertEquals(entities.size(), 1);
+        assertEquals(entityOne, entities.get(0));
     }
 }

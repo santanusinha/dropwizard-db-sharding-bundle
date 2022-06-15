@@ -431,7 +431,7 @@ public class LookupDao<T> implements ShardedDao<T> {
             this.getter = getter;
             this.entityPopulator = entityPopulator;
             this.key = key;
-            val skipFlag = System.getProperty("lookup.ro.skipTxn");
+            val skipFlag = System.getProperty("ro.skipTxn");
             this.skipTransaction = null != skipFlag && (skipFlag.isEmpty() || Boolean.parseBoolean(skipFlag));
         }
 
