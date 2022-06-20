@@ -144,8 +144,6 @@ public class RelationalDaoTest {
         val persistedEntityThree = relationalDao.get(relationalKey, "3").orElse(null);
         assertNotNull(persistedEntityThree);
         assertEquals(newValue, persistedEntityThree.getValue());
-
-
     }
 
     @Test
