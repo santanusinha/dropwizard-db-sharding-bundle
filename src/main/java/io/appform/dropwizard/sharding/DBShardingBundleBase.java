@@ -69,6 +69,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     private static final String DEFAULT_NAMESPACE = "default";
     private static final String SHARD_ENV = "db.shards";
+    private static final String RO_SKIP_TRANSACTION_ENV = "db.ro.skipTxn";
     private static final String DEFAULT_SHARDS = "2";
 
     private List<HibernateBundle<T>> shardBundles = Lists.newArrayList();
@@ -80,6 +81,8 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     private String dbNamespace;
     @Getter
     private int numShards;
+    @Getter
+    private boolean roSkipTransaction;
 
     private ShardInfoProvider shardInfoProvider;
 
@@ -115,7 +118,9 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     private void init(final ImmutableList<Class<?>> inEntities) {
         boolean defaultNamespace = StringUtils.equalsIgnoreCase(dbNamespace, DEFAULT_NAMESPACE);
         val numShardsProperty = defaultNamespace ? SHARD_ENV : String.join(".", dbNamespace, SHARD_ENV);
+        val roSkipTransactionProperty = defaultNamespace ? RO_SKIP_TRANSACTION_ENV : String.join(".", dbNamespace, RO_SKIP_TRANSACTION_ENV);
         String numShardsEnv = System.getProperty(numShardsProperty, DEFAULT_SHARDS);
+        String roSkipTransactionEnv = System.getProperty(roSkipTransactionProperty);
         this.numShards = Integer.parseInt(numShardsEnv);
         val blacklistingStore = getBlacklistingStore();
         this.shardManager = createShardManager(numShards, blacklistingStore);
@@ -134,6 +139,8 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                     }
                 })
         );
+
+        this.roSkipTransaction = null != roSkipTransactionEnv && (roSkipTransactionEnv.isEmpty() || Boolean.parseBoolean(roSkipTransactionEnv));
     }
 
     @Override
@@ -187,7 +194,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     public <EntityType, T extends Configuration>
     LookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
         return new LookupDao<>(this.sessionFactories, clazz,
-                new ShardCalculator<>(this.shardManager, new ConsistentHashBucketIdExtractor<>(this.shardManager)));
+                new ShardCalculator<>(this.shardManager, new ConsistentHashBucketIdExtractor<>(this.shardManager)), roSkipTransaction);
     }
 
     public <EntityType, T extends Configuration>
@@ -201,7 +208,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     public <EntityType, T extends Configuration>
     LookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz,
                                                 BucketIdExtractor<String> bucketIdExtractor) {
-        return new LookupDao<>(this.sessionFactories, clazz, new ShardCalculator<>(this.shardManager, bucketIdExtractor));
+        return new LookupDao<>(this.sessionFactories, clazz, new ShardCalculator<>(this.shardManager, bucketIdExtractor), roSkipTransaction);
     }
 
     public <EntityType, T extends Configuration>
@@ -215,7 +222,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     public <EntityType, T extends Configuration>
     RelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
         return new RelationalDao<>(this.sessionFactories, clazz,
-                new ShardCalculator<>(this.shardManager, new ConsistentHashBucketIdExtractor<>(this.shardManager)));
+                new ShardCalculator<>(this.shardManager, new ConsistentHashBucketIdExtractor<>(this.shardManager)), roSkipTransaction);
     }
 
 
@@ -232,7 +239,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     public <EntityType, T extends Configuration>
     RelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz,
                                                      BucketIdExtractor<String> bucketIdExtractor) {
-        return new RelationalDao<>(this.sessionFactories, clazz, new ShardCalculator<>(this.shardManager, bucketIdExtractor));
+        return new RelationalDao<>(this.sessionFactories, clazz, new ShardCalculator<>(this.shardManager, bucketIdExtractor), roSkipTransaction);
     }
 
     public <EntityType, T extends Configuration>

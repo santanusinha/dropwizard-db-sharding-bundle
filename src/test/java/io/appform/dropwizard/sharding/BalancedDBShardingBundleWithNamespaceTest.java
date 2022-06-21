@@ -21,6 +21,11 @@ package io.appform.dropwizard.sharding;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
+import org.junit.After;
+import org.junit.Test;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public class BalancedDBShardingBundleWithNamespaceTest extends DBShardingBundleTestBase {
 
@@ -33,4 +38,34 @@ public class BalancedDBShardingBundleWithNamespaceTest extends DBShardingBundleT
             }
         };
     }
+
+    @After
+    public void after() {
+        System.clearProperty("namespace.db.ro.skipTxn");
+    }
+
+    @Test
+    public void testBundleWithRoSkipTxnPropertySetForDifferentNamespace() {
+        System.setProperty("someothernamespace.db.ro.skipTxn", "true");
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.initBundles(bootstrap);
+        bundle.runBundles(testConfig, environment);
+        bundle.run(testConfig, environment);
+
+        assertFalse(bundle.isRoSkipTransaction());
+    }
+
+    @Test
+    public void testBundleWithRoSkipTxnPropertySet() {
+        System.setProperty("namespace.db.ro.skipTxn", "true");
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.initBundles(bootstrap);
+        bundle.runBundles(testConfig, environment);
+        bundle.run(testConfig, environment);
+
+        assertTrue(bundle.isRoSkipTransaction());
+    }
+
 }

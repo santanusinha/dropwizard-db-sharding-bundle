@@ -83,8 +83,8 @@ public class LockTest {
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
-        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator);
-        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator);
+        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, false);
+        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator, false);
     }
 
     @Test

@@ -86,10 +86,10 @@ public class LookupDaoTest {
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
                                                                               new ConsistentHashBucketIdExtractor<>(
                                                                                       shardManager));
-        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator);
-        phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator);
-        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator);
-        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator);
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator, false);
+        phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator, false);
+        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator, false);
+        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator, false);
     }
 
     @After

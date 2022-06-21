@@ -45,6 +45,7 @@ public class RelationalDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
     private RelationalDao<RelationalEntity> relationalDao;
+    private RelationalDao<RelationalEntity> relationalDao1;
 
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
@@ -73,7 +74,14 @@ public class RelationalDaoTest {
         relationalDao = new RelationalDao<>(sessionFactories,
                                             RelationalEntity.class,
                                             new ShardCalculator<>(shardManager,
-                                                                  new ConsistentHashBucketIdExtractor<>(shardManager)));
+                                                                  new ConsistentHashBucketIdExtractor<>(shardManager)),
+                                            false);
+        relationalDao1 = new RelationalDao<>(sessionFactories,
+                RelationalEntity.class,
+                new ShardCalculator<>(shardManager,
+                        new ConsistentHashBucketIdExtractor<>(shardManager)),
+                true);
+
     }
 
     @After
@@ -198,8 +206,6 @@ public class RelationalDaoTest {
 
     @Test
     public void testReadSkipsTransaction() throws Exception {
-        System.setProperty("ro.skipTxn", "true");
-
         val relationalKey = UUID.randomUUID().toString();
 
         val entityOne = RelationalEntity.builder()
@@ -207,9 +213,9 @@ public class RelationalDaoTest {
                 .keyTwo("1")
                 .value(UUID.randomUUID().toString())
                 .build();
-        relationalDao.save(relationalKey, entityOne);
+        relationalDao1.save(relationalKey, entityOne);
 
-        val readOnlyContext = relationalDao.readOnlyExecutor(relationalKey,
+        val readOnlyContext = relationalDao1.readOnlyExecutor(relationalKey,
                 DetachedCriteria.forClass(RelationalEntity.class)
                         .add(Restrictions.eq("keyTwo", "1"))
                 , 0, 1);
@@ -223,8 +229,6 @@ public class RelationalDaoTest {
 
     @Test
     public void testReadUsesTransaction() throws Exception {
-        System.setProperty("ro.skipTxn", "false");
-
         val relationalKey = UUID.randomUUID().toString();
 
         val entityOne = RelationalEntity.builder()

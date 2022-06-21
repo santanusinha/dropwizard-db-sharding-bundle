@@ -133,19 +133,23 @@ public class RelationalDao<T> implements ShardedDao<T> {
     @Getter
     private final ShardCalculator<String> shardCalculator;
     private final Field keyField;
+    private final boolean roSkipTransaction;
 
     /**
      * Create a relational DAO.
      * @param sessionFactories List of session factories. One for each shard.
      * @param entityClass The class for which the dao will be used.
      * @param shardCalculator
+     * @param roSkipTransaction
      */
     public RelationalDao(
             List<SessionFactory> sessionFactories, Class<T> entityClass,
-            ShardCalculator<String> shardCalculator ) {
+            ShardCalculator<String> shardCalculator,
+            boolean roSkipTransaction) {
         this.shardCalculator = shardCalculator;
         this.daos = sessionFactories.stream().map(RelationalDaoPriv::new).collect(Collectors.toList());
         this.entityClass = entityClass;
+        this.roSkipTransaction = roSkipTransaction;
 
         Field fields[] = FieldUtils.getFieldsWithAnnotation(entityClass, Id.class);
         Preconditions.checkArgument(fields.length != 0, "A field needs to be designated as @Id");
@@ -495,8 +499,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
                     throw new RuntimeException(e);
                 }
             };
-            val skipFlag = System.getProperty("ro.skipTxn");
-            this.skipTransaction = null != skipFlag && (skipFlag.isEmpty() || Boolean.parseBoolean(skipFlag));
+            this.skipTransaction = relationalDao.roSkipTransaction;
         }
 
         public List<T> execute() {

@@ -44,7 +44,7 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
     public CacheableLookupDao(List<SessionFactory> sessionFactories,
                               Class<T> entityClass,
                               ShardCalculator<String> shardCalculator, LookupCache<T> cache) {
-        super(sessionFactories, entityClass, shardCalculator);
+        super(sessionFactories, entityClass, shardCalculator, false);
         this.cache = cache;
     }
 
