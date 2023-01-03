@@ -28,6 +28,7 @@ import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import lombok.SneakyThrows;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -311,6 +312,49 @@ public class LookupDaoTest {
         assertEquals(4, allAudits.size());
     }
 
+    @Test
+    @SneakyThrows
+    public void test() {
+        Transaction transaction = Transaction.builder()
+                .transactionId("TXNID")
+                .amount(100)
+                .to("9986402019")
+                .build();
+        Audit started = Audit.builder()
+                .text("Started")
+                .transaction(transaction)
+                .build();
+
+        Audit completed = Audit.builder()
+                .text("Completed")
+                .transaction(transaction)
+                .build();
+
+        transaction.setAudits(ImmutableList.of(started, completed));
+        transactionDao.save(transaction.getTransactionId(), transaction);
+
+
+        val criteria = DetachedCriteria.forClass(Transaction.class)
+                .add(Restrictions.eq("transactionId", transaction.getTransactionId()));
+
+        val auditCriteria = DetachedCriteria.forClass(Audit.class)
+                .add(Restrictions.eq("transaction.transactionId", transaction.getTransactionId()));
+
+
+        val res = transactionDao.select(transaction.getTransactionId(),criteria, 0, Integer.MAX_VALUE);
+        assertEquals(1, res.size());
+
+        val res2 = transactionDao.readOnlyExecutor(transaction.getTransactionId(), criteria)
+                .readAugmentParent(auditDao, auditCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                    children.forEach(e -> System.out.println(e.getText()));
+                    parent.setAudits(children);
+                })
+                .execute();
+        assertTrue(res2.isPresent());
+        assertEquals(2, res2.get().getAudits().size());
+
+    }
+
 
     private void saveHierarchy(String phone) throws Exception {
 
@@ -381,4 +425,5 @@ public class LookupDaoTest {
         );
 
     }
+
 }

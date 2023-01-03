@@ -60,7 +60,8 @@ public class LockTest {
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
 
     private LookupDao<SomeLookupObject> lookupDao;
-    private RelationalDao<SomeOtherObject> relationDao;
+    private RelationalDao<SomeLookupObject> relationDao;
+    private RelationalDao<SomeOtherObject> relationChildDao;
 
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
@@ -90,7 +91,8 @@ public class LockTest {
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
         lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator);
-        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator);
+        relationDao = new RelationalDao<>(sessionFactories, SomeLookupObject.class, shardCalculator);
+        relationChildDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator);
     }
 
     @Test
@@ -104,8 +106,8 @@ public class LockTest {
 
         Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
-        Assert.assertEquals(6, relationDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class), 0, 10).size());
-        Assert.assertEquals("Hello", relationDao.get("0", 1L).get().getValue());
+        Assert.assertEquals(6, relationChildDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class), 0, 10).size());
+        Assert.assertEquals("Hello", relationChildDao.get("0", 1L).get().getValue());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -116,7 +118,7 @@ public class LockTest {
         lookupDao.save(p1);
         lookupDao.lockAndGetExecutor("0")
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> {
+                .save(relationChildDao, parent -> {
                     SomeOtherObject result = SomeOtherObject.builder()
                             .myId(parent.getMyId())
                             .value("Hello")
@@ -138,7 +140,7 @@ public class LockTest {
 
         lookupDao.saveAndGetExecutor(p1)
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> SomeOtherObject.builder()
+                .save(relationChildDao, parent -> SomeOtherObject.builder()
                         .myId(parent.getMyId())
                         .value("Hello")
                         .build())
@@ -156,7 +158,7 @@ public class LockTest {
                 .name("Parent 1")
                 .build();
 
-        SomeOtherObject c1 = relationDao.save(p1.getMyId(), SomeOtherObject.builder()
+        SomeOtherObject c1 = relationChildDao.save(p1.getMyId(), SomeOtherObject.builder()
                 .myId(p1.getMyId())
                 .value("Hello")
                 .build()).get();
@@ -164,7 +166,7 @@ public class LockTest {
 
         lookupDao.saveAndGetExecutor(p1)
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .update(relationDao, c1.getId(), child -> {
+                .update(relationChildDao, c1.getId(), child -> {
                     child.setValue("Hello Changed");
                     return child;
                 })
@@ -173,7 +175,7 @@ public class LockTest {
 
         Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
-        Assert.assertEquals("Hello Changed", relationDao.get("0", 1L).get().getValue());
+        Assert.assertEquals("Hello Changed", relationChildDao.get("0", 1L).get().getValue());
     }
 
     @Test
@@ -183,7 +185,7 @@ public class LockTest {
                 .name("Parent 1")
                 .build();
 
-        SomeOtherObject c1 = relationDao.save(p1.getMyId(), SomeOtherObject.builder()
+        SomeOtherObject c1 = relationChildDao.save(p1.getMyId(), SomeOtherObject.builder()
                 .myId(p1.getMyId())
                 .value("Hello")
                 .build()).get();
@@ -191,7 +193,7 @@ public class LockTest {
 
         lookupDao.saveAndGetExecutor(p1)
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, c1, child -> {
+                .save(relationChildDao, c1, child -> {
                     child.setValue("Hello Changed");
                     return child;
                 })
@@ -200,7 +202,7 @@ public class LockTest {
 
         Assert.assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         Assert.assertEquals("Changed", lookupDao.get("0").get().getName());
-        Assert.assertEquals("Hello Changed", relationDao.get("0", 1L).get().getValue());
+        Assert.assertEquals("Hello Changed", relationChildDao.get("0", 1L).get().getValue());
     }
 
     @Test(expected = ConstraintViolationException.class)
@@ -219,7 +221,7 @@ public class LockTest {
 
         lookupDao.saveAndGetExecutor(p2)
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> SomeOtherObject.builder()
+                .save(relationChildDao, parent -> SomeOtherObject.builder()
                         .myId(parent.getMyId())
                         .value("Hello")
                         .build())
@@ -240,7 +242,7 @@ public class LockTest {
 
         lookupDao.saveAndGetExecutor(p1)
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> SomeOtherObject.builder()
+                .save(relationChildDao, parent -> SomeOtherObject.builder()
                         .myId(parent.getMyId())
                         .value("Hello")
                         .build())
@@ -260,7 +262,7 @@ public class LockTest {
                 .build();
         lookupDao.save(parent);
 
-        final SomeOtherObject child = relationDao.save(parent.getMyId(), SomeOtherObject.builder()
+        final SomeOtherObject child = relationChildDao.save(parent.getMyId(), SomeOtherObject.builder()
                 .myId(parent.getMyId())
                 .value("Hello")
                 .build()).get();
@@ -273,7 +275,7 @@ public class LockTest {
                 .add(Restrictions.eq("myId", parent.getMyId()));
 
         lookupDao.lockAndGetExecutor(parent.getMyId())
-                .createOrUpdate(relationDao, updateCriteria, childObj -> {
+                .createOrUpdate(relationChildDao, updateCriteria, childObj -> {
                     childObj.setValue(childModifiedValue);
                     return childObj;
                 }, () -> {
@@ -286,7 +288,7 @@ public class LockTest {
                 .mutate(parentObj -> parentObj.setName(parentModifiedValue))
                 .execute();
 
-        Assert.assertEquals(childModifiedValue, relationDao.get(parent.getMyId(), child.getId()).get().getValue());
+        Assert.assertEquals(childModifiedValue, relationChildDao.get(parent.getMyId(), child.getId()).get().getValue());
         Assert.assertEquals(parentModifiedValue, lookupDao.get(parentId).get().getName());
 
         //test non existing entity creation
@@ -296,7 +298,7 @@ public class LockTest {
                 .add(Restrictions.eq("value", newChildValue));
 
         lookupDao.lockAndGetExecutor(parent.getMyId())
-                .createOrUpdate(relationDao, creationCriteria, childObj -> {
+                .createOrUpdate(relationChildDao, creationCriteria, childObj -> {
                     Assert.assertNotEquals(null, childObj);
                     Assert.fail("New Entity is getting updated. It should have been created.");
 
@@ -310,7 +312,7 @@ public class LockTest {
                 .mutate(parentObj -> parentObj.setName(newParentValue))
                 .execute();
 
-        final SomeOtherObject savedChild = relationDao.select(parent.getMyId(), creationCriteria, 0, 1)
+        final SomeOtherObject savedChild = relationChildDao.select(parent.getMyId(), creationCriteria, 0, 1)
                 .stream()
                 .findFirst()
                 .get();
@@ -328,7 +330,7 @@ public class LockTest {
                 .build();
         lookupDao.save(parent);
 
-        val child = relationDao.save(parent.getMyId(), SomeOtherObject.builder()
+        val child = relationChildDao.save(parent.getMyId(), SomeOtherObject.builder()
                 .myId(parent.getMyId())
                 .value("Hello")
                 .build()).get();
@@ -346,7 +348,7 @@ public class LockTest {
                                           .build())
                 .execute();
 
-        val updatedChild = relationDao.get(parent.getMyId(), child.getId()).orElse(null);
+        val updatedChild = relationChildDao.get(parent.getMyId(), child.getId()).orElse(null);
         assertNotNull(updatedChild);
         assertEquals(childModifiedValue, updatedChild.getValue());
     }
@@ -360,12 +362,12 @@ public class LockTest {
                 .name("Parent 1")
                 .build();
 
-        final SomeOtherObject child1 = relationDao.save(parent1.getMyId(), SomeOtherObject.builder()
+        final SomeOtherObject child1 = relationChildDao.save(parent1.getMyId(), SomeOtherObject.builder()
                 .myId(parent1.getMyId())
                 .value("Hello1")
                 .build()).get();
 
-        final SomeOtherObject child2 = relationDao.save(parent1.getMyId(), SomeOtherObject.builder()
+        final SomeOtherObject child2 = relationChildDao.save(parent1.getMyId(), SomeOtherObject.builder()
                 .myId(parent1.getMyId())
                 .value("Hello2")
                 .build()).get();
@@ -376,7 +378,7 @@ public class LockTest {
                 .name("Parent 2")
                 .build();
 
-        final SomeOtherObject child3 = relationDao.save(parent2.getMyId(), SomeOtherObject.builder()
+        final SomeOtherObject child3 = relationChildDao.save(parent2.getMyId(), SomeOtherObject.builder()
                 .myId(parent2.getMyId())
                 .value("Hello3")
                 .build()).get();
@@ -393,18 +395,18 @@ public class LockTest {
         final String parentModifiedValue = "Parent Changed";
 
         lookupDao.lockAndGetExecutor(parent1.getMyId())
-                .update(relationDao, allSelectCriteria, entityObj -> {
+                .update(relationChildDao, allSelectCriteria, entityObj -> {
                     entityObj.setValue(childModifiedValue);
                     return entityObj;
                 }, () -> true)
                 .mutate(parent -> parent.setName(parentModifiedValue))
                 .execute();
 
-        Assert.assertEquals(childModifiedValue, relationDao.get(parent1.getMyId(), child1.getId()).get().getValue());
-        Assert.assertEquals(childModifiedValue, relationDao.get(parent1.getMyId(), child2.getId()).get().getValue());
+        Assert.assertEquals(childModifiedValue, relationChildDao.get(parent1.getMyId(), child1.getId()).get().getValue());
+        Assert.assertEquals(childModifiedValue, relationChildDao.get(parent1.getMyId(), child2.getId()).get().getValue());
         Assert.assertEquals(parentModifiedValue, lookupDao.get(parent1Id).get().getName());
 
-        Assert.assertEquals("Hello3", relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
+        Assert.assertEquals("Hello3", relationChildDao.get(parent2.getMyId(), child3.getId()).get().getValue());
         Assert.assertEquals("Parent 2", lookupDao.get(parent2Id).get().getName());
 
         final boolean[] shouldUpdateNext = new boolean[1];
@@ -414,7 +416,7 @@ public class LockTest {
         final String childModifiedValue2 = "Hello Modified Partial";
         final String parentModifiedValue2 = "Parent Changed Partial";
         lookupDao.lockAndGetExecutor(parent1.getMyId())
-                .update(relationDao, allSelectCriteria, entityObj -> {
+                .update(relationChildDao, allSelectCriteria, entityObj -> {
                     entityObj.setValue(childModifiedValue2);
 
                     if (entityObj.getId() == child1.getId()) {
@@ -426,11 +428,11 @@ public class LockTest {
                 .mutate(parent -> parent.setName(parentModifiedValue2))
                 .execute();
 
-        Assert.assertEquals(childModifiedValue2, relationDao.get(parent1Id, child1.getId()).get().getValue());
-        Assert.assertEquals(childModifiedValue, relationDao.get(parent1Id, child2.getId()).get().getValue());
+        Assert.assertEquals(childModifiedValue2, relationChildDao.get(parent1Id, child1.getId()).get().getValue());
+        Assert.assertEquals(childModifiedValue, relationChildDao.get(parent1Id, child2.getId()).get().getValue());
         Assert.assertEquals(parentModifiedValue2, lookupDao.get(parent1Id).get().getName());
 
-        Assert.assertEquals("Hello3", relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
+        Assert.assertEquals("Hello3", relationChildDao.get(parent2.getMyId(), child3.getId()).get().getValue());
         Assert.assertEquals("Parent 2", lookupDao.get(parent2Id).get().getName());
     }
 
@@ -448,7 +450,7 @@ public class LockTest {
                 .addOrder(Order.asc("id"));
         val testExecuted = new AtomicBoolean();
         val res = lookupDao.readOnlyExecutor(p1.getMyId())
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationChildDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
                     assertNull(parent.getChildren());
                     assertEquals(6, children.size());
                     assertNotNull(parent);
@@ -481,29 +483,29 @@ public class LockTest {
                 .build();
 
         // save
-        LockedContext<SomeOtherObject> context = relationDao.saveAndGetExecutor(someOtherObject.getMyId(), someOtherObject);
-        context.save(relationDao, parent -> {
+        LockedContext<SomeOtherObject> context = relationChildDao.saveAndGetExecutor(someOtherObject.getMyId(), someOtherObject);
+        context.save(relationChildDao, parent -> {
             someOtherObject2.setMyId(String.valueOf(parent.getId()));
             return  someOtherObject2;
         });
-        context.save(relationDao, parent -> {
+        context.save(relationChildDao, parent -> {
             someOtherObject3.setMyId(String.valueOf(parent.getId()));
             return  someOtherObject3;
         });
         context.execute();
 
         // update
-        LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(someOtherObject.getMyId(),
+        LockedContext<SomeOtherObject> contextUpdate = relationChildDao.lockAndGetExecutor(someOtherObject.getMyId(),
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("myId", someOtherObject.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
         contextUpdate.execute();
 
         // get
-        Optional<SomeOtherObject> resp = relationDao.get(someOtherObject.getMyId(), 1L);
+        Optional<SomeOtherObject> resp = relationChildDao.get(someOtherObject.getMyId(), 1L);
         Assert.assertNotNull(resp.get());
         Assert.assertEquals("UPDATE", resp.get().getValue());
-        Optional<SomeOtherObject> resp1 = relationDao.get(someOtherObject.getMyId(), 2L);
+        Optional<SomeOtherObject> resp1 = relationChildDao.get(someOtherObject.getMyId(), 2L);
         Assert.assertNotNull(resp1.get());
     }
 
@@ -520,20 +522,20 @@ public class LockTest {
                 .build();
 
         // save
-        LockedContext<SomeOtherObject> context = relationDao.saveAndGetExecutor(someOtherObject.getMyId(), someOtherObject);
-        context.save(relationDao, parent -> {
+        LockedContext<SomeOtherObject> context = relationChildDao.saveAndGetExecutor(someOtherObject.getMyId(), someOtherObject);
+        context.save(relationChildDao, parent -> {
             someOtherObject2.setMyId(String.valueOf(parent.getId()));
             return  someOtherObject2;
         });
         context.execute();
 
         // update
-        LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(someOtherObject.getMyId(),
+        LockedContext<SomeOtherObject> contextUpdate = relationChildDao.lockAndGetExecutor(someOtherObject.getMyId(),
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("myId", someOtherObject.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
-        contextUpdate.update(relationDao, someOtherObject2.getId(),
+        contextUpdate.update(relationChildDao, someOtherObject2.getId(),
                 child -> {
                     child.setValue("HELLO_UPDATED");
                     return child;
@@ -542,9 +544,9 @@ public class LockTest {
         contextUpdate.execute();
 
         // get
-        Optional<SomeOtherObject> resp = relationDao.get(someOtherObject.getMyId(), 1L);
+        Optional<SomeOtherObject> resp = relationChildDao.get(someOtherObject.getMyId(), 1L);
         Assert.assertNotNull(resp.get());
-        Optional<SomeOtherObject> resp1 = relationDao.get(someOtherObject.getMyId(), 2L);
+        Optional<SomeOtherObject> resp1 = relationChildDao.get(someOtherObject.getMyId(), 2L);
         Assert.assertNotNull(resp1.get());
         Assert.assertEquals("HELLO_UPDATED", resp1.get().getValue());
     }
@@ -566,29 +568,29 @@ public class LockTest {
                 .build();
 
         // save
-        LockedContext<SomeOtherObject> context = relationDao.saveAndGetExecutor(someOtherObject.getMyId(), someOtherObject);
-        context.save(relationDao, parent -> {
+        LockedContext<SomeOtherObject> context = relationChildDao.saveAndGetExecutor(someOtherObject.getMyId(), someOtherObject);
+        context.save(relationChildDao, parent -> {
             someOtherObject2.setMyId(String.valueOf(parent.getId()));
             return  someOtherObject2;
         });
-        context.save(relationDao, parent -> {
+        context.save(relationChildDao, parent -> {
             someOtherObject3.setMyId(String.valueOf(parent.getId()));
             return  someOtherObject3;
         });
         context.execute();
 
         // update
-        LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(someOtherObject.getMyId(),
+        LockedContext<SomeOtherObject> contextUpdate = relationChildDao.lockAndGetExecutor(someOtherObject.getMyId(),
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("myId", someOtherObject.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
-        contextUpdate.update(relationDao, someOtherObject2.getId(),
+        contextUpdate.update(relationChildDao, someOtherObject2.getId(),
                 child1 -> {
                     child1.setValue("CHILD_ONE");
                     return child1;
                 });
-        contextUpdate.update(relationDao, someOtherObject3.getId(),
+        contextUpdate.update(relationChildDao, someOtherObject3.getId(),
                 child2 -> {
                     child2.setValue("CHILD_TWO");
                     return child2;
@@ -597,12 +599,12 @@ public class LockTest {
         contextUpdate.execute();
 
         // get
-        Optional<SomeOtherObject> resp = relationDao.get(someOtherObject.getMyId(), 1L);
+        Optional<SomeOtherObject> resp = relationChildDao.get(someOtherObject.getMyId(), 1L);
         Assert.assertNotNull(resp.get());
-        Optional<SomeOtherObject> resp1 = relationDao.get(someOtherObject.getMyId(), 2L);
+        Optional<SomeOtherObject> resp1 = relationChildDao.get(someOtherObject.getMyId(), 2L);
         Assert.assertNotNull(resp1.get());
         Assert.assertEquals("CHILD_ONE", resp1.get().getValue());
-        Optional<SomeOtherObject> resp2 = relationDao.get(someOtherObject.getMyId(), 3L);
+        Optional<SomeOtherObject> resp2 = relationChildDao.get(someOtherObject.getMyId(), 3L);
         Assert.assertNotNull(resp2.get());
         Assert.assertEquals("CHILD_TWO", resp2.get().getValue());
     }
@@ -620,20 +622,20 @@ public class LockTest {
                 .build();
 
         // save
-        LockedContext<SomeOtherObject> context = relationDao.saveAndGetExecutor(p1.getMyId(), p1);
-        context.save(relationDao, parent -> {
+        LockedContext<SomeOtherObject> context = relationChildDao.saveAndGetExecutor(p1.getMyId(), p1);
+        context.save(relationChildDao, parent -> {
             c1.setMyId(String.valueOf(parent.getId()));
             return  c1;
         });
         context.execute();
 
         // update
-        LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(p1.getMyId(),
+        LockedContext<SomeOtherObject> contextUpdate = relationChildDao.lockAndGetExecutor(p1.getMyId(),
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("myId", p1.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
-        contextUpdate.update(relationDao,
+        contextUpdate.update(relationChildDao,
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("id", c1.getId())),
                 child -> {
@@ -644,11 +646,11 @@ public class LockTest {
         contextUpdate.execute();
 
         // get
-        Optional<SomeOtherObject> resp = relationDao.get(p1.getMyId(), 1L);
+        Optional<SomeOtherObject> resp = relationChildDao.get(p1.getMyId(), 1L);
         Assert.assertNotNull(resp.get());
         Assert.assertEquals("UPDATE", resp.get().getValue());
 
-        Optional<SomeOtherObject> resp1 = relationDao.get(p1.getMyId(), 2L);
+        Optional<SomeOtherObject> resp1 = relationChildDao.get(p1.getMyId(), 2L);
         Assert.assertNotNull(resp1.get());
         Assert.assertEquals("CHILD_ONE", resp1.get().getValue());
     }
@@ -671,24 +673,24 @@ public class LockTest {
                 .build();
 
         // save
-        LockedContext<SomeOtherObject> context = relationDao.saveAndGetExecutor(p1.getMyId(), p1);
-        context.save(relationDao, parent -> {
+        LockedContext<SomeOtherObject> context = relationChildDao.saveAndGetExecutor(p1.getMyId(), p1);
+        context.save(relationChildDao, parent -> {
             c1.setMyId(String.valueOf(parent.getId()));
             return  c1;
         });
-        context.save(relationDao, parent -> {
+        context.save(relationChildDao, parent -> {
             c2.setMyId(String.valueOf(parent.getId()));
             return  c2;
         });
         context.execute();
 
         // update
-        LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(p1.getMyId(),
+        LockedContext<SomeOtherObject> contextUpdate = relationChildDao.lockAndGetExecutor(p1.getMyId(),
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("myId", p1.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
-        contextUpdate.update(relationDao,
+        contextUpdate.update(relationChildDao,
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("id", c1.getId())),
                 child -> {
@@ -696,7 +698,7 @@ public class LockTest {
                     return child;
                 }, () -> false);
 
-        contextUpdate.update(relationDao,
+        contextUpdate.update(relationChildDao,
                 DetachedCriteria.forClass(SomeOtherObject.class)
                         .add(Restrictions.eq("id", c2.getId())),
                 child -> {
@@ -708,15 +710,15 @@ public class LockTest {
         contextUpdate.execute();
 
         // get
-        Optional<SomeOtherObject> resp = relationDao.get(p1.getMyId(), 1L);
+        Optional<SomeOtherObject> resp = relationChildDao.get(p1.getMyId(), 1L);
         Assert.assertNotNull(resp.get());
         Assert.assertEquals("UPDATE", resp.get().getValue());
 
-        Optional<SomeOtherObject> resp1 = relationDao.get(p1.getMyId(), 2L);
+        Optional<SomeOtherObject> resp1 = relationChildDao.get(p1.getMyId(), 2L);
         Assert.assertNotNull(resp1.get());
         Assert.assertEquals("CHILD_ONE", resp1.get().getValue());
 
-        Optional<SomeOtherObject> resp2 = relationDao.get(p1.getMyId(), 3L);
+        Optional<SomeOtherObject> resp2 = relationChildDao.get(p1.getMyId(), 3L);
         Assert.assertNotNull(resp2.get());
         Assert.assertEquals("CHILD_TWO", resp2.get().getValue());
     }
@@ -739,7 +741,7 @@ public class LockTest {
         val testExecuted = new AtomicBoolean();
         val res = lookupDao.readOnlyExecutor(p1.getMyId(),
                                              () -> saveEntity(lookupDao.saveAndGetExecutor(p1)))
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationChildDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
                     assertNull(parent.getChildren());
                     assertEquals(6, children.size());
                     assertNotNull(parent);
@@ -762,7 +764,7 @@ public class LockTest {
         assertFalse(lookupDao.readOnlyExecutor("0").execute().isPresent());
 
         assertFalse(lookupDao.readOnlyExecutor("0", () -> false)
-                            .readAugmentParent(relationDao,
+                            .readAugmentParent(relationChildDao,
                                                allSelectCriteria,
                                                0,
                                                Integer.MAX_VALUE,
@@ -791,7 +793,7 @@ public class LockTest {
                 .addOrder(Order.asc("id"));
         val testExecuted = new AtomicBoolean();
         val res = lookupDao.readOnlyExecutor(p1.getMyId())
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationChildDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
                     assertNull(parent.getChildren());
                     assertEquals(6, children.size());
                     assertNotNull(parent);
@@ -807,7 +809,7 @@ public class LockTest {
 
         testExecuted.set(false);
         val res2 = lookupDao.readOnlyExecutor(p2.getMyId())
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationChildDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
                                        testExecuted.set(true);
                                    },
                                    p -> !p.getMyId().equals("1")) //Don't read children if object id is blah
@@ -817,14 +819,69 @@ public class LockTest {
         assertFalse(testExecuted.get());
     }
 
+    @Test
+    @SneakyThrows
+    public void testReadMultiChildConditionalWithRelationalReadOnlyLockedContext() {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p1));
+        SomeLookupObject p2 = SomeLookupObject.builder()
+                .myId("1")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p2));
+
+
+        final String parentKey1 = p1.getMyId();
+        final DetachedCriteria criteria1 = DetachedCriteria.forClass(SomeLookupObject.class)
+                .add(Restrictions.eq("myId", parentKey1))
+                .addOrder(Order.asc("id"));
+
+        final DetachedCriteria allSelectCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("myId", parentKey1))
+                .addOrder(Order.asc("id"));
+        val testExecuted = new AtomicBoolean();
+        val res = relationDao.readOnlyExecutor(parentKey1, criteria1)
+                .readAugmentParent(relationChildDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                    assertNull(parent.getChildren());
+                    assertEquals(6, children.size());
+                    assertNotNull(parent);
+                    testExecuted.set(true);
+                    parent.setChildren(children);
+                })
+                .execute();
+
+        assertTrue(res.isPresent());
+        assertEquals(6, res.get().getChildren().size());
+        assertTrue(testExecuted.get());
+
+
+        final String parentKey2 = p2.getMyId();
+        final DetachedCriteria criteria2 = DetachedCriteria.forClass(SomeLookupObject.class)
+                .add(Restrictions.eq("myId", parentKey2))
+                .addOrder(Order.asc("id"));
+        testExecuted.set(false);
+        val res2 = relationDao.readOnlyExecutor(parentKey2, criteria2)
+                .readAugmentParent(relationChildDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                            testExecuted.set(true);
+                        },
+                        p -> !p.getMyId().equals("1")) //Don't read children if object id is blah
+                .execute();
+
+        assertTrue(res2.isPresent());
+        assertFalse(testExecuted.get());
+    }
+
     private boolean saveEntity(LockedContext<SomeLookupObject> lockedContext) {
         return lockedContext
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
-                .save(relationDao, parent -> SomeOtherObject.builder()
+                .save(relationChildDao, parent -> SomeOtherObject.builder()
                         .myId(parent.getMyId())
                         .value("Hello")
                         .build())
-                .saveAll(relationDao,
+                .saveAll(relationChildDao,
                          parent -> IntStream.range(1, 6)
                                  .mapToObj(i -> SomeOtherObject.builder()
                                          .myId(parent.getMyId())

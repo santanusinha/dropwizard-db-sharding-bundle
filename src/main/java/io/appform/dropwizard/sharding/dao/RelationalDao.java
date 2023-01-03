@@ -18,9 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
-import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import io.appform.dropwizard.sharding.utils.Transactions;
 import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Builder;
@@ -46,9 +44,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
@@ -73,15 +69,19 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }
 
         T get(Object lookupKey) {
-            return uniqueResult(currentSession()
-                    .createCriteria(entityClass)
-                    .add(Restrictions.eq(keyField.getName(), lookupKey))
-                    .setLockMode(LockMode.READ));
+            val criteria = DetachedCriteria.forClass(entityClass)
+                    .add(Restrictions.eq(keyField.getName(), lookupKey));
+            return getLocked(criteria, LockMode.READ);
         }
 
         T getLockedForWrite(DetachedCriteria criteria) {
             return uniqueResult(criteria.getExecutableCriteria(currentSession())
                     .setLockMode(LockMode.UPGRADE_NOWAIT));
+        }
+
+        T getLocked(DetachedCriteria criteria, LockMode lockMode) {
+            return uniqueResult(criteria.getExecutableCriteria(currentSession())
+                    .setLockMode(lockMode));
         }
 
         T save(T entity) {
@@ -251,7 +251,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }
     }
 
-    <U> List<T> select(LookupDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
+    <U> List<T> select(ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
         SelectParamPriv selectParam = SelectParamPriv.builder()
                 .criteria(criteria)
@@ -342,6 +342,21 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new LockedContext<T>(shardId, dao.sessionFactory, dao::save, entity);
+    }
+
+    public ReadOnlyContext<T> readOnlyExecutor(String parentKey, DetachedCriteria criteria) {
+        int shardId = shardCalculator.shardId(parentKey);
+        RelationalDaoPriv dao = daos.get(shardId);
+        return new ReadOnlyContext<>(shardId, dao.sessionFactory, () -> dao.getLocked(criteria, LockMode.NONE), null);
+    }
+
+    public ReadOnlyContext<T> readOnlyExecutor(String parentKey, DetachedCriteria criteria, Supplier<Boolean> entityPopulator) {
+        int shardId = shardCalculator.shardId(parentKey);
+        RelationalDaoPriv dao = daos.get(shardId);
+        return new ReadOnlyContext<>(shardId,
+                dao.sessionFactory,
+                () -> dao.getLocked(criteria, LockMode.NONE),
+                entityPopulator);
     }
 
     <U> boolean createOrUpdate(LockedContext<U> context,
