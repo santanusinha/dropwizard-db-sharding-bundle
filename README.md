@@ -121,5 +121,5 @@ The project dependencies are:
 </dependency>
 ```
 # NOTE
-- Package and group id has changed from `io.dropwizard.sharding` to `io.appfrom.dropwizard.sharding` from 1.3.12-3.
+- Package and group id has changed from `io.dropwizard.sharding` to `io.appform.dropwizard.sharding` from 1.3.12-3.
 - static create* methods have been replaced with instance methods from 1.3.13-4
