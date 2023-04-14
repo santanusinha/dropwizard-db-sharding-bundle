@@ -44,6 +44,4 @@ public class ShardedHibernateFactory {
     @Valid
     private BlacklistConfig blacklist;
 
-    @Valid
-    private CustomDatabaseConfig customConfig;
 }
