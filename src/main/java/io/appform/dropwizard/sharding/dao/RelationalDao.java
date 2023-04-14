@@ -350,6 +350,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return new LockedContext<T>(shardId, dao.sessionFactory, dao::save, entity);
     }
 
+    // Expectation : Criteria must return single Row
     public ReadOnlyContext<T> readOnlyExecutor(String parentKey, DetachedCriteria criteria) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
@@ -357,6 +358,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
                 null, customDatabaseConfig.isSkipReadOnlyTransaction());
     }
 
+    // Expectation : Criteria must return single Row
     public ReadOnlyContext<T> readOnlyExecutor(String parentKey, DetachedCriteria criteria, Supplier<Boolean> entityPopulator) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
