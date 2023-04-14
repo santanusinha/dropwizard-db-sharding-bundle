@@ -92,7 +92,7 @@ public class LockTest {
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
         final CustomDatabaseConfig customDatabaseConfig = new CustomDatabaseConfig(true);
         lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, customDatabaseConfig);
-        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator);
+        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator, customDatabaseConfig);
     }
 
     @Test

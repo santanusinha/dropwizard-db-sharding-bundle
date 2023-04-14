@@ -84,6 +84,7 @@ public class CacheableLookupDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        final CustomDatabaseConfig customDatabaseConfig = new CustomDatabaseConfig();
         lookupDao = new CacheableLookupDao<>(
                 sessionFactories,
                 TestEntity.class,
@@ -107,7 +108,7 @@ public class CacheableLookupDaoTest {
                         return cache.get(key);
                     }
                 },
-                new CustomDatabaseConfig());
+                customDatabaseConfig);
         phoneDao = new CacheableLookupDao<>(sessionFactories,
                                             Phone.class,
                                             new ShardCalculator<>(shardManager,
@@ -131,7 +132,7 @@ public class CacheableLookupDaoTest {
                                                     return cache.get(key);
                                                 }
                                             },
-                new CustomDatabaseConfig());
+                customDatabaseConfig);
         transactionDao = new CacheableRelationalDao<>(sessionFactories,
                                                       Transaction.class,
                                                       new ShardCalculator<>(shardManager,
@@ -198,7 +199,8 @@ public class CacheableLookupDaoTest {
                                                                       numResults,
                                                                       ':'));
                                                           }
-                                                      });
+                                                      },
+                customDatabaseConfig);
         auditDao = new CacheableRelationalDao<>(sessionFactories,
                                                 Audit.class,
                                                 new ShardCalculator<>(shardManager,
@@ -252,7 +254,8 @@ public class CacheableLookupDaoTest {
                                                                                                         numResults,
                                                                                                         ':'));
                                                     }
-                                                });
+                                                },
+                customDatabaseConfig);
     }
 
     @After

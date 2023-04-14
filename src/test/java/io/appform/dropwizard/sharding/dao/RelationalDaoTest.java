@@ -19,6 +19,7 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.config.CustomDatabaseConfig;
 import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntity;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -69,10 +70,11 @@ public class RelationalDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        final CustomDatabaseConfig customDatabaseConfig = new CustomDatabaseConfig();
         relationalDao = new RelationalDao<>(sessionFactories,
                                             RelationalEntity.class,
                                             new ShardCalculator<>(shardManager,
-                                                                  new ConsistentHashBucketIdExtractor<>(shardManager)));
+                                                                  new ConsistentHashBucketIdExtractor<>(shardManager)), customDatabaseConfig);
     }
 
     @After

@@ -3,7 +3,6 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import lombok.Getter;
-import lombok.val;
 import lombok.var;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
@@ -19,24 +18,21 @@ import java.util.function.Supplier;
 public class ReadOnlyContext<T> {
     private final int shardId;
     private final SessionFactory sessionFactory;
-    private final Function<String, T> getter;
+    private final Supplier<T> getter;
     private final Supplier<Boolean> entityPopulator;
-    private final String key;
     private final List<Function<T, Void>> operations = Lists.newArrayList();
     private final boolean skipTransaction;
 
     public ReadOnlyContext(
             int shardId,
             SessionFactory sessionFactory,
-            Function<String, T> getter,
+            Supplier<T> getter,
             Supplier<Boolean> entityPopulator,
-            String key,
             boolean skipTxn) {
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
         this.getter = getter;
         this.entityPopulator = entityPopulator;
-        this.key = key;
         this.skipTransaction = skipTxn;
     }
 
@@ -104,7 +100,7 @@ public class ReadOnlyContext<T> {
         TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true, this.skipTransaction);
         transactionHandler.beforeStart();
         try {
-            T result = getter.apply(key);
+            T result = getter.get();
             if (null == result) {
                 return null;
             }
