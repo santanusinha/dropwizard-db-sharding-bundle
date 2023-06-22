@@ -387,7 +387,7 @@ public class LookupDaoTest {
 
     @Test
     @SneakyThrows
-    public void test() {
+    public void testRelationalDaoReadOnlyContext() {
         Transaction transaction = Transaction.builder()
                 .transactionId("TXNID")
                 .amount(100)
