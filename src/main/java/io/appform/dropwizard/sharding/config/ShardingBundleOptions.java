@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CustomDatabaseConfig {
+public class ShardingBundleOptions {
     private boolean skipReadOnlyTransaction = false;
 }

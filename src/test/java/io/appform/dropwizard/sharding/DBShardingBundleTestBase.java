@@ -21,6 +21,7 @@ import com.codahale.metrics.health.HealthCheckRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.dao.testdata.OrderDao;
@@ -57,7 +58,10 @@ import static org.mockito.Mockito.when;
 public abstract class DBShardingBundleTestBase {
     protected static class TestConfig extends Configuration {
         @Getter
-        private ShardedHibernateFactory shards = new ShardedHibernateFactory();
+        private ShardedHibernateFactory shards = ShardedHibernateFactory.builder()
+                .shardingOptions(new ShardingBundleOptions(false))
+                .build();
+
     }
 
     protected final TestConfig testConfig = new TestConfig();

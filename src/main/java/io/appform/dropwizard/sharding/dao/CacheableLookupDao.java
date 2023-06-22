@@ -18,7 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.appform.dropwizard.sharding.caching.LookupCache;
-import io.appform.dropwizard.sharding.config.CustomDatabaseConfig;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.exceptions.DaoFwdException;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
@@ -44,9 +44,10 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
 
     public CacheableLookupDao(List<SessionFactory> sessionFactories,
                               Class<T> entityClass,
-                              ShardCalculator<String> shardCalculator, LookupCache<T> cache,
-                              CustomDatabaseConfig customDatabaseConfig) {
-        super(sessionFactories, entityClass, shardCalculator, customDatabaseConfig);
+                              ShardCalculator<String> shardCalculator,
+                              LookupCache<T> cache,
+                              ShardingBundleOptions shardingOptions) {
+        super(sessionFactories, entityClass, shardCalculator, shardingOptions);
         this.cache = cache;
     }
 

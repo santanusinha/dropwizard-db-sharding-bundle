@@ -20,7 +20,7 @@ package io.appform.dropwizard.sharding.dao.locktest;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import io.appform.dropwizard.sharding.config.CustomDatabaseConfig;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.LockedContext;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
@@ -90,9 +90,9 @@ public class LockTest {
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
-        final CustomDatabaseConfig customDatabaseConfig = new CustomDatabaseConfig(true);
-        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, customDatabaseConfig);
-        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator, customDatabaseConfig);
+        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions(true);
+        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, shardingOptions);
+        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator, shardingOptions);
     }
 
     @Test

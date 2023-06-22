@@ -18,7 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
-import io.appform.dropwizard.sharding.config.CustomDatabaseConfig;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.Transactions;
 import io.dropwizard.hibernate.AbstractDAO;
@@ -145,7 +145,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
     @Getter
     private final ShardCalculator<String> shardCalculator;
     @Getter
-    private final CustomDatabaseConfig customDatabaseConfig;
+    private final ShardingBundleOptions shardingOptions;
 
     private final Field keyField;
 
@@ -156,13 +156,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param shardCalculator
      */
     public RelationalDao(
-            List<SessionFactory> sessionFactories, Class<T> entityClass,
+            List<SessionFactory> sessionFactories,
+            Class<T> entityClass,
             ShardCalculator<String> shardCalculator,
-            CustomDatabaseConfig customDatabaseConfig) {
+            ShardingBundleOptions shardingOptions) {
         this.shardCalculator = shardCalculator;
         this.daos = sessionFactories.stream().map(RelationalDaoPriv::new).collect(Collectors.toList());
         this.entityClass = entityClass;
-        this.customDatabaseConfig = customDatabaseConfig;
+        this.shardingOptions = shardingOptions;
 
         Field fields[] = FieldUtils.getFieldsWithAnnotation(entityClass, Id.class);
         Preconditions.checkArgument(fields.length != 0, "A field needs to be designated as @Id");
@@ -355,7 +356,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new ReadOnlyContext<>(shardId, dao.sessionFactory, () -> dao.getLocked(criteria, LockMode.NONE),
-                null, customDatabaseConfig.isSkipReadOnlyTransaction());
+                null, shardingOptions.isSkipReadOnlyTransaction());
     }
 
     // Expectation : Criteria must return single Row
@@ -363,7 +364,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new ReadOnlyContext<>(shardId, dao.sessionFactory, () -> dao.getLocked(criteria, LockMode.NONE),
-                entityPopulator, customDatabaseConfig.isSkipReadOnlyTransaction());
+                entityPopulator, shardingOptions.isSkipReadOnlyTransaction());
     }
 
     <U> boolean createOrUpdate(LockedContext<U> context,

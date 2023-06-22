@@ -18,7 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.appform.dropwizard.sharding.caching.RelationalCache;
-import io.appform.dropwizard.sharding.config.CustomDatabaseConfig;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
@@ -36,8 +36,8 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
     public CacheableRelationalDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
                                   ShardCalculator<String> shardCalculator,
                                   RelationalCache<T> cache,
-                                  CustomDatabaseConfig customDatabaseConfig) {
-        super(sessionFactories, entityClass, shardCalculator, customDatabaseConfig);
+                                  ShardingBundleOptions shardingOptions) {
+        super(sessionFactories, entityClass, shardCalculator, shardingOptions);
         this.cache = cache;
     }
 

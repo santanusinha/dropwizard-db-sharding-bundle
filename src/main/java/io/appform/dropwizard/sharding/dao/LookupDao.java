@@ -18,7 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
-import io.appform.dropwizard.sharding.config.CustomDatabaseConfig;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
@@ -150,7 +150,7 @@ public class LookupDao<T> implements ShardedDao<T> {
     @Getter
     private final ShardCalculator<String> shardCalculator;
     @Getter
-    private final CustomDatabaseConfig customDatabaseConfig;
+    private final ShardingBundleOptions shardingOptions;
     private final Field keyField;
 
     /**
@@ -163,11 +163,11 @@ public class LookupDao<T> implements ShardedDao<T> {
             List<SessionFactory> sessionFactories,
             Class<T> entityClass,
             ShardCalculator<String> shardCalculator,
-            CustomDatabaseConfig customDatabaseConfig) {
+            ShardingBundleOptions shardingOptions) {
         this.daos = sessionFactories.stream().map(LookupDaoPriv::new).collect(Collectors.toList());
         this.entityClass = entityClass;
         this.shardCalculator = shardCalculator;
-        this.customDatabaseConfig = customDatabaseConfig;
+        this.shardingOptions = shardingOptions;
 
         Field fields[] = FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
         Preconditions.checkArgument(fields.length != 0, "At least one field needs to be sharding key");
@@ -307,15 +307,21 @@ public class LookupDao<T> implements ShardedDao<T> {
     public ReadOnlyContext<T> readOnlyExecutor(String id) {
         int shardId = shardCalculator.shardId(id);
         LookupDaoPriv dao = daos.get(shardId);
-        return new ReadOnlyContext<>(shardId,  dao.sessionFactory, () -> dao.getLocked(id, LockMode.NONE),
-                null, customDatabaseConfig.isSkipReadOnlyTransaction());
+        return new ReadOnlyContext<>(shardId,
+                dao.sessionFactory,
+                () -> dao.getLocked(id, LockMode.NONE),
+                null,
+                shardingOptions.isSkipReadOnlyTransaction());
     }
 
     public ReadOnlyContext<T> readOnlyExecutor(String id, Supplier<Boolean> entityPopulator) {
         int shardId = shardCalculator.shardId(id);
         LookupDaoPriv dao = daos.get(shardId);
-        return new ReadOnlyContext<>(shardId, dao.sessionFactory, () -> dao.getLocked(id, LockMode.NONE),
-                entityPopulator, customDatabaseConfig.isSkipReadOnlyTransaction());
+        return new ReadOnlyContext<>(shardId,
+                dao.sessionFactory,
+                () -> dao.getLocked(id, LockMode.NONE),
+                entityPopulator,
+                shardingOptions.isSkipReadOnlyTransaction());
     }
 
     public LockedContext<T> saveAndGetExecutor(T entity) {
