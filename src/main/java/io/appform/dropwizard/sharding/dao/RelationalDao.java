@@ -18,9 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
-import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import io.appform.dropwizard.sharding.utils.Transactions;
 import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Builder;
@@ -28,12 +26,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.hibernate.Criteria;
-import org.hibernate.LockMode;
-import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
+import org.hibernate.*;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
@@ -44,11 +37,7 @@ import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BooleanSupplier;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
-import java.util.function.UnaryOperator;
+import java.util.function.*;
 import java.util.stream.Collectors;
 
 /**
@@ -209,14 +198,26 @@ public class RelationalDao<T> implements ShardedDao<T> {
         Transactions.execute(context.getSessionFactory(), false, dao::save, entity, handler, false);
     }
 
-    <U> boolean update(LockedContext<U> context, Object id, Function<T, T> updater) {
+    <U> boolean update(LockedContext<U> context, Object id, UnaryOperator<T> updater) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
         return update(context.getSessionFactory(), dao, id, updater, false);
     }
 
+    <U> boolean update(LockedContext<U> context, Object id, BiFunction<U, T, T> updater) {
+        RelationalDaoPriv dao = daos.get(context.getShardId());
+        return update(context.getSessionFactory(), dao, id, t -> updater.apply(context.getEntity(), t), false);
+    }
+
     <U> boolean update(LockedContext<U> context,
                        DetachedCriteria criteria,
-                       Function<T, T> updater,
+                       BiFunction<U, T, T> updater,
+                       BooleanSupplier updateNext) {
+        return update(context, criteria, t -> updater.apply(context.getEntity(), t), updateNext);
+    }
+
+    <U> boolean update(LockedContext<U> context,
+                       DetachedCriteria criteria,
+                       UnaryOperator<T> updater,
                        BooleanSupplier updateNext) {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
 
@@ -249,6 +250,16 @@ public class RelationalDao<T> implements ShardedDao<T> {
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity with scroll: " + criteria, e);
         }
+    }
+
+    <U> List<T> select(LockedContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
+        final RelationalDaoPriv dao = daos.get(context.getShardId());
+        SelectParamPriv selectParam = SelectParamPriv.builder()
+                .criteria(criteria)
+                .start(first)
+                .numRows(numResults)
+                .build();
+        return Transactions.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false);
     }
 
     <U> List<T> select(LookupDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {

@@ -7,10 +7,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
-import java.util.function.BooleanSupplier;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 
 @Getter
 public class LockedContext<T> {
@@ -47,6 +44,25 @@ public class LockedContext<T> {
     public LockedContext<T> mutate(Mutator<T> mutator) {
         return apply(parent -> {
             mutator.mutator(parent);
+            return null;
+        });
+    }
+
+    public<U> LockedContext<T> augment(RelationalDao<U> relationalDao,
+                                       DetachedCriteria criteria,
+                                       int first,
+                                       int numResults,
+                                       BiConsumer<T, List<U>> augmenter,
+                                       Predicate<T> filter) {
+        return apply(parent -> {
+            if (filter.test(parent)) {
+                try {
+                    augmenter.accept(parent, relationalDao.select(this, criteria, first, numResults));
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
             return null;
         });
     }
@@ -106,7 +122,18 @@ public class LockedContext<T> {
         });
     }
 
-    public <U> LockedContext<T> update(RelationalDao<U> relationalDao, Object id, Function<U, U> handler) {
+    public <U> LockedContext<T> update(RelationalDao<U> relationalDao, Object id, UnaryOperator<U> handler) {
+        return apply(parent -> {
+            try {
+                relationalDao.update(this, id, handler);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+    }
+
+    public <U> LockedContext<T> update(RelationalDao<U> relationalDao, Object id, BiFunction<T, U, U> handler) {
         return apply(parent -> {
             try {
                 relationalDao.update(this, id, handler);
@@ -135,7 +162,22 @@ public class LockedContext<T> {
     public <U> LockedContext<T> update(
             RelationalDao<U> relationalDao,
             DetachedCriteria criteria,
-            Function<U, U> updater,
+            BiFunction<T, U, U> updater,
+            BooleanSupplier updateNext) {
+        return apply(parent -> {
+            try {
+                relationalDao.update(this, criteria, updater, updateNext);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+    }
+
+    public <U> LockedContext<T> update(
+            RelationalDao<U> relationalDao,
+            DetachedCriteria criteria,
+            UnaryOperator<U> updater,
             BooleanSupplier updateNext) {
         return apply(parent -> {
             try {
