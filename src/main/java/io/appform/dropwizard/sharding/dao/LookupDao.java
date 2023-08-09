@@ -48,7 +48,6 @@ import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -191,8 +190,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         this.shardingOptions = shardingOptions;
         this.listenerFactories = listenerFactories;
         this.shardInfoProvider = shardInfoProvider;
-        this.transactionExecutor = new TransactionExecutor(shardInfoProvider, getClass(), entityClass, listenerFactories,
-                sessionFactories.size());
+        this.transactionExecutor = new TransactionExecutor(shardInfoProvider, getClass(), entityClass, listenerFactories);
 
         Field fields[] = FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
         Preconditions.checkArgument(fields.length != 0, "At least one field needs to be sharding key");
@@ -491,12 +489,7 @@ public class LookupDao<T> implements ShardedDao<T> {
                     .daoClass(getClass())
                     .entityClass(entityClass)
                     .build();
-            val listeners = listenerFactories.stream().map(listenerFactory ->
-                            listenerFactory.createListener(getClass(), entityClass, shardName))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-            this.transactionListenerExecutor = new TransactionListenerExecutor(listeners);
-
+            this.transactionListenerExecutor = new TransactionListenerExecutor(listenerFactories);
         }
 
 
@@ -561,7 +554,8 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         private T executeImpl() {
-            transactionListenerExecutor.beforeExecute(listenerContext);
+            val listeners = transactionListenerExecutor.createReadOnlyContextListeners(listenerContext);
+            transactionListenerExecutor.beforeExecute(listeners, listenerContext);
             TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true, this.skipTransaction);
             transactionHandler.beforeStart();
             try {
@@ -569,11 +563,11 @@ public class LookupDao<T> implements ShardedDao<T> {
                 if (null != result) {
                     operations.forEach(operation -> operation.apply(result));
                 }
-                transactionListenerExecutor.afterExecute(listenerContext);
+                transactionListenerExecutor.afterExecute(listeners, listenerContext);
                 return result;
             }
             catch (Exception e) {
-                transactionListenerExecutor.afterException(listenerContext, e);
+                transactionListenerExecutor.afterException(listeners, listenerContext, e);
                 transactionHandler.onError();
                 throw e;
             }

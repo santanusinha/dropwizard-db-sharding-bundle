@@ -26,12 +26,8 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Utility functional class for running transactions.
@@ -41,26 +37,16 @@ public class TransactionExecutor {
     private final Class<?> daoClass;
     private final Class<?> entityClass;
     private final ShardInfoProvider shardInfoProvider;
-    private final Map<Integer, TransactionListenerExecutor> transactionListenerExecutors;
+    private final TransactionListenerExecutor transactionListenerExecutor;
 
     public TransactionExecutor(final ShardInfoProvider shardInfoProvider,
                                final Class<?> daoClass,
                                final Class<?> entityClass,
-                               final List<TransactionListenerFactory> transactionListenerFactories,
-                               final int shards) {
+                               final List<TransactionListenerFactory> transactionListenerFactories) {
         this.daoClass = daoClass;
         this.entityClass = entityClass;
         this.shardInfoProvider = shardInfoProvider;
-        this.transactionListenerExecutors = IntStream.range(0, shards)
-                .boxed()
-                .collect(Collectors.toMap(shardId -> shardId, shardId -> {
-                    val shardName = shardInfoProvider.shardName(shardId);
-                    val listeners = transactionListenerFactories.stream().map(listenerFactory ->
-                                    listenerFactory.createListener(daoClass, entityClass, shardName))
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toList());
-                    return new TransactionListenerExecutor(listeners);
-                }));
+        this.transactionListenerExecutor = new TransactionListenerExecutor(transactionListenerFactories);
     }
 
     public <T, U> Optional<T> executeAndResolve(SessionFactory sessionFactory, Function<U, T> function, U arg,
@@ -108,8 +94,8 @@ public class TransactionExecutor {
                 .opType(opType)
                 .shardName(shardInfoProvider.shardName(shardId))
                 .build();
-        val listenerExecutor = transactionListenerExecutors.getOrDefault(shardId, new TransactionListenerExecutor());
-        listenerExecutor.beforeExecute(listenerContext);
+        val listeners = transactionListenerExecutor.createShardedDaoListeners(listenerContext);
+        transactionListenerExecutor.beforeExecute(listeners, listenerContext);
         val transactionHandler = new TransactionHandler(sessionFactory, readOnly);
         if (completeTransaction) {
             transactionHandler.beforeStart();
@@ -120,13 +106,13 @@ public class TransactionExecutor {
             if (completeTransaction) {
                 transactionHandler.afterEnd();
             }
-            listenerExecutor.afterExecute(listenerContext);
+            transactionListenerExecutor.afterExecute(listeners, listenerContext);
             return returnValue;
         } catch (Exception e) {
             if (completeTransaction) {
                 transactionHandler.onError();
             }
-            listenerExecutor.afterException(listenerContext, e);
+            transactionListenerExecutor.afterException(listeners, listenerContext, e);
             throw e;
         }
     }
@@ -138,18 +124,18 @@ public class TransactionExecutor {
                 .opType(opType)
                 .shardName(shardInfoProvider.shardName(shardId))
                 .build();
-        val listenerExecutor = transactionListenerExecutors.getOrDefault(shardId, new TransactionListenerExecutor());
-        listenerExecutor.beforeExecute(listenerContext);
+        val listeners = transactionListenerExecutor.createShardedDaoListeners(listenerContext);
+        transactionListenerExecutor.beforeExecute(listeners, listenerContext);
         val transactionHandler = new TransactionHandler(sessionFactory, true);
         transactionHandler.beforeStart();
         try {
             T result = handler.apply(transactionHandler.getSession());
             transactionHandler.afterEnd();
-            listenerExecutor.afterExecute(listenerContext);
+            transactionListenerExecutor.afterExecute(listeners, listenerContext);
             return result;
         } catch (Exception e) {
             transactionHandler.onError();
-            listenerExecutor.afterException(listenerContext, e);
+            transactionListenerExecutor.afterException(listeners, listenerContext, e);
             throw e;
         }
     }

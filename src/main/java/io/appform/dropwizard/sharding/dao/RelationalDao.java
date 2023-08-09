@@ -165,8 +165,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         this.entityClass = entityClass;
         this.shardInfoProvider = shardInfoProvider;
         this.listenerFactories = listenerFactories;
-        this.transactionExecutor = new TransactionExecutor(shardInfoProvider, getClass(), entityClass, listenerFactories,
-                sessionFactories.size());
+        this.transactionExecutor = new TransactionExecutor(shardInfoProvider, getClass(), entityClass, listenerFactories);
         Field fields[] = FieldUtils.getFieldsWithAnnotation(entityClass, Id.class);
         Preconditions.checkArgument(fields.length != 0, "A field needs to be designated as @Id");
         Preconditions.checkArgument(fields.length == 1, "Only one field can be designated as @Id");

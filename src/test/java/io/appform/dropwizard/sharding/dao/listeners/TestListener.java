@@ -1,21 +1,15 @@
 package io.appform.dropwizard.sharding.dao.listeners;
 
-import io.appform.dropwizard.sharding.listeners.TransactionListenerContext;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
+import io.appform.dropwizard.sharding.listeners.TransactionListenerContext;
 import org.junit.Assert;
 
 public class TestListener implements TransactionListener {
 
-    private final Class<?> daoClass;
-    private final Class<?> entityClass;
-    private final String shardName;
+    private final TransactionListenerContext transactionListenerContext;
 
-    public TestListener(final Class<?> daoClass,
-                        final Class<?> entityClass,
-                        final String shardName) {
-        this.daoClass = daoClass;
-        this.entityClass = entityClass;
-        this.shardName = shardName;
+    public TestListener(final TransactionListenerContext listenerContext) {
+        this.transactionListenerContext = listenerContext;
     }
 
     @Override
@@ -34,9 +28,9 @@ public class TestListener implements TransactionListener {
     }
 
     private void validateContext(final TransactionListenerContext listenerContext) {
-        Assert.assertEquals(shardName, listenerContext.getShardName());
-        Assert.assertNotNull(listenerContext.getOpType());
-        Assert.assertEquals(daoClass, listenerContext.getDaoClass());
-        Assert.assertEquals(entityClass, listenerContext.getEntityClass());
+        Assert.assertEquals(transactionListenerContext.getShardName(), listenerContext.getShardName());
+        Assert.assertNotNull(transactionListenerContext.getOpType());
+        Assert.assertEquals(transactionListenerContext.getDaoClass(), listenerContext.getDaoClass());
+        Assert.assertEquals(transactionListenerContext.getEntityClass(), listenerContext.getEntityClass());
     }
 }
