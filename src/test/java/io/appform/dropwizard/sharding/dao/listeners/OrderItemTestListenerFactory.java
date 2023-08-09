@@ -9,16 +9,11 @@ import java.util.Optional;
 
 public class OrderItemTestListenerFactory implements TransactionListenerFactory {
 
-//    @Override
-//    public TransactionListener createListener(Class<?> daoClass, Class<?> entityClass, String shardName) {
-//        if (daoClass == OrderItem.class) {
-//            return new TestListener(daoClass, entityClass, shardName);
-//        }
-//        return null;
-//    }
-
     @Override
     public Optional<TransactionListener> createShardedDaoListener(TransactionListenerContext listenerContext) {
+        if (listenerContext.getDaoClass() == OrderItem.class) {
+            return Optional.of(new TestListener(listenerContext));
+        }
         return Optional.empty();
     }
 
