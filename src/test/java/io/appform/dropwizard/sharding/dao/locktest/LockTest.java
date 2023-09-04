@@ -20,11 +20,14 @@ package io.appform.dropwizard.sharding.dao.locktest;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.LockedContext;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
 import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
+import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
+import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
@@ -91,8 +94,11 @@ public class LockTest {
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
         final ShardingBundleOptions shardingOptions = new ShardingBundleOptions(true);
-        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, shardingOptions);
-        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator);
+        final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
+        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, shardingOptions,
+                                    shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));
+        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator,
+                                          shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));
     }
 
     @Test

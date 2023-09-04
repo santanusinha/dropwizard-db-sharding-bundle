@@ -1,6 +1,9 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
+import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import lombok.Getter;
 import org.hibernate.SessionFactory;
@@ -28,20 +31,39 @@ public class LockedContext<T> {
     private Function<T, T> saver;
     private T entity;
     private final Mode mode;
+    private final TransactionExecutionContext executionContext;
+    private final TransactionObserver observer;
 
-    public LockedContext(int shardId, SessionFactory sessionFactory, Supplier<T> getter) {
+    public LockedContext(
+            int shardId,
+            SessionFactory sessionFactory,
+            Supplier<T> getter,
+            Class<T> entityClass,
+            ShardInfoProvider shardInfoProvider,
+            TransactionObserver observer) {
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
         this.getter = getter;
+        this.observer = observer;
         this.mode = Mode.READ;
+        this.executionContext = buildExecutionContext(shardInfoProvider, entityClass);
     }
 
-    public LockedContext(int shardId, SessionFactory sessionFactory, Function<T, T> saver, T entity) {
+    public LockedContext(
+            int shardId,
+            SessionFactory sessionFactory,
+            Function<T, T> saver,
+            T entity,
+            Class<T> entityClass,
+            ShardInfoProvider shardInfoProvider,
+            TransactionObserver observer) {
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
         this.saver = saver;
         this.entity = entity;
+        this.observer = observer;
         this.mode = Mode.INSERT;
+        this.executionContext = buildExecutionContext(shardInfoProvider, entityClass);
     }
 
     public LockedContext<T> mutate(Mutator<T> mutator) {
@@ -162,19 +184,32 @@ public class LockedContext<T> {
     }
 
     public T execute() {
-        TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false);
-        transactionHandler.beforeStart();
-        try {
-            T result = generateEntity();
-            operations
-                    .forEach(operation -> operation.apply(result));
-            return result;
-        } catch (Exception e) {
-            transactionHandler.onError();
-            throw e;
-        } finally {
-            transactionHandler.afterEnd();
-        }
+        return observer.execute(executionContext, () -> {
+            TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false);
+            transactionHandler.beforeStart();
+            try {
+                T result = generateEntity();
+                operations
+                        .forEach(operation -> operation.apply(result));
+                return result;
+            } catch (Exception e) {
+                transactionHandler.onError();
+                throw e;
+            } finally {
+                transactionHandler.afterEnd();
+            }
+        });
+    }
+
+    private TransactionExecutionContext buildExecutionContext(final ShardInfoProvider shardInfoProvider,
+                                                              final Class<T> entityClass) {
+        return TransactionExecutionContext.builder()
+                .shardName(shardInfoProvider.shardName(shardId))
+                .lockedContextMode(mode.name())
+                .entityClass(entityClass)
+                .daoClass(getClass())
+                .opType("execute")
+                .build();
     }
 
     private T generateEntity() {

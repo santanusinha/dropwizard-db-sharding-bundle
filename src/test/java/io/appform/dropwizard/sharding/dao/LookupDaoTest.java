@@ -20,11 +20,15 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
+import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
+import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Audit;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Phone;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
+import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
@@ -88,10 +92,16 @@ public class LookupDaoTest {
                                                                               new ConsistentHashBucketIdExtractor<>(
                                                                                       shardManager));
         final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
-        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator, shardingOptions);
-        phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator, shardingOptions);
-        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator);
-        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator);
+        final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
+        val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
+        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator, shardingOptions,
+                                    shardInfoProvider, observer);
+        phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator, shardingOptions,
+                                   shardInfoProvider, observer);
+        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator,
+                                             shardInfoProvider, observer);
+        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator,
+                                       shardInfoProvider, observer);
     }
 
     @After

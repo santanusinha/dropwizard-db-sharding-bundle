@@ -6,8 +6,9 @@
         </encoder>
     </appender>
 
-    <logger name="org.hibernate" level="DEBUG" />
-    <logger name="org.hibernate.SQL" level="DEBUG"/>
+    <logger name="org.hibernate" level="ERROR" />
+    <logger name="org.hibernate.SQL" level="ERROR"/>
+    <logger name="io.appform" level="DEBUG"/>
     <logger name="org.hibernate.engine.transaction.internal.TransactionImpl" level="DEBUG" />
     <root level="ALL">
         <appender-ref ref="STDOUT"/>

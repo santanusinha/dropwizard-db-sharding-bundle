@@ -19,7 +19,12 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
+import io.appform.dropwizard.sharding.dao.interceptors.EntityClassThreadLocalObserver;
+import io.appform.dropwizard.sharding.dao.interceptors.InterceptorTestUtil;
 import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntity;
+import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
@@ -33,6 +38,7 @@ import org.hibernate.criterion.DetachedCriteria;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.MDC;
 
 import java.util.List;
 import java.util.UUID;
@@ -58,7 +64,7 @@ public class RelationalDaoTest {
 
         StandardServiceRegistry serviceRegistry
                 = new StandardServiceRegistryBuilder().applySettings(
-                configuration.getProperties())
+                        configuration.getProperties())
                 .build();
         return configuration.buildSessionFactory(serviceRegistry);
     }
@@ -69,10 +75,15 @@ public class RelationalDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         relationalDao = new RelationalDao<>(sessionFactories,
                                             RelationalEntity.class,
                                             new ShardCalculator<>(shardManager,
-                                                                  new ConsistentHashBucketIdExtractor<>(shardManager)));
+                                                                  new ConsistentHashBucketIdExtractor<>(shardManager)),
+                                            shardInfoProvider,
+                                            new EntityClassThreadLocalObserver(
+                                                    new DaoClassLocalObserver(
+                                                            new TerminalTransactionObserver())));
     }
 
     @After
@@ -128,12 +139,12 @@ public class RelationalDaoTest {
 
         val newValue = UUID.randomUUID().toString();
         int rowsUpdated = relationalDao.updateUsingQuery(relationalKey,
-                UpdateOperationMeta.builder()
-                        .queryName("testUpdateUsingKeyTwo")
-                        .params(ImmutableMap.of("keyTwo", "2",
-                                "value", newValue))
-                        .build()
-        );
+                                                         UpdateOperationMeta.builder()
+                                                                 .queryName("testUpdateUsingKeyTwo")
+                                                                 .params(ImmutableMap.of("keyTwo", "2",
+                                                                                         "value", newValue))
+                                                                 .build()
+                                                        );
         assertEquals(2, rowsUpdated);
 
         val persistedEntityTwo = relationalDao.get(relationalKey, "2").orElse(null);
@@ -175,12 +186,14 @@ public class RelationalDaoTest {
 
         val newValue = UUID.randomUUID().toString();
         int rowsUpdated = relationalDao.updateUsingQuery(relationalKey,
-                UpdateOperationMeta.builder()
-                        .queryName("testUpdateUsingKeyTwo")
-                        .params(ImmutableMap.of("keyTwo", UUID.randomUUID().toString(),
-                                "value", newValue))
-                        .build()
-        );
+                                                         UpdateOperationMeta.builder()
+                                                                 .queryName("testUpdateUsingKeyTwo")
+                                                                 .params(ImmutableMap.of("keyTwo",
+                                                                                         UUID.randomUUID().toString(),
+                                                                                         "value",
+                                                                                         newValue))
+                                                                 .build()
+                                                        );
         assertEquals(0, rowsUpdated);
 
 
@@ -195,5 +208,19 @@ public class RelationalDaoTest {
         val persistedEntityThree = relationalDao.get(relationalKey, "3").orElse(null);
         assertNotNull(persistedEntityThree);
         assertEquals(entityThree.getValue(), persistedEntityThree.getValue());
+    }
+
+    @Test
+    public void testSaveWithInterceptors() throws Exception {
+        val relationalKey = UUID.randomUUID().toString();
+
+        val entityOne = RelationalEntity.builder()
+                .key("1")
+                .keyTwo("1")
+                .value(UUID.randomUUID().toString())
+                .build();
+        MDC.clear();
+        relationalDao.save(relationalKey, entityOne);
+        InterceptorTestUtil.validateThreadLocal(RelationalDao.class, RelationalEntity.class);
     }
 }
