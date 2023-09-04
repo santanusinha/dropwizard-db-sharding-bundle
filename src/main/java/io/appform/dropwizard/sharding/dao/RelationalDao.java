@@ -52,11 +52,11 @@ import java.util.stream.Collectors;
  * A murmur 128 hash of the string parent key is used to route the save and retrieve calls from the proper shard.
  */
 @Slf4j
-public class RelationalDao<T> implements ShardedDao<T> {
+public class RelationalDao<T> implements ShardedDao<T>, IRelationalDao<T> {
 
     private final class RelationalDaoPriv extends AbstractDAO<T> {
 
-        private final SessionFactory sessionFactory;
+        private final SessionFactory  sessionFactory;
 
         /**
          * Creates a new DAO with a given session provider.
@@ -169,48 +169,53 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
 
+    @Override
     public Optional<T> get(String parentKey, Object key) throws Exception {
         return Optional.ofNullable(get(parentKey, key, t-> t));
     }
 
+    @Override
     public<U> U get(String parentKey, Object key, Function<T, U> function) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, true, dao::get, key, function);
     }
 
+    @Override
     public Optional<T> save(String parentKey, T entity) throws Exception {
         return Optional.ofNullable(save(parentKey, entity, t -> t));
     }
 
+    @Override
     public <U> U save(String parentKey, T entity, Function<T, U> handler) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, false, dao::save, entity, handler);
     }
 
+    @Override
     public boolean saveAll(String parentKey, Collection<T> entities) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, false, dao::saveAll, entities);
     }
 
-    <U> void save(LockedContext<U> context, T entity) {
+    public <U> void save(LockedContext<U> context, T entity) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
         Transactions.execute(context.getSessionFactory(), false, dao::save, entity, t->t, false);
     }
 
-    <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
+    public <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
         Transactions.execute(context.getSessionFactory(), false, dao::save, entity, handler, false);
     }
 
-    <U> boolean update(LockedContext<U> context, Object id, Function<T, T> updater) {
+    public  <U> boolean update(LockedContext<U> context, Object id, Function<T, T> updater) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
         return update(context.getSessionFactory(), dao, id, updater, false);
     }
 
-    <U> boolean update(LockedContext<U> context,
+    public <U> boolean update(LockedContext<U> context,
                        DetachedCriteria criteria,
                        Function<T, T> updater,
                        BooleanSupplier updateNext) {
@@ -257,12 +262,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return Transactions.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false);
     }
 
+    @Override
     public boolean update(String parentKey, Object id, Function<T, T> updater) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return update(dao.sessionFactory, dao, id, updater, true);
     }
 
+    @Override
     public <U> U runInSession(String id, Function<Session, U> handler) {
         int shardId = shardCalculator.shardId(id);
         RelationalDaoPriv dao = daos.get(shardId);
@@ -287,6 +294,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }
     }
 
+    @Override
     public boolean update(String parentKey, DetachedCriteria criteria, Function<T, T> updater) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
@@ -317,30 +325,35 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
 
+    @Override
     public int updateUsingQuery(String parentKey, UpdateOperationMeta updateOperationMeta) {
         int shardId = shardCalculator.shardId(parentKey);
         val dao = daos.get(shardId);
         return Transactions.execute(dao.sessionFactory, false, dao::update, updateOperationMeta);
     }
 
-    public <U> int updateUsingQuery(LockedContext<U> lockedContext, UpdateOperationMeta updateOperationMeta) {
+    @Override
+    public <U> int updateUsingQuery(LockedContext<U> lockedContext,
+        UpdateOperationMeta updateOperationMeta) {
         val dao = daos.get(lockedContext.getShardId());
         return Transactions.execute(lockedContext.getSessionFactory(), false, dao::update, updateOperationMeta, false);
     }
 
+    @Override
     public LockedContext<T> lockAndGetExecutor(String parentKey, DetachedCriteria criteria) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new LockedContext<T>(shardId, dao.sessionFactory, () -> dao.getLockedForWrite(criteria));
     }
 
+    @Override
     public LockedContext<T> saveAndGetExecutor(String parentKey, T entity) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new LockedContext<T>(shardId, dao.sessionFactory, dao::save, entity);
     }
 
-    <U> boolean createOrUpdate(LockedContext<U> context,
+    public <U> boolean createOrUpdate(LockedContext<U> context,
                                DetachedCriteria criteria,
                                Function<T, T> updater,
                                Supplier<T> entityGenerator) {
@@ -378,7 +391,9 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }
     }
 
-    public boolean updateAll(String parentKey, int start, int numRows, DetachedCriteria criteria, Function<T, T> updater) {
+    @Override
+    public boolean updateAll(String parentKey, int start, int numRows, DetachedCriteria criteria,
+        Function<T, T> updater) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         try {
@@ -408,11 +423,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }
     }
 
+    @Override
     public List<T> select(String parentKey, DetachedCriteria criteria, int first, int numResults) throws Exception {
         return select(parentKey, criteria, first, numResults, t-> t);
     }
 
-    public<U> U select(String parentKey, DetachedCriteria criteria, int first, int numResults, Function<List<T>, U> handler) throws Exception {
+    @Override
+    public<U> U select(String parentKey, DetachedCriteria criteria, int first, int numResults,
+        Function<List<T>, U> handler) throws Exception {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         SelectParamPriv selectParam = SelectParamPriv.<T>builder()
@@ -423,6 +441,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return Transactions.execute(dao.sessionFactory, true, dao::select, selectParam, handler);
     }
 
+    @Override
     public long count(String parentKey, DetachedCriteria criteria) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
@@ -430,6 +449,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
 
+    @Override
     public boolean exists(String parentKey, Object key) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
@@ -443,6 +463,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param criteria The select criteria
      * @return List of counts in each shard
      */
+    @Override
     public List<Long> countScatterGather(DetachedCriteria criteria) {
         return daos.stream().map(dao -> {
             try {
@@ -453,6 +474,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         }).collect(Collectors.toList());
     }
 
+    @Override
     public List<T> scatterGather(DetachedCriteria criteria, int start, int numRows) {
         return daos.stream().map(dao -> {
             try {
