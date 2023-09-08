@@ -18,13 +18,16 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import io.appform.dropwizard.sharding.utils.Transactions;
 import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import lombok.var;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.hibernate.Criteria;
 import org.hibernate.LockMode;
@@ -42,8 +45,10 @@ import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -120,6 +125,10 @@ public class RelationalDao<T> implements ShardedDao<T> {
             return query.executeUpdate();
         }
 
+        public List<T> getLocked(DetachedCriteria criteria, LockMode lockMode) {
+            return list(criteria.getExecutableCriteria(currentSession())
+                    .setLockMode(lockMode));
+        }
     }
 
     @Builder
@@ -248,6 +257,16 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
     <U> List<T> select(LookupDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
+        final RelationalDaoPriv dao = daos.get(context.getShardId());
+        SelectParamPriv selectParam = SelectParamPriv.builder()
+                .criteria(criteria)
+                .start(first)
+                .numRows(numResults)
+                .build();
+        return Transactions.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false);
+    }
+
+    <U> List<T> select(RelationalDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) throws Exception {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
         SelectParamPriv selectParam = SelectParamPriv.builder()
                 .criteria(criteria)
@@ -470,6 +489,152 @@ public class RelationalDao<T> implements ShardedDao<T> {
 
     protected Field getKeyField() {
         return this.keyField;
+    }
+
+    public ReadOnlyContext<T> readOnlyExecutor(String parentKey, DetachedCriteria criteria, boolean rejectIfMultiParent) {
+        int shardId = shardCalculator.shardId(parentKey);
+        RelationalDaoPriv dao = daos.get(shardId);
+        return new ReadOnlyContext<>(shardId, dao.sessionFactory, () -> dao.getLocked(criteria, LockMode.NONE),
+                null, true, rejectIfMultiParent);
+    }
+
+    @Getter
+    public static class ReadOnlyContext<T> {
+        private final int shardId;
+        private final SessionFactory sessionFactory;
+        private final Supplier<List<T>> getter;
+        private final Supplier<Boolean> entityPopulator;
+        private final List<Function<List<T>, Void>> operations = Lists.newArrayList();
+        private final boolean skipTransaction;
+        private final boolean rejectIfMultiParentResult;
+
+        public ReadOnlyContext(
+                int shardId,
+                SessionFactory sessionFactory,
+                Supplier<List<T>> getter,
+                Supplier<Boolean> entityPopulator,
+                boolean skipTxn,
+                boolean rejectIfMultiParentResult) {
+            this.shardId = shardId;
+            this.sessionFactory = sessionFactory;
+            this.getter = getter;
+            this.entityPopulator = entityPopulator;
+            this.skipTransaction = skipTxn;
+            this.rejectIfMultiParentResult = rejectIfMultiParentResult;
+        }
+
+        private ReadOnlyContext<T> apply(Function<List<T>, Void> handler) {
+            this.operations.add(handler);
+            return this;
+        }
+
+        public <U> ReadOnlyContext<T> readAugmentSingleParent(
+                RelationalDao<U> relationalDao,
+                DetachedCriteria criteria,
+                int first,
+                int numResults,
+                BiConsumer<T, List<U>> consumer) {
+            return readAugmentWithSingleParent(relationalDao, criteria, first, numResults, consumer, p -> true);
+        }
+
+        public <U> ReadOnlyContext<T> readOneAugmentSingleParent(
+                RelationalDao<U> relationalDao,
+                DetachedCriteria criteria,
+                BiConsumer<T, List<U>> consumer,
+                Predicate<T> filter) {
+            return readAugmentWithSingleParent(relationalDao, criteria, 0, 1, consumer, filter);
+        }
+
+
+        public <U> ReadOnlyContext<T> readAugmentMultiParent(
+                RelationalDao<U> relationalDao,
+                DetachedCriteria criteria,
+                int first,
+                int numResults,
+                BiConsumer<List<T>, List<U>> consumer) {
+            return readAugmentMultiParent(relationalDao, criteria, first, numResults, consumer, p -> true);
+        }
+
+        public <U> ReadOnlyContext<T> readOneAugmentMultiParent(
+                RelationalDao<U> relationalDao,
+                DetachedCriteria criteria,
+                BiConsumer<List<T>, List<U>> consumer,
+                Predicate<List<T>> filter) {
+            return readAugmentMultiParent(relationalDao, criteria, 0, 1, consumer, filter);
+        }
+
+        private  <U> ReadOnlyContext<T> readAugmentMultiParent(
+                RelationalDao<U> relationalDao,
+                DetachedCriteria criteria,
+                int first,
+                int numResults,
+                BiConsumer<List<T>, List<U>> consumer,
+                Predicate<List<T>> filter) {
+            return apply(parents -> {
+                if (filter.test(parents)) {
+                    try {
+                        consumer.accept(parents, relationalDao.select(this, criteria, first, numResults));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                return null;
+            });
+        }
+
+        private  <U> ReadOnlyContext<T> readAugmentWithSingleParent(
+                RelationalDao<U> relationalDao,
+                DetachedCriteria criteria,
+                int first,
+                int numResults,
+                BiConsumer<T, List<U>> consumer,
+                Predicate<T> filter) {
+            return apply(parents -> {
+                parents.forEach(parent -> {
+                    if (filter.test(parent)) {
+                        try {
+                            consumer.accept(parent, relationalDao.select(this, criteria, first, numResults));
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
+                return null;
+            });
+        }
+
+        public Optional<List<T>> execute() {
+            var result = executeImpl();
+            if (null == result
+                    && null != entityPopulator
+                    && Boolean.TRUE.equals(entityPopulator.get())) {//Try to populate entity (maybe from cold store etc)
+                result = executeImpl();
+            }
+            return Optional.ofNullable(result);
+        }
+
+        private List<T> executeImpl() {
+            TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true, this.skipTransaction);
+            transactionHandler.beforeStart();
+            try {
+                List<T> result = getter.get();
+                if (null == result || result.isEmpty()) {
+                    return null;
+                }
+                if(result.size() > 1 && rejectIfMultiParentResult) {
+                    throw new RuntimeException("Invalid Criteria provided");
+                }
+                operations.forEach(operation -> operation.apply(result));
+                return result;
+            }
+            catch (Exception e) {
+                transactionHandler.onError();
+                throw e;
+            }
+            finally {
+                transactionHandler.afterEnd();
+            }
+        }
     }
 
 }

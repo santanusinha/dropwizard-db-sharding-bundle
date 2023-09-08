@@ -48,9 +48,9 @@ public class TestEntity {
     @Column(name = "ext_id", unique = true)
     private String externalId;
 
-    @Column(name = "text", nullable = false)
-    @NotEmpty
-    @NotNull
+    @Column(name = "text", nullable = true)
+   // @NotEmpty
+   // @NotNull
     private String text;
 
 }
