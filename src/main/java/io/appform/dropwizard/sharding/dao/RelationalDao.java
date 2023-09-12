@@ -19,6 +19,7 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
@@ -142,6 +143,8 @@ public class RelationalDao<T> implements ShardedDao<T> {
     private final Class<T> entityClass;
     @Getter
     private final ShardCalculator<String> shardCalculator;
+    @Getter
+    private final ShardingBundleOptions shardingOptions;
     private final Field keyField;
 
     private final TransactionExecutor transactionExecutor;
@@ -158,12 +161,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public RelationalDao(
             List<SessionFactory> sessionFactories, Class<T> entityClass,
             ShardCalculator<String> shardCalculator,
+            ShardingBundleOptions shardingOptions,
             final ShardInfoProvider shardInfoProvider,
             final TransactionObserver observer) {
         this.shardCalculator = shardCalculator;
         this.daos = sessionFactories.stream().map(RelationalDaoPriv::new).collect(Collectors.toList());
         this.entityClass = entityClass;
         this.shardInfoProvider = shardInfoProvider;
+        this.shardingOptions = shardingOptions;
         this.observer = observer;
         this.transactionExecutor = new TransactionExecutor(shardInfoProvider, getClass(), entityClass, observer);
 
@@ -190,7 +195,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return transactionExecutor.execute(dao.sessionFactory, true, dao::get, key, function,
-                "get", shardId, false);
+                "get", shardId, shardingOptions.isSkipReadOnlyTransaction());
     }
 
     public Optional<T> save(String parentKey, T entity) throws Exception {
@@ -271,7 +276,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
                 .numRows(numResults)
                 .build();
         return transactionExecutor.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false,
-                "select", context.getShardId(), false);
+                "select", context.getShardId(), shardingOptions.isSkipReadOnlyTransaction());
     }
 
     public boolean update(String parentKey, Object id, Function<T, T> updater) {
@@ -442,14 +447,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
                 .start(first)
                 .numRows(numResults)
                 .build();
-        return transactionExecutor.execute(dao.sessionFactory, true, dao::select, selectParam, handler, "select", shardId, false);
+        return transactionExecutor.execute(dao.sessionFactory, true, dao::select, selectParam, handler, "select", shardId, shardingOptions.isSkipReadOnlyTransaction());
     }
 
     public long count(String parentKey, DetachedCriteria criteria) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return transactionExecutor.<Long, DetachedCriteria>execute(dao.sessionFactory, true, dao::count, criteria,
-                "count", shardId, false);
+                "count", shardId, shardingOptions.isSkipReadOnlyTransaction());
     }
 
 
@@ -457,7 +462,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         Optional<T> result = transactionExecutor.<T, Object>executeAndResolve(dao.sessionFactory, true, dao::get, key,
-                "exists", shardId, false);
+                "exists", shardId, shardingOptions.isSkipReadOnlyTransaction());
         return result.isPresent();
     }
 
@@ -474,7 +479,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
                     val dao = daos.get(shardId);
                     try {
                         return transactionExecutor.execute(dao.sessionFactory, true, dao::count, criteria,
-                                "countScatterGather", shardId, false);
+                                "countScatterGather", shardId, shardingOptions.isSkipReadOnlyTransaction());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -492,7 +497,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
                                 .numRows(numRows)
                                 .build();
                         return transactionExecutor.execute(dao.sessionFactory, true, dao::select, selectParam,
-                                "scatterGather", shardId, false);
+                                "scatterGather", shardId, shardingOptions.isSkipReadOnlyTransaction());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }

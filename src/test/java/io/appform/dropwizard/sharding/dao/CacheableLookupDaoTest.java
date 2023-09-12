@@ -143,6 +143,7 @@ public class CacheableLookupDaoTest {
                 new ShardCalculator<>(shardManager,
                         new ConsistentHashBucketIdExtractor<>(
                                 shardManager)),
+                new ShardingBundleOptions(true),
                 new RelationalCache<Transaction>() {
 
                     private Map<String, Object> cache = new HashMap<>();
@@ -209,6 +210,7 @@ public class CacheableLookupDaoTest {
                 Audit.class,
                 new ShardCalculator<>(shardManager,
                         new ConsistentHashBucketIdExtractor<>(shardManager)),
+                new ShardingBundleOptions(true),
                 new RelationalCache<Audit>() {
 
                     private Map<String, Object> cache = new HashMap<>();

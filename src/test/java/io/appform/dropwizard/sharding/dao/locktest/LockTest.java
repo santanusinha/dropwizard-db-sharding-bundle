@@ -100,7 +100,8 @@ public class LockTest {
         lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, shardingOptions,
                 shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));
         relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator,
-                shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));
+                new ShardingBundleOptions(true), shardInfoProvider,
+            new DaoClassLocalObserver(new TerminalTransactionObserver()));
     }
 
     @Test

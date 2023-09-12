@@ -94,7 +94,7 @@ public class LookupDaoTest {
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
                 new ConsistentHashBucketIdExtractor<>(
                         shardManager));
-        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
+        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions(true);
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator, shardingOptions,
@@ -102,8 +102,8 @@ public class LookupDaoTest {
         phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator, shardingOptions,
                 shardInfoProvider, observer);
         transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator,
-                shardInfoProvider, observer);
-        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator,
+                shardingOptions, shardInfoProvider, observer);
+        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator, shardingOptions,
                 shardInfoProvider, observer);
     }
 
