@@ -49,27 +49,28 @@ public class TransactionExecutor {
 
     public <T, U> Optional<T> executeAndResolve(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg,
                                                 String opType,
-                                                int shardId) {
-        T result = execute(sessionFactory, readOnly, function, arg, opType, shardId);
+                                                int shardId, boolean skipCommit) {
+        T result = execute(sessionFactory, readOnly, function, arg, opType, shardId, skipCommit);
         return Optional.ofNullable(result);
     }
 
     public <T, U> T execute(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg,
                             String opType,
-                            int shardId) {
-        return execute(sessionFactory, readOnly, function, arg, t -> t, opType, shardId);
+                            int shardId,
+                            boolean skipCommit) {
+        return execute(sessionFactory, readOnly, function, arg, t -> t, opType, shardId, skipCommit);
     }
 
     public <T, U> T execute(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg, boolean completeTransaction,
                             String opType,
-                            int shardId) {
-        return execute(sessionFactory, readOnly, function, arg, t -> t, completeTransaction, opType, shardId);
+                            int shardId, boolean skipCommit) {
+        return execute(sessionFactory, readOnly, function, arg, t -> t, completeTransaction, opType, shardId, skipCommit);
     }
 
     public <T, U, V> V execute(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg, Function<T, V> handler,
                                String opType,
-                               int shardId) {
-        return execute(sessionFactory, readOnly, function, arg, handler, true, opType, shardId);
+                               int shardId, boolean skipCommit) {
+        return execute(sessionFactory, readOnly, function, arg, handler, true, opType, shardId, skipCommit);
     }
 
     public <T, U, V> V execute(SessionFactory sessionFactory,
@@ -79,7 +80,8 @@ public class TransactionExecutor {
                                Function<T, V> handler,
                                boolean completeTransaction,
                                String opType,
-                               int shardId) {
+                               int shardId,
+                               boolean skipCommit) {
         return execute(sessionFactory,
                 readOnly,
                 session -> {
@@ -88,7 +90,9 @@ public class TransactionExecutor {
                 },
                 completeTransaction,
                 opType,
-                shardId);
+                shardId,
+                skipCommit
+            );
     }
 
     public <T> T execute(
@@ -97,7 +101,8 @@ public class TransactionExecutor {
             Function<Session, T> handler,
             boolean completeTransaction,
             String opType,
-            int shardId) {
+            int shardId,
+            boolean skipCommit) {
         val context = TransactionExecutionContext.builder()
                 .daoClass(daoClass)
                 .entityClass(entityClass)
@@ -105,7 +110,7 @@ public class TransactionExecutor {
                 .opType(opType)
                 .build();
         return observer.execute(context, () -> {
-            val transactionHandler = new TransactionHandler(sessionFactory, readOnly);
+            val transactionHandler = new TransactionHandler(sessionFactory, readOnly, skipCommit);
             if (completeTransaction) {
                 transactionHandler.beforeStart();
             }

@@ -234,7 +234,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(key);
         LookupDaoPriv dao = daos.get(shardId);
         return transactionExecutor.execute(dao.sessionFactory, true, dao::get, key, handler, "get",
-                shardId);
+                shardId, shardingOptions.isSkipReadOnlyTransaction());
     }
 
     /**
@@ -279,7 +279,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key, shardId);
         LookupDaoPriv dao = daos.get(shardId);
         return transactionExecutor.execute(dao.sessionFactory, false, dao::save, entity, handler,
-                "save", shardId);
+                "save", shardId, false);
     }
 
     public boolean updateInLock(String id, Function<Optional<T>, T> updater) {
@@ -298,7 +298,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(id);
         LookupDaoPriv dao = daos.get(shardId);
         return transactionExecutor.execute(dao.sessionFactory, false, dao::update, updateOperationMeta,
-                "updateUsingQuery", shardId);
+                "updateUsingQuery", shardId, false);
     }
 
     private boolean updateImpl(
@@ -315,7 +315,7 @@ public class LookupDao<T> implements ShardedDao<T> {
                 }
                 dao.update(newEntity);
                 return true;
-            }, "updateImpl", shardId);
+            }, "updateImpl", shardId, false);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
         }
@@ -378,7 +378,7 @@ public class LookupDao<T> implements ShardedDao<T> {
                     try {
                         val dao = daos.get(shardId);
                         return transactionExecutor.execute(dao.sessionFactory, true, dao::select, criteria, "scatterGather",
-                                shardId);
+                                shardId, shardingOptions.isSkipReadOnlyTransaction());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -397,7 +397,7 @@ public class LookupDao<T> implements ShardedDao<T> {
                 .mapToObj(shardId -> {
                     val dao = daos.get(shardId);
                     try {
-                        return transactionExecutor.execute(dao.sessionFactory, true, dao::count, criteria, "count", shardId);
+                        return transactionExecutor.execute(dao.sessionFactory, true, dao::count, criteria, "count", shardId, shardingOptions.isSkipReadOnlyTransaction());
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -423,7 +423,7 @@ public class LookupDao<T> implements ShardedDao<T> {
                 return transactionExecutor.execute(daos.get(shardId).sessionFactory,
                         true,
                         daos.get(shardId)::select,
-                        criteria, "get", shardId);
+                        criteria, "get", shardId, shardingOptions.isSkipReadOnlyTransaction());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -433,13 +433,13 @@ public class LookupDao<T> implements ShardedDao<T> {
     public <U> U runInSession(String id, Function<Session, U> handler) {
         int shardId = shardCalculator.shardId(id);
         LookupDaoPriv dao = daos.get(shardId);
-        return transactionExecutor.execute(dao.sessionFactory, true, handler, true, "runInSession", shardId);
+        return transactionExecutor.execute(dao.sessionFactory, true, handler, true, "runInSession", shardId, false);
     }
 
     public boolean delete(String id) {
         int shardId = shardCalculator.shardId(id);
         return transactionExecutor.execute(daos.get(shardId).sessionFactory, false, daos.get(shardId)::delete, id, "delete",
-                shardId);
+                shardId, false);
     }
 
     protected Field getKeyField() {
