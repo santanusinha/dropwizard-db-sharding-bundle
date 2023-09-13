@@ -27,11 +27,12 @@ import java.util.Map;
  */
 @Slf4j
 public class TaskUtils {
-    private TaskUtils() {}
+    private TaskUtils() {
+    }
 
 
     public static int parseShardParam(Map<String, List<String>> params) throws Exception {
-        if(!params.containsKey("shardId")) {
+        if (!params.containsKey("shardId")) {
             log.warn("No shard specified for blacklisting");
             throw new Exception("No shard id provided");
         }
@@ -39,7 +40,7 @@ public class TaskUtils {
                 .stream()
                 .findFirst()
                 .orElse(null);
-        if(null == shardValue) {
+        if (null == shardValue) {
             log.warn("No shard value specified for shardId during blacklisting");
             throw new Exception("Null shard id provided");
         }

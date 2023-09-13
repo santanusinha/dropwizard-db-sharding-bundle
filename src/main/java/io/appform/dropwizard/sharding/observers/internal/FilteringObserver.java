@@ -42,8 +42,7 @@ public final class FilteringObserver extends TransactionObserver {
                 .map(filter -> {
                     try {
                         return filter.evaluate(context);
-                    }
-                    catch (Throwable t) {
+                    } catch (Throwable t) {
                         log.error("Error running filter: " + filter.getClass(), t);
                         return TransactionFilterResult.allow();
                     }

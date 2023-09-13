@@ -17,8 +17,7 @@ public class EntityClassThreadLocalObserver extends TransactionObserver {
         MDC.put(InterceptorTestUtil.ENTITY_START, context.getEntityClass().getSimpleName());
         try {
             return proceed(context, supplier);
-        }
-        finally {
+        } finally {
             MDC.put(InterceptorTestUtil.ENTITY_END, context.getEntityClass().getSimpleName());
         }
     }

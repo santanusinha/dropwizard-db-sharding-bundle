@@ -81,14 +81,14 @@ public class TransactionExecutor {
                                String opType,
                                int shardId) {
         return execute(sessionFactory,
-                       readOnly,
-                       session -> {
-                           T result = function.apply(arg);
-                           return handler.apply(result);
-                       },
-                       completeTransaction,
-                       opType,
-                       shardId);
+                readOnly,
+                session -> {
+                    T result = function.apply(arg);
+                    return handler.apply(result);
+                },
+                completeTransaction,
+                opType,
+                shardId);
     }
 
     public <T> T execute(

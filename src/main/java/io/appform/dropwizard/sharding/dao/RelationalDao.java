@@ -19,9 +19,9 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
-import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Builder;
 import lombok.Getter;
@@ -293,7 +293,7 @@ public class RelationalDao<T> implements ShardedDao<T>, IRelationalDao<T> {
         return transactionExecutor.execute(dao.sessionFactory, true, handler, true, "runInSession", shardId);
     }
 
-    private boolean update(int shardId, SessionFactory daoSessionFactory,  RelationalDaoPriv dao,
+    private boolean update(int shardId, SessionFactory daoSessionFactory, RelationalDaoPriv dao,
                            Object id, Function<T, T> updater, boolean completeTransaction) {
         try {
             return transactionExecutor.<T, Object, Boolean>execute(daoSessionFactory, true, dao::get, id, (T entity) -> {
@@ -364,7 +364,7 @@ public class RelationalDao<T> implements ShardedDao<T>, IRelationalDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new LockedContext<T>(shardId, dao.sessionFactory, () -> dao.getLockedForWrite(criteria),
-                                    entityClass, shardInfoProvider, observer);
+                entityClass, shardInfoProvider, observer);
     }
 
     @Override
@@ -372,7 +372,7 @@ public class RelationalDao<T> implements ShardedDao<T>, IRelationalDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         return new LockedContext<T>(shardId, dao.sessionFactory, dao::save, entity,
-                                    entityClass, shardInfoProvider, observer);
+                entityClass, shardInfoProvider, observer);
     }
 
     public <U> boolean createOrUpdate(LockedContext<U> context,

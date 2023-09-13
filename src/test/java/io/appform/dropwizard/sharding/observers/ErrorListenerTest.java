@@ -11,12 +11,15 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Property;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 
 /**
  *
@@ -41,8 +44,8 @@ public class ErrorListenerTest extends BundleBasedTestBase {
         @Override
         public void afterException(TransactionExecutionContext listenerContext, Throwable e) {
             log.error("Error in function: {}.{}",
-                      listenerContext.getEntityClass().getSimpleName(),
-                      listenerContext.getOpType());
+                    listenerContext.getEntityClass().getSimpleName(),
+                    listenerContext.getOpType());
             errorCounter.incrementAndGet();
         }
     }
@@ -56,21 +59,21 @@ public class ErrorListenerTest extends BundleBasedTestBase {
 
         @Override
         public void beforeExecute(TransactionExecutionContext listenerContext) {
-            if(0 == where) {
+            if (0 == where) {
                 throw new RuntimeException("Before Execute Test Error");
             }
         }
 
         @Override
         public void afterExecute(TransactionExecutionContext listenerContext) {
-            if(1 == where) {
+            if (1 == where) {
                 throw new RuntimeException("After Execute Test Error");
             }
         }
 
         @Override
         public void afterException(TransactionExecutionContext listenerContext, Throwable e) {
-            if(2 == where) {
+            if (2 == where) {
                 throw new RuntimeException("Error Execute Test Error");
             }
         }
@@ -93,7 +96,7 @@ public class ErrorListenerTest extends BundleBasedTestBase {
         return bundle;
     }
 
-    @Before
+    @BeforeEach
     public void reset() {
         cl.preCounter.set(0);
         cl.postCounter.set(0);
@@ -110,26 +113,22 @@ public class ErrorListenerTest extends BundleBasedTestBase {
 
 
         val parent = parentDao.saveAndGetExecutor(new SimpleParent()
-                                                          .setName("P1"))
+                        .setName("P1"))
                 .save(childDao, parentObj -> new SimpleChild()
                         .setParent(parentObj.getName())
                         .setValue("CV1"))
                 .execute();
         assertNotNull(parent);
-        try {
-            parentDao.lockAndGetExecutor(parent.getName())
-                    .update(childDao,
-                            DetachedCriteria.forClass(SimpleChild.class)
-                                    .add(Property.forName(SimpleChild.Fields.parent).eq(parent.getName())),
-                            child -> {
-                                throw new RuntimeException("Test error");
-                            })
-                    .execute();
-            fail("Should have thrown");
-        }
-        catch (Exception e) {
-            assertEquals(2, cl.errorCounter.get());
-        }
+        assertThrows(Exception.class,
+                () -> parentDao.lockAndGetExecutor(parent.getName())
+                        .update(childDao,
+                                DetachedCriteria.forClass(SimpleChild.class)
+                                        .add(Property.forName(SimpleChild.Fields.parent).eq(parent.getName())),
+                                child -> {
+                                    throw new RuntimeException("Test error");
+                                })
+                        .execute());
+        assertEquals(2, cl.errorCounter.get());
         assertEquals(4, cl.preCounter.get());
         assertEquals(2, cl.postCounter.get());
     }

@@ -14,7 +14,7 @@ import io.dropwizard.setup.AdminEnvironment;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.Getter;
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.util.Map;
 
@@ -58,7 +58,7 @@ public abstract class BundleBasedTestBase {
         return shard;
     }
 
-    @Before
+    @BeforeEach
     public void setup() {
         testConfig.shards.setShards(ImmutableList.of(createConfig("1"), createConfig("2")));
         when(jerseyEnvironment.getResourceConfig()).thenReturn(new DropwizardResourceConfig());

@@ -18,18 +18,18 @@
 package io.appform.dropwizard.sharding;
 
 import io.appform.dropwizard.sharding.caching.LookupCache;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.multi.MultiPackageTestEntity;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class BalancedDbShardingBundleWithMultipleClassPath extends DBShardingBundleTestBase {
 
@@ -83,10 +83,10 @@ public class BalancedDbShardingBundleWithMultipleClassPath extends DBShardingBun
                 .build();
 
         Optional<MultiPackageTestEntity> saveMultiPackageTestEntity = lookupDao.save(multiPackageTestEntity);
-        Assert.assertEquals(multiPackageTestEntity.getText(), saveMultiPackageTestEntity.get().getText());
+        assertEquals(multiPackageTestEntity.getText(), saveMultiPackageTestEntity.get().getText());
 
         Optional<MultiPackageTestEntity> fetchedMultiPackageTestEntity = lookupDao.get(multiPackageTestEntity.getLookup());
-        Assert.assertEquals(saveMultiPackageTestEntity.get().getText(), fetchedMultiPackageTestEntity.get().getText());
+        assertEquals(saveMultiPackageTestEntity.get().getText(), fetchedMultiPackageTestEntity.get().getText());
 
         LookupDao<TestEntity> testEntityLookupDao = bundle.createParentObjectDao(TestEntity.class);
 
@@ -95,33 +95,33 @@ public class BalancedDbShardingBundleWithMultipleClassPath extends DBShardingBun
                 .text("Test Second Package")
                 .build();
         Optional<TestEntity> savedTestEntity = testEntityLookupDao.save(testEntity);
-        Assert.assertEquals(testEntity.getText(), savedTestEntity.get().getText());
+        assertEquals(testEntity.getText(), savedTestEntity.get().getText());
 
         Optional<TestEntity> fetchedTestEntity = testEntityLookupDao.get(testEntity.getExternalId());
-        Assert.assertEquals(savedTestEntity.get().getText(), fetchedTestEntity.get().getText());
+        assertEquals(savedTestEntity.get().getText(), fetchedTestEntity.get().getText());
 
         // Cacheble
         LookupDao<TestEntity> testEntityLookupDaoCacheble = bundle.createParentObjectDao(TestEntity.class, CACHE_MANAGER);
         Optional<TestEntity> savedTestEntityCacheble = testEntityLookupDaoCacheble.save(testEntity);
-        Assert.assertEquals(testEntity.getText(), savedTestEntityCacheble.get().getText());
+        assertEquals(testEntity.getText(), savedTestEntityCacheble.get().getText());
 
         Optional<TestEntity> fetchTestEntityCacheble = testEntityLookupDaoCacheble.get(testEntity.getExternalId());
-        Assert.assertEquals(savedTestEntityCacheble.get().getText(), fetchTestEntityCacheble.get().getText());
+        assertEquals(savedTestEntityCacheble.get().getText(), fetchTestEntityCacheble.get().getText());
 
         // Bucketizer
         LookupDao<TestEntity> testEntityLookupDaoBucketizer = bundle.createParentObjectDao(TestEntity.class, new ConsistentHashBucketIdExtractor<>(bundle.getShardManager()));
         Optional<TestEntity> savedEntityLookupDaoBucketizer = testEntityLookupDaoBucketizer.save(testEntity);
-        Assert.assertEquals(testEntity.getText(), savedEntityLookupDaoBucketizer.get().getText());
+        assertEquals(testEntity.getText(), savedEntityLookupDaoBucketizer.get().getText());
 
         Optional<TestEntity> fetchEntityLookupDaoBucketizer = testEntityLookupDaoBucketizer.get(testEntity.getExternalId());
-        Assert.assertEquals(savedEntityLookupDaoBucketizer.get().getText(), fetchEntityLookupDaoBucketizer.get().getText());
+        assertEquals(savedEntityLookupDaoBucketizer.get().getText(), fetchEntityLookupDaoBucketizer.get().getText());
 
         // Cacheble + Bucketizer
         LookupDao<TestEntity> testEntityLookupDaoCachebleAndBucketizer = bundle.createParentObjectDao(TestEntity.class, new ConsistentHashBucketIdExtractor<>(bundle.getShardManager()), CACHE_MANAGER);
         Optional<TestEntity> savedEntityLookupDaoCachebleAndBucketizer = testEntityLookupDaoCachebleAndBucketizer.save(testEntity);
-        Assert.assertEquals(testEntity.getText(), savedEntityLookupDaoCachebleAndBucketizer.get().getText());
+        assertEquals(testEntity.getText(), savedEntityLookupDaoCachebleAndBucketizer.get().getText());
 
         Optional<TestEntity> fetchEntityLookupDaoCachebleAndBucketizer = testEntityLookupDaoCachebleAndBucketizer.get(testEntity.getExternalId());
-        Assert.assertEquals(savedEntityLookupDaoCachebleAndBucketizer.get().getText(), fetchEntityLookupDaoCachebleAndBucketizer.get().getText());
+        assertEquals(savedEntityLookupDaoCachebleAndBucketizer.get().getText(), fetchEntityLookupDaoCachebleAndBucketizer.get().getText());
     }
 }

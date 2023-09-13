@@ -8,13 +8,13 @@ import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import lombok.SneakyThrows;
 import lombok.val;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  *
@@ -55,7 +55,7 @@ public class ListenerTest extends BundleBasedTestBase {
         return bundle;
     }
 
-    @Before
+    @BeforeEach
     public void reset() {
         cl.preCounter.set(0);
         cl.postCounter.set(0);
@@ -71,13 +71,13 @@ public class ListenerTest extends BundleBasedTestBase {
         val childDao = bundle.createRelatedObjectDao(SimpleChild.class);
 
         val parent = parentDao.save(new SimpleParent()
-                                            .setName("P1"))
+                        .setName("P1"))
                 .orElse(null);
         assertNotNull(parent);
         val child = childDao.save(parent.getName(),
-                                  new SimpleChild()
-                                          .setParent(parent.getName())
-                                          .setValue("CV1"))
+                        new SimpleChild()
+                                .setParent(parent.getName())
+                                .setValue("CV1"))
                 .orElse(null);
         assertNotNull(child);
         assertEquals(2, cl.preCounter.get());

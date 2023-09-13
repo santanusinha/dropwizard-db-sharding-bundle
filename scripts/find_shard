@@ -8,19 +8,22 @@ MIN_BUCKET = 0
 MAX_BUCKET = 999
 NUM_BUCKETS = 16
 
+
 def asInt(h):
-    return ord(h[0]) |  numpy.int32(ord(h[1]) << 8) |   numpy.int32(ord(h[2]) << 16) |  numpy.int32(ord(h[3]) << 24)
-    
+    return ord(h[0]) | numpy.int32(ord(h[1]) << 8) | numpy.int32(ord(h[2]) << 16) | numpy.int32(ord(h[3]) << 24)
+
+
 def getKey(k):
     return -1 * k if (k < 0) else k
 
-def getBucketId(key,min_bucket,max_bucket):
-    hashKey= asInt(mmh3.hash_bytes(key))
+
+def getBucketId(key, min_bucket, max_bucket):
+    hashKey = asInt(mmh3.hash_bytes(key))
     hashKey = getKey(hashKey)
     return hashKey % (max_bucket - min_bucket + 1)
-    
 
-def getBuckets(min_bucket,max_bucket,num_bucket):
+
+def getBuckets(min_bucket, max_bucket, num_bucket):
     buckets = dict()
     shardCounter = 0
     start = min_bucket
@@ -28,28 +31,29 @@ def getBuckets(min_bucket,max_bucket,num_bucket):
     endReached = False
     while (not endReached):
         end = start + interval - 1
-        endReached = not((max_bucket - start)  > (2 *interval))
-        end = max_bucket if(endReached) else end
+        endReached = not ((max_bucket - start) > (2 * interval))
+        end = max_bucket if (endReached) else end
         i = start
-        while (i <= end ):
-            buckets[i]=shardCounter
-            i+=1
-        shardCounter+=1        
+        while (i <= end):
+            buckets[i] = shardCounter
+            i += 1
+        shardCounter += 1
         start += interval
     return buckets
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-k",   "--key", action='append', required=True,  help="A key to search for. Can be specified multiple times for multiple keys.")
-parser.add_argument("-s",   "--num_bucket", type=int , default=NUM_BUCKETS, required=False, help="total number of shards")
-parser.add_argument("-min", "--min_bucket", type=int , default=MIN_BUCKET,  required=False, help="bucket range min value")
-parser.add_argument("-max", "--max_bucket",  type=int , default=MAX_BUCKET,  required=False, help="bucket range max value")
+parser.add_argument("-k", "--key", action='append', required=True,
+                    help="A key to search for. Can be specified multiple times for multiple keys.")
+parser.add_argument("-s", "--num_bucket", type=int, default=NUM_BUCKETS, required=False, help="total number of shards")
+parser.add_argument("-min", "--min_bucket", type=int, default=MIN_BUCKET, required=False, help="bucket range min value")
+parser.add_argument("-max", "--max_bucket", type=int, default=MAX_BUCKET, required=False, help="bucket range max value")
 
 options = parser.parse_args()
-#keys = options.keys.split(",")
+# keys = options.keys.split(",")
 keys = options.key
-buckets = getBuckets(options.min_bucket,options.max_bucket,options.num_bucket)
+buckets = getBuckets(options.min_bucket, options.max_bucket, options.num_bucket)
 for key in keys:
-    bucket_id = getBucketId(key,options.min_bucket,options.max_bucket)
+    bucket_id = getBucketId(key, options.min_bucket, options.max_bucket)
     shard = buckets[bucket_id]
-    print("%s -> %d"  %(key ,shard+1))
+    print("%s -> %d" % (key, shard + 1))

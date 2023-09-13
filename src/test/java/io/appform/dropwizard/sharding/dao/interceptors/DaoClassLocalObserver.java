@@ -19,8 +19,7 @@ public class DaoClassLocalObserver extends TransactionObserver {
         MDC.put(InterceptorTestUtil.DAO_START, context.getDaoClass().getSimpleName());
         try {
             return proceed(context, supplier);
-        }
-        finally {
+        } finally {
             MDC.put(InterceptorTestUtil.DAO_END, context.getDaoClass().getSimpleName());
         }
     }

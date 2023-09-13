@@ -60,17 +60,18 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
      * Cache miss will be delegated to {@link LookupDao#get(String)} method.
      * <b>Note:</b> Lazy loading will not work once the object is returned.
      * If you need lazy loading functionality use the alternate {@link LookupDao#get(String, Function)} method.
+     *
      * @param key The value of the key field to look for.
      * @return The entity
      * @throws Exception if backing dao throws
      */
     @Override
     public Optional<T> get(String key) throws Exception {
-        if(cache.exists(key)) {
+        if (cache.exists(key)) {
             return Optional.of(cache.get(key));
         }
         T entity = super.get(key, t -> t);
-        if(entity != null) {
+        if (entity != null) {
             cache.put(key, entity);
         }
         return Optional.ofNullable(entity);
@@ -79,6 +80,7 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
     /**
      * Write through the entity on proper shard based on hash of the value in the key field in the object and into cache.
      * <b>Note:</b> Lazy loading will not work on the augmented entity.
+     *
      * @param entity Entity to save
      * @return Entity
      * @throws Exception if backing dao throws
@@ -86,7 +88,7 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
     @Override
     public Optional<T> save(T entity) throws Exception {
         T savedEntity = super.save(entity, t -> t);
-        if(savedEntity != null) {
+        if (savedEntity != null) {
             final String key = getKeyField().get(entity).toString();
             cache.put(key, entity);
         }
@@ -96,13 +98,14 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
     /**
      * Update the entity with a given id and refresh the object in the cache.
      * Actual save will be delegated to {@link LookupDao#update(String, Function)} method.
+     *
      * @param id Id of the entity that will be updated
      * @return True/False
      */
     @Override
     public boolean update(String id, Function<Optional<T>, T> updater) {
         boolean result = super.update(id, updater);
-        if(result) {
+        if (result) {
             try {
                 Optional<T> updatedEntity = super.get(id);
                 updatedEntity.ifPresent(t -> cache.put(id, t));
@@ -116,13 +119,14 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
     /**
      * Read through exists check on the basis of key (value of field annotated with {@link LookupKey}) from cache.
      * Cache miss will be delegated to {@link LookupDao#exists(String)} method.
+     *
      * @param key The value of the key field to look for.
      * @return Whether the entity exists or not
      * @throws Exception if backing dao throws
      */
     @Override
     public boolean exists(String key) throws Exception {
-        if(cache.exists(key)) {
+        if (cache.exists(key)) {
             return true;
         }
         Optional<T> entity = super.get(key);

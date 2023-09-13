@@ -54,7 +54,7 @@ public abstract class ShardManager {
     public int shardForBucket(int bucketId) {
         final int shard = shardForBucketImpl(bucketId);
         final Boolean isBlacklisted = blackListedShards.get(shard);
-        if(null != isBlacklisted && isBlacklisted) {
+        if (null != isBlacklisted && isBlacklisted) {
             throw new ShardBlacklistedException(shard);
         }
         return shard;
@@ -63,14 +63,14 @@ public abstract class ShardManager {
     public boolean isMappedToValidShard(int bucketId) {
         final int shard = shardForBucketImpl(bucketId);
         final Boolean isBlacklisted = blackListedShards.get(shard);
-        if(null != isBlacklisted && isBlacklisted) {
+        if (null != isBlacklisted && isBlacklisted) {
             return false;
         }
         return true;
     }
 
     public void blacklistShard(int shardId) {
-        if(shardId >=0 && shardId < numShards()) {
+        if (shardId >= 0 && shardId < numShards()) {
             shardBlacklistingStore.blacklist(shardId);
             blackListedShards.refresh(shardId);
         }
@@ -86,7 +86,7 @@ public abstract class ShardManager {
     }
 
     public void unblacklistShard(int shardId) {
-        if(shardId >=0 && shardId < numShards()) {
+        if (shardId >= 0 && shardId < numShards()) {
             shardBlacklistingStore.unblacklist(shardId);
             blackListedShards.refresh(shardId);
         }

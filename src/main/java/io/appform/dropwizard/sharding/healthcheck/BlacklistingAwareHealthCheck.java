@@ -1,4 +1,3 @@
-
 package io.appform.dropwizard.sharding.healthcheck;
 
 import com.codahale.metrics.health.HealthCheck;

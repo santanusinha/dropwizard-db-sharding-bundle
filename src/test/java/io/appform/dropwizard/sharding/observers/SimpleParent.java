@@ -1,11 +1,21 @@
 package io.appform.dropwizard.sharding.observers;
 
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.experimental.FieldNameConstants;
 import org.hibernate.proxy.HibernateProxy;
 
-import javax.persistence.*;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+import javax.persistence.Transient;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Objects;
@@ -43,11 +53,11 @@ public class SimpleParent {
             return false;
         }
         Class<?> oEffectiveClass = o instanceof HibernateProxy
-                                   ? ((HibernateProxy) o).getHibernateLazyInitializer()
-                                           .getPersistentClass() : o.getClass();
+                ? ((HibernateProxy) o).getHibernateLazyInitializer()
+                .getPersistentClass() : o.getClass();
         Class<?> thisEffectiveClass = this instanceof HibernateProxy
-                                      ? ((HibernateProxy) this).getHibernateLazyInitializer()
-                                              .getPersistentClass() : this.getClass();
+                ? ((HibernateProxy) this).getHibernateLazyInitializer()
+                .getPersistentClass() : this.getClass();
         if (thisEffectiveClass != oEffectiveClass) {
             return false;
         }

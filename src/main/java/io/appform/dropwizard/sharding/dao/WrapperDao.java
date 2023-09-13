@@ -17,10 +17,10 @@
 
 package io.appform.dropwizard.sharding.dao;
 
-import io.dropwizard.hibernate.AbstractDAO;
 import io.appform.dropwizard.sharding.sharding.ShardedTransaction;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
+import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Enhancer;
@@ -50,9 +50,10 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
 
     /**
      * Create a relational DAO.
+     *
      * @param sessionFactories List of session factories. One for each shard.
-     * @param daoClass Class for the dao.
-     * @param shardCalculator {@link ShardCalculator} for finding shard
+     * @param daoClass         Class for the dao.
+     * @param shardCalculator  {@link ShardCalculator} for finding shard
      */
     public WrapperDao(List<SessionFactory> sessionFactories, Class<DaoType> daoClass, ShardCalculator<String> shardCalculator) {
         this(sessionFactories, daoClass, null, null, shardCalculator);
@@ -60,16 +61,17 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
 
     /**
      * Create a relational DAO.
-     * @param sessionFactories List of session factories, one for each shard
-     * @param daoClass Class for the dao.
+     *
+     * @param sessionFactories             List of session factories, one for each shard
+     * @param daoClass                     Class for the dao.
      * @param extraConstructorParamClasses Class names for constructor parameters to the DAO other than SessionFactory
      * @param extraConstructorParamObjects Objects for constructor parameters to the DAO other than SessionFactory
-     * @param shardCalculator {@link ShardCalculator} for finding shard
+     * @param shardCalculator              {@link ShardCalculator} for finding shard
      */
     public WrapperDao(
             List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
             Class[] extraConstructorParamClasses,
-            Class[] extraConstructorParamObjects, ShardCalculator<String> shardCalculator ) {
+            Class[] extraConstructorParamObjects, ShardCalculator<String> shardCalculator) {
         this.shardCalculator = shardCalculator;
         this.daos = sessionFactories.stream().map((SessionFactory sessionFactory) -> {
             Enhancer enhancer = new Enhancer();
@@ -77,7 +79,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
             enhancer.setSuperclass(daoClass);
             enhancer.setCallback((MethodInterceptor) (obj, method, args, proxy) -> {
                 final ShardedTransaction transaction = method.getAnnotation(ShardedTransaction.class);
-                if(null == transaction) {
+                if (null == transaction) {
                     return proxy.invokeSuper(obj, args);
                 }
                 final TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, transaction.readOnly());
@@ -100,6 +102,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
 
     /**
      * Get a fully formed DAO that localizes all dao operations to the shard for the given parentKey.
+     *
      * @param parentKey key that will be used to find the shard
      * @return Wrapper for parent dao
      */
@@ -110,16 +113,16 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
     @SuppressWarnings("unchecked")
     private DaoType createDAOProxy(SessionFactory sessionFactory, Enhancer enhancer,
                                    Class[] extraConstructorParamClasses, Class[] extraConstructorParamObjects) {
-        Class[] constructorClasses = new Class[] {SessionFactory.class};
-        if(null != extraConstructorParamClasses) {
+        Class[] constructorClasses = new Class[]{SessionFactory.class};
+        if (null != extraConstructorParamClasses) {
             ArrayUtils.addAll(constructorClasses, extraConstructorParamClasses);
         }
-        Object[] constructorObjects = new Object[] {sessionFactory};
+        Object[] constructorObjects = new Object[]{sessionFactory};
 
-        if(null != extraConstructorParamObjects) {
+        if (null != extraConstructorParamObjects) {
             ArrayUtils.addAll(constructorObjects, extraConstructorParamClasses);
         }
-        return (DaoType)enhancer.create(constructorClasses, constructorObjects);
+        return (DaoType) enhancer.create(constructorClasses, constructorObjects);
     }
 
 }

@@ -26,12 +26,11 @@ public class TimerObserver extends TransactionObserver {
         val w = Stopwatch.createStarted();
         try {
             return proceed(context, supplier);
-        }
-        finally {
+        } finally {
             log.info("Method {}::{} took: {}ms",
-                     context.getDaoClass().getSimpleName(),
-                     context.getOpType(),
-                     w.elapsed());
+                    context.getDaoClass().getSimpleName(),
+                    context.getOpType(),
+                    w.elapsed());
         }
     }
 }

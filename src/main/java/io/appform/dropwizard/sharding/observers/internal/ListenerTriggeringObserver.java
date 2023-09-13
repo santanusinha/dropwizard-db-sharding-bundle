@@ -47,8 +47,7 @@ public final class ListenerTriggeringObserver extends TransactionObserver {
             listeners.forEach(listener -> {
                 try {
                     listener.beforeExecute(context);
-                }
-                catch (Throwable t) {
+                } catch (Throwable t) {
                     log.info("Error running listener beforeExecute: " + listener.getClass(), t);
                 }
             });
@@ -56,20 +55,17 @@ public final class ListenerTriggeringObserver extends TransactionObserver {
             listeners.forEach(listener -> {
                 try {
                     listener.afterExecute(context);
-                }
-                catch (Throwable t) {
+                } catch (Throwable t) {
                     log.info("Error running listener afterExecute: " + listener.getClass(), t);
                 }
 
             });
             return result;
-        }
-        catch (Throwable t) {
+        } catch (Throwable t) {
             listeners.forEach(listener -> {
                 try {
                     listener.afterException(context, t);
-                }
-                catch (Throwable th) {
+                } catch (Throwable th) {
                     log.info("Error running listener afterException: " + listener.getClass(), th);
                 }
 

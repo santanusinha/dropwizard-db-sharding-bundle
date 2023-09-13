@@ -1,8 +1,9 @@
 package io.appform.dropwizard.sharding.dao.interceptors;
 
 import lombok.experimental.UtilityClass;
-import org.junit.Assert;
 import org.slf4j.MDC;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @UtilityClass
 public class InterceptorTestUtil {
@@ -16,9 +17,9 @@ public class InterceptorTestUtil {
 
     public void validateThreadLocal(final Class<?> daoClass,
                                     final Class<?> entityClass) {
-        Assert.assertEquals(daoClass.getSimpleName(), MDC.get(DAO_START));
-        Assert.assertEquals(daoClass.getSimpleName(), MDC.get(DAO_END));
-        Assert.assertEquals(entityClass.getSimpleName(), MDC.get(ENTITY_START));
-        Assert.assertEquals(entityClass.getSimpleName(), MDC.get(ENTITY_END));
+        assertEquals(daoClass.getSimpleName(), MDC.get(DAO_START));
+        assertEquals(daoClass.getSimpleName(), MDC.get(DAO_END));
+        assertEquals(entityClass.getSimpleName(), MDC.get(ENTITY_START));
+        assertEquals(entityClass.getSimpleName(), MDC.get(ENTITY_END));
     }
 }

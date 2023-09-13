@@ -10,10 +10,10 @@ import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.filters.TransactionFilterResult;
 import lombok.SneakyThrows;
 import lombok.val;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  *
@@ -51,8 +51,7 @@ public class FilterBlockTest extends BundleBasedTestBase {
         try {
             parentDao.save(new SimpleParent().setName("P1"));
             fail("Should have thrown");
-        }
-        catch (TransactionFilteredException e) {
+        } catch (TransactionFilteredException e) {
             assertEquals(1, e.getReasons().size());
         }
     }

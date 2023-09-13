@@ -18,7 +18,11 @@
 package io.appform.dropwizard.sharding.utils;
 
 import lombok.Getter;
-import org.hibernate.*;
+import org.hibernate.CacheMode;
+import org.hibernate.FlushMode;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
 import org.hibernate.resource.transaction.spi.TransactionStatus;
 
@@ -68,11 +72,11 @@ public class TransactionHandler {
         }
 
         try {
-            if(!skipCommit) {
+            if (!skipCommit) {
                 commitTransaction();
             }
         } catch (Exception e) {
-            if(!skipCommit) {
+            if (!skipCommit) {
                 rollbackTransaction();
             }
             throw e;

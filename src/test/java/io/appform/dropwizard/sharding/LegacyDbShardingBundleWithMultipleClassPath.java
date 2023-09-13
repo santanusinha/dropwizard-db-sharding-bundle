@@ -21,13 +21,13 @@ import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.multi.MultiPackageTestEntity;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
-public class LegacyDbShardingBundleWithMultipleClassPath extends DBShardingBundleTestBase {
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+public class LegacyDbShardingBundleWithMultipleClassPath extends DBShardingBundleTestBase {
 
 
     @Override
@@ -43,7 +43,6 @@ public class LegacyDbShardingBundleWithMultipleClassPath extends DBShardingBundl
 
     @Test
     public void testMultiPackage() throws Exception {
-
         DBShardingBundleBase<TestConfig> bundle = getBundle();
 
         bundle.initialize(bootstrap);
@@ -58,10 +57,10 @@ public class LegacyDbShardingBundleWithMultipleClassPath extends DBShardingBundl
                 .build();
 
         Optional<MultiPackageTestEntity> saveMultiPackageTestEntity = lookupDao.save(multiPackageTestEntity);
-        Assert.assertEquals(multiPackageTestEntity.getText(), saveMultiPackageTestEntity.get().getText());
+        assertEquals(multiPackageTestEntity.getText(), saveMultiPackageTestEntity.get().getText());
 
         Optional<MultiPackageTestEntity> fetchedMultiPackageTestEntity = lookupDao.get(multiPackageTestEntity.getLookup());
-        Assert.assertEquals(saveMultiPackageTestEntity.get().getText(), fetchedMultiPackageTestEntity.get().getText());
+        assertEquals(saveMultiPackageTestEntity.get().getText(), fetchedMultiPackageTestEntity.get().getText());
 
         LookupDao<TestEntity> testEntityLookupDao = bundle.createParentObjectDao(TestEntity.class);
 
@@ -70,10 +69,10 @@ public class LegacyDbShardingBundleWithMultipleClassPath extends DBShardingBundl
                 .text("Test Second Package")
                 .build();
         Optional<TestEntity> savedTestEntity = testEntityLookupDao.save(testEntity);
-        Assert.assertEquals(testEntity.getText(), savedTestEntity.get().getText());
+        assertEquals(testEntity.getText(), savedTestEntity.get().getText());
 
         Optional<TestEntity> fetchedTestEntity = testEntityLookupDao.get(testEntity.getExternalId());
-        Assert.assertEquals(savedTestEntity.get().getText(), fetchedTestEntity.get().getText());
+        assertEquals(savedTestEntity.get().getText(), fetchedTestEntity.get().getText());
 
 
     }

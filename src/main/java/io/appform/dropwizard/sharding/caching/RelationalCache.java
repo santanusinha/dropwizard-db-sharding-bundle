@@ -30,44 +30,50 @@ public interface RelationalCache<V> {
 
     /**
      * Write through method that will be called if cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#save(String, Object)} is used
+     *
      * @param parentKey The key of the parent that the entity is related to
-     * @param key The key that needs to be used to write this element to cache
-     * @param entity Entity that needs to be written into cache
+     * @param key       The key that needs to be used to write this element to cache
+     * @param entity    Entity that needs to be written into cache
      */
     void put(String parentKey, Object key, V entity);
 
     /**
      * Write through method that will be called if cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#select(String, DetachedCriteria, int, int, Function)} is used
+     *
      * @param parentKey The key of the parent that the entity is related to
-     * @param entities List of entities that needs to be written into cache
+     * @param entities  List of entities that needs to be written into cache
      */
     void put(String parentKey, List<V> entities);
 
     /**
      * Write through method that will be called if cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#select(String, DetachedCriteria, int, int, Function)} is used
+     *
      * @param parentKey The key of the parent that the entity is related to
-     * @param entities List of entities that needs to be written into cache
+     * @param entities  List of entities that needs to be written into cache
      */
     void put(String parentKey, int first, int numResults, List<V> entities);
 
     /**
      * Read through exists method that will be called if cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#exists(String, Object)} is used
+     *
      * @param parentKey The key of the parent that the entity is related to
-     * @param key The key that needs to be used to write this element to cache
+     * @param key       The key that needs to be used to write this element to cache
      * @return Whether the entity exists or not.
      */
     boolean exists(String parentKey, Object key);
 
     /**
      * Read through method that will be called if a cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#get(String, Object)} is used
+     *
      * @param parentKey The key of the parent the entity is related to
-     * @param key The key of the entity that needs to be read
+     * @param key       The key of the entity that needs to be read
      * @return entity Entity that was read through the cache
      */
     V get(String parentKey, Object key);
 
     /**
      * Read through method that will be called if a cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#select(String, DetachedCriteria, int, int, Function)} is used
+     *
      * @param parentKey The key of the parent the entity is related to
      * @return Entities that was read through the cache
      */
@@ -75,6 +81,7 @@ public interface RelationalCache<V> {
 
     /**
      * Read through method that will be called if a cache enabled {@link io.appform.dropwizard.sharding.dao.CacheableRelationalDao#select(String, DetachedCriteria, int, int, Function)} is used
+     *
      * @param parentKey The key of the parent the entity is related to
      * @return Entities that was read through the cache
      */

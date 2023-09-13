@@ -18,7 +18,12 @@
 package io.appform.dropwizard.sharding.dao.testdata.entities;
 
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.persistence.Column;

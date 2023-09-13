@@ -19,7 +19,11 @@ package io.appform.dropwizard.sharding.config;
 
 import com.google.common.collect.Lists;
 import io.dropwizard.db.DataSourceFactory;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.Singular;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.validation.Valid;
@@ -51,4 +55,6 @@ public class ShardedHibernateFactory {
     @Valid
     private ShardingBundleOptions shardingOptions;
 
+    @Valid
+    private MetricConfig metricConfig;
 }
