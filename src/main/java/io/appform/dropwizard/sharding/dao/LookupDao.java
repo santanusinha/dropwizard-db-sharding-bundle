@@ -29,6 +29,7 @@ import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.utils.InternalUtils;
+import io.appform.dropwizard.sharding.utils.ResultScroller;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import io.dropwizard.hibernate.AbstractDAO;
@@ -38,6 +39,7 @@ import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.hibernate.Criteria;
 import org.hibernate.LockMode;
+import org.hibernate.ScrollMode;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.*;
@@ -51,12 +53,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 /**
  * A dao to manage lookup and top level elements in the system. Can save and retrieve an object (tree) from any shard.
@@ -163,6 +163,15 @@ public class LookupDao<T> implements ShardedDao<T> {
                 executableCriteria.setMaxResults(count);
             }
             return list(executableCriteria);
+        }
+
+        <U> List<U> forEach(DetachedCriteria criteria, Function<T, U> handler) {
+            try(val scroller = ResultScroller.<T>fromCriteria(
+                    criteria.getExecutableCriteria(currentSession()))) {
+                return StreamSupport.stream(Spliterators.spliteratorUnknownSize(scroller, Spliterator.ORDERED), false)
+                        .map(handler)
+                        .collect(Collectors.toList());
+            }
         }
 
         long count(DetachedCriteria criteria) {
