@@ -25,6 +25,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -34,7 +35,7 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
 
     private RelationalCache<T> cache;
 
-    public CacheableRelationalDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
+    public CacheableRelationalDao(Map<Integer,List<SessionFactory>> sessionFactories, Class<T> entityClass,
                                   ShardCalculator<String> shardCalculator,
                                   RelationalCache<T> cache,
                                   ShardInfoProvider shardInfoProvider,

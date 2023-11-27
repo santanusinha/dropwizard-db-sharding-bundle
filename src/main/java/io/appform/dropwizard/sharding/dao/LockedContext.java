@@ -25,6 +25,7 @@ public class LockedContext<T> {
     enum Mode {READ, INSERT}
 
     private final int shardId;
+    private final String parent;
     private final SessionFactory sessionFactory;
     private final List<Function<T, Void>> operations = Lists.newArrayList();
     private Supplier<T> getter;
@@ -36,12 +37,14 @@ public class LockedContext<T> {
 
     public LockedContext(
             int shardId,
+            String parent,
             SessionFactory sessionFactory,
             Supplier<T> getter,
             Class<T> entityClass,
             ShardInfoProvider shardInfoProvider,
             TransactionObserver observer) {
         this.shardId = shardId;
+        this.parent = parent;
         this.sessionFactory = sessionFactory;
         this.getter = getter;
         this.observer = observer;
@@ -51,6 +54,7 @@ public class LockedContext<T> {
 
     public LockedContext(
             int shardId,
+            String parent,
             SessionFactory sessionFactory,
             Function<T, T> saver,
             T entity,
@@ -58,6 +62,7 @@ public class LockedContext<T> {
             ShardInfoProvider shardInfoProvider,
             TransactionObserver observer) {
         this.shardId = shardId;
+        this.parent = parent;
         this.sessionFactory = sessionFactory;
         this.saver = saver;
         this.entity = entity;

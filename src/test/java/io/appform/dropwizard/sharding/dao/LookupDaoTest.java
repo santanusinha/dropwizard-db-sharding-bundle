@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.TestUtil;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
@@ -97,13 +98,13 @@ public class LookupDaoTest {
         final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
-        lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator, shardingOptions,
+        lookupDao = new LookupDao<>(TestUtil.convertToMap(sessionFactories), TestEntity.class, shardCalculator, shardingOptions,
+                                    shardInfoProvider, observer);
+        phoneDao = new LookupDao<>(TestUtil.convertToMap(sessionFactories), Phone.class, shardCalculator, shardingOptions,
                 shardInfoProvider, observer);
-        phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator, shardingOptions,
+        transactionDao = new RelationalDao<>(TestUtil.convertToMap(sessionFactories), Transaction.class, shardCalculator,
                 shardInfoProvider, observer);
-        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator,
-                shardInfoProvider, observer);
-        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator,
+        auditDao = new RelationalDao<>(TestUtil.convertToMap(sessionFactories), Audit.class, shardCalculator,
                 shardInfoProvider, observer);
     }
 

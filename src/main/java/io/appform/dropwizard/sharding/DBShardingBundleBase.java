@@ -51,6 +51,7 @@ import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtrac
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
+import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.hibernate.AbstractDAO;
 import io.dropwizard.hibernate.HibernateBundle;
@@ -61,6 +62,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import lombok.var;
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.reflections.Reflections;
@@ -68,6 +70,8 @@ import org.reflections.Reflections;
 import javax.persistence.Entity;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -87,8 +91,9 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     private static final String DEFAULT_SHARDS = "2";
 
     private List<HibernateBundle<T>> shardBundles = Lists.newArrayList();
+    private Map<Integer, Integer> shardMapping = new HashMap<>();
     @Getter
-    private List<SessionFactory> sessionFactories;
+    private Map<Integer, List<SessionFactory>> sessionFactories;
     @Getter
     private ShardManager shardManager;
     @Getter
@@ -150,7 +155,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 shardInfoProvider,
                 blacklistingStore,
                 shardManager);
-        IntStream.range(0, numShards).forEach(
+        IntStream.range(0, shardCount()).forEach(
                 shard -> shardBundles.add(new HibernateBundle<T>(inEntities, new SessionFactoryFactory()) {
                     @Override
                     protected String name() {
@@ -159,7 +164,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
                     @Override
                     public PooledDataSourceFactory getDataSourceFactory(T t) {
-                        return getConfig(t).getShards().get(shard);
+                        return getMultiMasterConfig(t).get(shard);
                     }
                 }));
     }
@@ -171,7 +176,11 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
             throw new RuntimeException(
                     "Shard count provided through environment does not match the size of the shard configuration list");
         }
-        sessionFactories = shardBundles.stream().map(HibernateBundle::getSessionFactory).collect(Collectors.toList());
+        sessionFactories = IntStream.range(0, shardBundles.size())
+                .boxed()
+                .collect(Collectors.groupingBy(shardMapping::get, LinkedHashMap::new,
+                                               Collectors.mapping(i -> shardBundles.get(i).getSessionFactory(),
+                                                                  Collectors.toList())));
         this.shardingOptions = getShardingOptions(configuration);
         environment.admin().addTask(new BlacklistShardTask(shardManager));
         environment.admin().addTask(new UnblacklistShardTask(shardManager));
@@ -233,6 +242,31 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     }
 
     protected abstract ShardedHibernateFactory getConfig(T config);
+
+    protected List<DataSourceFactory> getMultiMasterConfig(T config){
+        final List<DataSourceFactory> dataSourceFactories = getConfig(config).getShards();
+        final List<DataSourceFactory> factoryArrayList = new ArrayList<>();
+        for (int i = 0, j=0; i < dataSourceFactories.size(); i++) {
+            final DataSourceFactory originalFactory = dataSourceFactories.get(i);
+            final String[] urlValues = getUrlValues(originalFactory.getUrl());
+            for (String urlValue : urlValues) {
+                urlValue = urlValue.trim();
+                final DataSourceFactory newFactory = copyDataSourceFactory(originalFactory);
+                newFactory.setUrl(urlValue);
+                factoryArrayList.add(newFactory);
+                shardMapping.put(j++, i);
+            }
+        }
+        return factoryArrayList;
+    }
+
+    protected boolean enableMultiMaster() {
+        return false;
+    }
+
+    protected int shardCount() {
+        return numShards;
+    }
 
     protected Supplier<MetricConfig> getMetricConfig(T config) {
         return () -> getConfig(config).getMetricConfig();
@@ -403,6 +437,27 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 ((ListenerTriggeringObserver) observer).getListeners().forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
             }
         });
+    }
+
+    private String[] getUrlValues(final String url){
+        if(enableMultiMaster()){
+            return url.split(",");
+        }
+        return new String[] { url };
+    }
+
+    private DataSourceFactory copyDataSourceFactory(DataSourceFactory originalFactory) {
+        DataSourceFactory copiedFactory = new DataSourceFactory(); // Use your custom class if needed
+
+        // Use Apache Commons BeanUtils to copy fields
+        try {
+            BeanUtils.copyProperties(copiedFactory, originalFactory);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Error copying DataSourceFactory");
+        }
+
+        return copiedFactory;
     }
 
 }

@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -44,7 +45,7 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
 
     private LookupCache<T> cache;
 
-    public CacheableLookupDao(List<SessionFactory> sessionFactories,
+    public CacheableLookupDao(Map<Integer,List<SessionFactory>> sessionFactories,
                               Class<T> entityClass,
                               ShardCalculator<String> shardCalculator,
                               LookupCache<T> cache,

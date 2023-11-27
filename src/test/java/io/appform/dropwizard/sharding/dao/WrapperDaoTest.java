@@ -19,6 +19,7 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.TestUtil;
 import io.appform.dropwizard.sharding.dao.testdata.OrderDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
@@ -46,9 +47,9 @@ public class WrapperDaoTest {
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
         configuration.setProperty("hibernate.dialect",
-                "org.hibernate.dialect.H2Dialect");
+                                  "org.hibernate.dialect.H2Dialect");
         configuration.setProperty("hibernate.connection.driver_class",
-                "org.h2.Driver");
+                                  "org.h2.Driver");
         configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
         configuration.setProperty("hibernate.hbm2ddl.auto", "create");
         configuration.setProperty("hibernate.current_session_context_class", "managed");
@@ -67,7 +68,7 @@ public class WrapperDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        dao = new WrapperDao<>(sessionFactories, OrderDao.class,
+        dao = new WrapperDao<>(TestUtil.convertToMap(sessionFactories), OrderDao.class,
                 new ShardCalculator<>(shardManager, new ConsistentHashBucketIdExtractor<>(shardManager)));
 
     }

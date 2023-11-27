@@ -20,6 +20,7 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.TestUtil;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.dao.interceptors.EntityClassThreadLocalObserver;
 import io.appform.dropwizard.sharding.dao.interceptors.InterceptorTestUtil;
@@ -76,12 +77,12 @@ public class RelationalDaoTest {
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
-        relationalDao = new RelationalDao<>(sessionFactories,
-                RelationalEntity.class,
-                new ShardCalculator<>(shardManager,
+        relationalDao = new RelationalDao<>(TestUtil.convertToMap(sessionFactories),
+                                            RelationalEntity.class,
+                                            new ShardCalculator<>(shardManager,
                         new ConsistentHashBucketIdExtractor<>(shardManager)),
-                shardInfoProvider,
-                new EntityClassThreadLocalObserver(
+                                            shardInfoProvider,
+                                            new EntityClassThreadLocalObserver(
                         new DaoClassLocalObserver(
                                 new TerminalTransactionObserver())));
     }

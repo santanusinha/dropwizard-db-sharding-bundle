@@ -111,6 +111,7 @@ public class TransactionExecutor {
             }
             try {
                 T result = handler.apply(transactionHandler.getSession());
+                //dount: wont transactionHandler.getSession() be null if completeTransaction is false
                 if (completeTransaction) {
                     transactionHandler.afterEnd();
                 }

@@ -17,6 +17,8 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.MapDaoHolder;
+import io.appform.dropwizard.sharding.DaoHolder;
 import io.appform.dropwizard.sharding.sharding.ShardedTransaction;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
@@ -30,6 +32,7 @@ import org.hibernate.SessionFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -39,12 +42,13 @@ import java.util.stream.Collectors;
  *
  * <b>Note:</b>
  * - Methods in the custom dao will be transactional only if they are annotaded with {@link ShardedTransaction}
- * - Use {@link RelationalDao} where-ever possible as it will be slight more performant than this due to lack of any proxy.
+ * - Use {@link RelationalDao} where-ever possible as it will be slight more performant than this due to lack of any
+ * proxy.
  */
 @Slf4j
 public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao<T> {
 
-    private List<DaoType> daos;
+    private DaoHolder<DaoType> daos;
     @Getter
     private final ShardCalculator<String> shardCalculator;
 
@@ -55,7 +59,8 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @param daoClass         Class for the dao.
      * @param shardCalculator  {@link ShardCalculator} for finding shard
      */
-    public WrapperDao(List<SessionFactory> sessionFactories, Class<DaoType> daoClass, ShardCalculator<String> shardCalculator) {
+    public WrapperDao(Map<Integer, List<SessionFactory>> sessionFactories, Class<DaoType> daoClass,
+                      ShardCalculator<String> shardCalculator) {
         this(sessionFactories, daoClass, null, null, shardCalculator);
     }
 
@@ -69,35 +74,39 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @param shardCalculator              {@link ShardCalculator} for finding shard
      */
     public WrapperDao(
-            List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
+            Map<Integer, List<SessionFactory>> sessionFactories, Class<DaoType> daoClass,
             Class[] extraConstructorParamClasses,
             Class[] extraConstructorParamObjects, ShardCalculator<String> shardCalculator) {
         this.shardCalculator = shardCalculator;
-        this.daos = sessionFactories.stream().map((SessionFactory sessionFactory) -> {
-            Enhancer enhancer = new Enhancer();
-            enhancer.setUseFactory(false);
-            enhancer.setSuperclass(daoClass);
-            enhancer.setCallback((MethodInterceptor) (obj, method, args, proxy) -> {
-                final ShardedTransaction transaction = method.getAnnotation(ShardedTransaction.class);
-                if (null == transaction) {
-                    return proxy.invokeSuper(obj, args);
-                }
-                final TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, transaction.readOnly());
-                try {
-                    transactionHandler.beforeStart();
-                    Object result = proxy.invokeSuper(obj, args);
-                    transactionHandler.afterEnd();
-                    return result;
-                } catch (InvocationTargetException e) {
-                    transactionHandler.onError();
-                    throw e.getCause();
-                } catch (Exception e) {
-                    transactionHandler.onError();
-                    throw e;
-                }
-            });
-            return createDAOProxy(sessionFactory, enhancer, extraConstructorParamClasses, extraConstructorParamObjects);
-        }).collect(Collectors.toList());
+        this.daos = new MapDaoHolder<>(sessionFactories.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().stream()
+                        .map((SessionFactory sessionFactory) -> {
+                            Enhancer enhancer = new Enhancer();
+                            enhancer.setUseFactory(false);
+                            enhancer.setSuperclass(daoClass);
+                            enhancer.setCallback((MethodInterceptor) (obj, method, args, proxy) -> {
+                                final ShardedTransaction transaction = method.getAnnotation(ShardedTransaction.class);
+                                if (null == transaction) {
+                                    return proxy.invokeSuper(obj, args);
+                                }
+                                final TransactionHandler transactionHandler = new TransactionHandler(sessionFactory,
+                                                                                                     transaction.readOnly());
+                                try {
+                                    transactionHandler.beforeStart();
+                                    Object result = proxy.invokeSuper(obj, args);
+                                    transactionHandler.afterEnd();
+                                    return result;
+                                } catch (InvocationTargetException e) {
+                                    transactionHandler.onError();
+                                    throw e.getCause();
+                                } catch (Exception e) {
+                                    transactionHandler.onError();
+                                    throw e;
+                                }
+                            });
+                            return createDAOProxy(sessionFactory, enhancer, extraConstructorParamClasses,
+                                                  extraConstructorParamObjects);
+                        }).collect(Collectors.toList()))));
     }
 
     /**
@@ -107,7 +116,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @return Wrapper for parent dao
      */
     public DaoType forParent(final String parentKey) {
-        return daos.get(shardCalculator.shardId(parentKey));
+        return daos.get(shardCalculator.shardId(parentKey), parentKey);
     }
 
     @SuppressWarnings("unchecked")
