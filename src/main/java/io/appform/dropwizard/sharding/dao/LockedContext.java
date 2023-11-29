@@ -78,7 +78,7 @@ public class LockedContext<T> {
         return this;
     }
 
-    public <U> LockedContext<T> save(RelationalDao<U> relationalDao, Function<T, U> entityGenerator) {
+    public <U> LockedContext<T> save(IRelationalDao<U> relationalDao, Function<T, U> entityGenerator) {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
@@ -90,7 +90,7 @@ public class LockedContext<T> {
         });
     }
 
-    public <U> LockedContext<T> saveAll(RelationalDao<U> relationalDao, Function<T, List<U>> entityGenerator) {
+    public <U> LockedContext<T> saveAll(IRelationalDao<U> relationalDao, Function<T, List<U>> entityGenerator) {
         return apply(parent -> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
@@ -104,7 +104,7 @@ public class LockedContext<T> {
         });
     }
 
-    public <U> LockedContext<T> save(RelationalDao<U> relationalDao, U entity, Function<U, U> handler) {
+    public <U> LockedContext<T> save(IRelationalDao<U> relationalDao, U entity, Function<U, U> handler) {
         return apply(parent -> {
             try {
                 relationalDao.save(this, entity, handler);
@@ -116,7 +116,7 @@ public class LockedContext<T> {
     }
 
     public <U> LockedContext<T> updateUsingQuery(
-            RelationalDao<U> relationalDao,
+            IRelationalDao<U> relationalDao,
             UpdateOperationMeta updateOperationMeta) {
         return apply(parent -> {
             try {
@@ -128,7 +128,7 @@ public class LockedContext<T> {
         });
     }
 
-    public <U> LockedContext<T> update(RelationalDao<U> relationalDao, Object id, Function<U, U> handler) {
+    public <U> LockedContext<T> update(IRelationalDao<U> relationalDao, Object id, Function<U, U> handler) {
         return apply(parent -> {
             try {
                 relationalDao.update(this, id, handler);
@@ -140,7 +140,7 @@ public class LockedContext<T> {
     }
 
     public <U> LockedContext<T> createOrUpdate(
-            RelationalDao<U> relationalDao,
+            IRelationalDao<U> relationalDao,
             DetachedCriteria criteria,
             Function<U, U> updater,
             Supplier<U> entityGenerator) {
@@ -155,7 +155,7 @@ public class LockedContext<T> {
     }
 
     public <U> LockedContext<T> update(
-            RelationalDao<U> relationalDao,
+            IRelationalDao<U> relationalDao,
             DetachedCriteria criteria,
             Function<U, U> updater,
             BooleanSupplier updateNext) {
