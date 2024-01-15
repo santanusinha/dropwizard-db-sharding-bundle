@@ -10,5 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ShardingBundleOptions {
+
+    /*
+     Whether to skip transaction in a read only operation.
+     */
     private boolean skipReadOnlyTransaction = false;
 }

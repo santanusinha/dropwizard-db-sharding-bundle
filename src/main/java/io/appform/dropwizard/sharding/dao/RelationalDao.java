@@ -37,6 +37,7 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Projections;
+import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 
 import javax.persistence.Id;
@@ -82,12 +83,11 @@ public class RelationalDao<T> implements ShardedDao<T> {
          * @param lookupKey ID for which data needs to be fetched
          */
 
-        T get(final Object lookupKey) {
-            val q = createQuery(currentSession(),
-                    entityClass,
-                    (queryRoot, query, criteriaBuilder) ->
-                            query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), lookupKey)));
-            return uniqueResult(q.setLockMode(LockModeType.NONE));
+        T get(Object lookupKey) {
+            return uniqueResult(currentSession()
+                    .createCriteria(entityClass)
+                    .add(Restrictions.eq(keyField.getName(), lookupKey))
+                    .setLockMode(LockMode.READ));
         }
 
         /**

@@ -54,7 +54,7 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
      * @param entityClass The Class representing the entity type handled by the DAO.
      * @param shardCalculator A ShardCalculator for determining the database shard based on keys.
      * @param cache The LookupCache implementation for caching entities.
-     * @param shardingOptions ShardingBundleOptions for configuring sharding behavior.
+     * @param shardingOptions The ShardingBundleOptions for configuring the DAO.
      * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
      * @param observer A TransactionObserver for observing transaction events.
      */
