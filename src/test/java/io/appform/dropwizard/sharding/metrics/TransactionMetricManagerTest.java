@@ -3,6 +3,10 @@ package io.appform.dropwizard.sharding.metrics;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.ImmutableSet;
 import io.appform.dropwizard.sharding.config.MetricConfig;
+import io.appform.dropwizard.sharding.dao.LockedContext.Mode;
+import io.appform.dropwizard.sharding.dao.operations.OpContext;
+import io.appform.dropwizard.sharding.dao.operations.Save;
+import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecute;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import lombok.val;
 import org.junit.jupiter.api.Test;
@@ -59,8 +63,8 @@ class TransactionMetricManagerTest {
         val context = TransactionExecutionContext.builder()
                 .entityClass(this.getClass())
                 .daoClass(this.getClass())
-                .opType("read")
-                .lockedContextMode("readMode")
+                .commandName("read")
+                .opContext(LockAndExecute.<String>buildForRead().build())
                 .build();
         val metricRegistry = new MetricRegistry();
         val metricManager = new TransactionMetricManager(null, metricRegistry);
@@ -71,7 +75,7 @@ class TransactionMetricManagerTest {
         val metricPrefix = "db.sharding.entity.io_appform_dropwizard_sharding_metrics_TransactionMetricManagerTest." +
                 "io_appform_dropwizard_sharding_metrics_TransactionMetricManagerTest." +
                 "read." +
-                "readMode.";
+                "READ.";
         assertEquals(metrics.get(metricPrefix + "latency"), metricData.getTimer());
         assertEquals(metrics.get(metricPrefix + "total"), metricData.getTotal());
         assertEquals(metrics.get(metricPrefix + "success"), metricData.getSuccess());

@@ -20,6 +20,24 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.OpContext;
+import io.appform.dropwizard.sharding.dao.operations.RunInSession;
+import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
+import io.appform.dropwizard.sharding.dao.operations.Save;
+import io.appform.dropwizard.sharding.dao.operations.SelectAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.UpdateAll;
+import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
+import io.appform.dropwizard.sharding.dao.operations.Count;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
+import io.appform.dropwizard.sharding.dao.operations.Get;
+import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.SaveAll;
+import io.appform.dropwizard.sharding.dao.operations.ScrollParam;
+import io.appform.dropwizard.sharding.dao.operations.Select;
+import io.appform.dropwizard.sharding.dao.operations.SelectParam;
+import io.appform.dropwizard.sharding.dao.operations.UpdateWithScroll;
 import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
@@ -30,7 +48,6 @@ import io.appform.dropwizard.sharding.scroll.ScrollResultItem;
 import io.appform.dropwizard.sharding.utils.InternalUtils;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.hibernate.AbstractDAO;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
@@ -46,6 +63,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Projections;
+import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 
 import javax.persistence.Id;
@@ -96,12 +114,18 @@ public class RelationalDao<T> implements ShardedDao<T> {
          */
 
         T get(final Object lookupKey) {
-            val q = createQuery(currentSession(),
+            val q = InternalUtils.createQuery(currentSession(),
                                 entityClass,
                                 (queryRoot, query, criteriaBuilder) ->
                                         query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()),
                                                                           lookupKey)));
             return uniqueResult(q.setLockMode(LockModeType.NONE));
+        }
+
+        DetachedCriteria getDetachedCriteria(Object lookupKey) {
+            return DetachedCriteria.forClass(entityClass).add(
+                    Restrictions.eq(keyField.getName(), lookupKey))
+                .setLockMode(LockMode.READ);
         }
 
         /**
@@ -113,7 +137,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
          *                  row selection
          */
         T getLockedForWrite(final QuerySpec<T, T> querySpec) {
-            val q = createQuery(currentSession(), entityClass, querySpec);
+            val q = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
             return uniqueResult(q.setLockMode(LockModeType.PESSIMISTIC_WRITE));
         }
 
@@ -142,26 +166,33 @@ public class RelationalDao<T> implements ShardedDao<T> {
             currentSession().evict(oldEntity); //Detach ... otherwise update is a no-op
             currentSession().update(entity);
         }
-
-        List<T> select(SelectParamPriv<T> selectParam) {
+        List<T> select(SelectParam selectParam) {
             if (selectParam.criteria != null) {
                 val criteria = selectParam.criteria.getExecutableCriteria(currentSession());
-                criteria.setFirstResult(selectParam.start);
-                criteria.setMaxResults(selectParam.numRows);
+                if (-1 != selectParam.getStart()) {
+                    criteria.setFirstResult(selectParam.start);
+                }
+                if (-1 != selectParam.getNumRows()) {
+                    criteria.setMaxResults(selectParam.numRows);
+                }
                 return list(criteria);
             }
-            val query = createQuery(currentSession(), entityClass, selectParam.querySpec);
-            query.setFirstResult(selectParam.start);
-            query.setMaxResults(selectParam.numRows);
+            val query = InternalUtils.createQuery(currentSession(), entityClass, selectParam.querySpec);
+            if (-1 != selectParam.getStart()) {
+                query.setFirstResult(selectParam.start);
+            }
+            if (-1 != selectParam.getNumRows()) {
+                query.setMaxResults(selectParam.numRows);
+            }
             return list(query);
         }
 
-        ScrollableResults scroll(ScrollParamPriv<T> scrollDetails) {
+        ScrollableResults scroll(ScrollParam<T> scrollDetails) {
             if (scrollDetails.getCriteria() != null) {
                 final Criteria criteria = scrollDetails.getCriteria().getExecutableCriteria(currentSession());
                 return criteria.scroll(ScrollMode.FORWARD_ONLY);
             }
-            return createQuery(currentSession(), entityClass, scrollDetails.querySpec)
+            return InternalUtils.createQuery(currentSession(), entityClass, scrollDetails.getQuerySpec())
                     .scroll(ScrollMode.FORWARD_ONLY);
         }
 
@@ -206,21 +237,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
             return query.executeUpdate();
         }
 
-    }
-
-    @Builder
-    private static class SelectParamPriv<T> {
-        DetachedCriteria criteria;
-        QuerySpec<T, T> querySpec;
-        int start;
-        int numRows;
-    }
-
-    @Builder
-    @Getter
-    private static class ScrollParamPriv<T> {
-        private DetachedCriteria criteria;
-        private QuerySpec<T, T> querySpec;
     }
 
     private final List<RelationalDaoPriv> daos;
@@ -297,8 +313,11 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public <U> U get(String parentKey, Object key, Function<T, U> function) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
-        return transactionExecutor.execute(dao.sessionFactory, true, dao::get, key, function,
-                                           "get", shardId);
+        val opContext = Get.<T, U>builder()
+            .getter(dao::get)
+            .criteria(dao.getDetachedCriteria(key))
+            .afterGet(function).build();
+        return transactionExecutor.execute(dao.sessionFactory, true, "get", opContext, shardId);
     }
 
     /**
@@ -322,7 +341,9 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public <U> U save(String parentKey, T entity, Function<T, U> handler) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
-        return transactionExecutor.execute(dao.sessionFactory, false, dao::save, entity, handler, "save",
+        val opContext = Save.<T, U>builder()
+            .saver(dao::save).entity(entity).afterSave(handler).build();
+        return transactionExecutor.execute(dao.sessionFactory, false, "save", opContext,
                                            shardId);
     }
 
@@ -344,50 +365,45 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public boolean saveAll(String parentKey, Collection<T> entities) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
-        return transactionExecutor.execute(dao.sessionFactory, false, dao::saveAll, entities, "saveAll", shardId);
+        val opContext = SaveAll.<T>builder().saver(dao::saveAll).entities(entities).build();
+        return transactionExecutor.execute(dao.sessionFactory, false, "saveAll", opContext, shardId);
     }
 
     public Optional<T> createOrUpdate(
-            final String parentKey,
-            final DetachedCriteria selectionCriteria,
-            final UnaryOperator<T> updater,
-            final Supplier<T> entityGenerator) {
+        final String parentKey,
+        final DetachedCriteria selectionCriteria,
+        final UnaryOperator<T> updater,
+        final Supplier<T> entityGenerator) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
+        val opContext = CreateOrUpdate.<T>builder()
+            .criteria(selectionCriteria)
+            .getLockedForWrite(dao::getLockedForWrite)
+            .entityGenerator(entityGenerator)
+            .saver(dao::save)
+            .mutator(updater)
+            .updater(dao::update)
+            .getter(dao::get)
+            .build();
         return Optional.of(transactionExecutor.execute(
-                dao.sessionFactory,
-                false,
-                dao::getLockedForWrite,
-                selectionCriteria,
-                result -> {
-                    if (null == result) {
-                        val newEntity = entityGenerator.get();
-                        if (null != newEntity) {
-                            return dao.save(newEntity);
-                        }
-                        return null;
-                    }
-                    val updated = updater.apply(result);
-                    if (null != updated) {
-                        dao.update(result, updated);
-                    }
-                    return dao.get(selectionCriteria);
-                },
-                "createOrUpdate",
-                shardId));
-
+            dao.sessionFactory,
+            false,
+            "createOrUpdate",
+            opContext,
+            shardId));
     }
 
-    <U> void save(LockedContext<U> context, T entity) {
+    public <U> void save(LockedContext<U> context, T entity) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
-        transactionExecutor.execute(context.getSessionFactory(), false, dao::save, entity, t -> t, false,
-                                    "save", context.getShardId());
+        val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).build();
+        transactionExecutor.execute(context.getSessionFactory(), false, "save", opContext, context.getShardId(), false);
     }
 
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         RelationalDaoPriv dao = daos.get(context.getShardId());
-        transactionExecutor.execute(context.getSessionFactory(), false, dao::save, entity, handler, false,
-                                    "save", context.getShardId());
+        val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).afterSave(handler).build();
+
+        transactionExecutor.execute(context.getSessionFactory(), false, "save", opContext, context.getShardId(), false);
     }
 
 
@@ -429,46 +445,25 @@ public class RelationalDao<T> implements ShardedDao<T> {
     <U> boolean update(
             LockedContext<U> context,
             DetachedCriteria criteria,
-            Function<T, T> updater,
+            UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
         val dao = daos.get(context.getShardId());
-
+        val opContext = UpdateWithScroll.<T>builder()
+            .scroll(dao::scroll)
+            .scrollParam(ScrollParam.<T>builder()
+                .criteria(criteria)
+                .build())
+            .mutator(updater)
+            .updater(dao::update)
+            .updateNext(updateNext)
+            .build();
         try {
-            val scrollParam = ScrollParamPriv.<T>builder()
-                    .criteria(criteria)
-                    .build();
-            return transactionExecutor.<ScrollableResults, ScrollParamPriv<T>, Boolean>execute(
-                    context.getSessionFactory(),
-                    true,
-                    dao::scroll,
-                    scrollParam,
-                    scrollableResults -> {
-                        boolean updateNextObject = true;
-                        try (scrollableResults) {
-                            while (scrollableResults.next() && updateNextObject) {
-                                final T entity = (T) scrollableResults.get(
-                                        0);
-                                if (null == entity) {
-                                    return false;
-                                }
-                                final T newEntity = updater.apply(
-                                        entity);
-                                if (null == newEntity) {
-                                    return false;
-                                }
-                                dao.update(
-                                        entity,
-                                        newEntity);
-                                updateNextObject = updateNext.getAsBoolean();
-                            }
-                        }
-                        return true;
-                    },
-                    false,
-                    "update",
-                    context.getShardId());
-        }
-        catch (Exception e) {
+            return transactionExecutor.execute(context.getSessionFactory(),
+                true,
+                "update",
+                opContext,
+                context.getShardId(), false);
+        } catch (Exception e) {
             throw new RuntimeException("Error updating entity with scroll: " + criteria, e);
         }
     }
@@ -492,46 +487,25 @@ public class RelationalDao<T> implements ShardedDao<T> {
     <U> boolean update(
             LockedContext<U> context,
             QuerySpec<T, T> querySpec,
-            Function<T, T> updater,
+            UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
-        final RelationalDaoPriv dao = daos.get(context.getShardId());
-
+        val dao = daos.get(context.getShardId());
+        val opContext = UpdateWithScroll.<T>builder()
+            .scroll(dao::scroll)
+            .scrollParam(ScrollParam.<T>builder()
+                .querySpec(querySpec)
+                .build())
+            .mutator(updater)
+            .updater(dao::update)
+            .updateNext(updateNext)
+            .build();
         try {
-            final ScrollParamPriv<T> scrollParam = ScrollParamPriv.<T>builder()
-                    .querySpec(querySpec)
-                    .build();
-
-            return transactionExecutor.<ScrollableResults, ScrollParamPriv<T>, Boolean>execute(context.getSessionFactory(),
-                                                                                               true,
-                                                                                               dao::scroll,
-                                                                                               scrollParam,
-                                                                                               scrollableResults -> {
-                                                                                                   boolean updateNextObject = true;
-                                                                                                   try (scrollableResults) {
-                                                                                                       while (scrollableResults.next() && updateNextObject) {
-                                                                                                           final T entity = (T) scrollableResults.get(
-                                                                                                                   0);
-                                                                                                           if (null == entity) {
-                                                                                                               return false;
-                                                                                                           }
-                                                                                                           final T newEntity = updater.apply(
-                                                                                                                   entity);
-                                                                                                           if (null == newEntity) {
-                                                                                                               return false;
-                                                                                                           }
-                                                                                                           dao.update(
-                                                                                                                   entity,
-                                                                                                                   newEntity);
-                                                                                                           updateNextObject = updateNext.getAsBoolean();
-                                                                                                       }
-                                                                                                   }
-                                                                                                   return true;
-                                                                                               },
-                                                                                               false,
-                                                                                               "update",
-                                                                                               context.getShardId());
-        }
-        catch (Exception e) {
+            return transactionExecutor.execute(context.getSessionFactory(),
+                true,
+                "update",
+                opContext,
+                context.getShardId(), false);
+        } catch (Exception e) {
             throw new RuntimeException("Error updating entity with scroll: " + querySpec, e);
         }
     }
@@ -542,13 +516,16 @@ public class RelationalDao<T> implements ShardedDao<T> {
             int start,
             int numResults) {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
-        SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
+        val opContext = Select.<T, List<T>>builder()
+            .getter(dao::select)
+            .selectParam(SelectParam.<T>builder()
                 .criteria(criteria)
                 .start(start)
                 .numRows(numResults)
-                .build();
-        return transactionExecutor.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false,
-                                           "select", context.getShardId());
+                .build())
+            .build();
+        return transactionExecutor.execute(context.getSessionFactory(), true,
+            "select", opContext, context.getShardId(), false);
     }
 
 
@@ -567,13 +544,15 @@ public class RelationalDao<T> implements ShardedDao<T> {
      */
     <U> List<T> select(LookupDao.ReadOnlyContext<U> context, QuerySpec<T, T> querySpec, int start, int numResults) {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
-        SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
+        val opContext = Select.<T, List<T>>builder()
+            .getter(dao::select)
+            .selectParam(SelectParam.<T>builder()
                 .querySpec(querySpec)
                 .start(start)
                 .numRows(numResults)
-                .build();
-        return transactionExecutor.execute(context.getSessionFactory(), true, dao::select, selectParam, t -> t, false,
-                                           "select", context.getShardId());
+                .build())
+            .build();
+        return transactionExecutor.execute(context.getSessionFactory(), true, "select", opContext, context.getShardId(), false);
     }
 
     /**
@@ -683,12 +662,13 @@ public class RelationalDao<T> implements ShardedDao<T> {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final RelationalDaoPriv dao = daos.get(shardId);
+                    OpContext<List> opContext = RunWithCriteria.<List>builder()
+                        .detachedCriteria(criteria).handler(dao::run).build();
                     return transactionExecutor.execute(dao.sessionFactory,
                                                        true,
-                                                       dao::run,
-                                                       criteria,
                                                        "run",
-                                                       shardId);
+                                                        opContext,
+                                                        shardId);
                 }));
         return translator.apply(output);
     }
@@ -696,7 +676,9 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public <U> U runInSession(String id, Function<Session, U> handler) {
         int shardId = shardCalculator.shardId(id);
         RelationalDaoPriv dao = daos.get(shardId);
-        return transactionExecutor.execute(dao.sessionFactory, true, handler, true, "runInSession", shardId);
+        val opContext = RunInSession.<U>builder().handler(handler).build();
+        return transactionExecutor.
+            execute(dao.sessionFactory, true, "runInSession", opContext, shardId);
     }
 
     /**
@@ -725,23 +707,15 @@ public class RelationalDao<T> implements ShardedDao<T> {
             Function<T, T> updater,
             boolean completeTransaction) {
 
-        try {
-            return transactionExecutor.<T, Object, Boolean>execute(daoSessionFactory,
-                                                                   true,
-                                                                   dao::get,
-                                                                   id,
-                                                                   (T entity) -> {
-                                                                       if (null == entity) {
-                                                                           return false;
-                                                                       }
-                                                                       T newEntity = updater.apply(entity);
-                                                                       if (null == newEntity) {
-                                                                           return false;
-                                                                       }
-                                                                       dao.update(entity, newEntity);
-                                                                       return true;
+        val opContext = GetAndUpdate.<T>builder()
+            .criteria(dao.getDetachedCriteria(id))
+            .getter(dao::get)
+            .mutator(updater)
+            .updater(dao::update).build();
 
-                                                                   }, completeTransaction, "update", shardId);
+        try {
+            return transactionExecutor.execute(daoSessionFactory, true, "update",
+                                                                   opContext, shardId, completeTransaction);
         }
         catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
@@ -751,38 +725,22 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public boolean update(String parentKey, DetachedCriteria criteria, Function<T, T> updater) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
+        val  selectParam = SelectParam.<T>builder()
+            .criteria(criteria)
+            .start(0)
+            .numRows(1)
+            .build();
+        val opContext = SelectAndUpdate.<T>builder()
+            .selectParam(selectParam)
+            .selector(dao::select)
+            .mutator(updater)
+            .updater(dao::update).build();
         try {
-            val selectParam = SelectParamPriv.<T>builder()
-                    .criteria(criteria)
-                    .start(0)
-                    .numRows(1)
-                    .build();
-            return transactionExecutor.<List<T>, SelectParamPriv<T>, Boolean>execute(dao.sessionFactory,
-                                                                                     true,
-                                                                                     dao::select,
-                                                                                     selectParam,
-                                                                                     (List<T> entityList) -> {
-                                                                                         if (entityList == null || entityList.isEmpty()) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         T oldEntity =
-                                                                                                 entityList.get(
-                                                                                                         0);
-                                                                                         if (null == oldEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         T newEntity =
-                                                                                                 updater.apply(
-                                                                                                         oldEntity);
-                                                                                         if (null == newEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         dao.update(oldEntity,
-                                                                                                    newEntity);
-                                                                                         return true;
-                                                                                     },
-                                                                                     "update",
-                                                                                     shardId);
+            return transactionExecutor.execute(dao.sessionFactory,
+                true,
+                "update",
+                opContext,
+                shardId);
         }
         catch (Exception e) {
             throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
@@ -809,38 +767,23 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public boolean update(String parentKey, QuerySpec<T, T> querySpec, Function<T, T> updater) {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
+        val  selectParam = SelectParam.<T>builder()
+            .querySpec(querySpec)
+            .start(0)
+            .numRows(1)
+            .build();
+        val opContext = SelectAndUpdate.<T>builder()
+            .selectParam(selectParam)
+            .selector(dao::select)
+            .mutator(updater)
+            .updater(dao::update).build();
         try {
-            val selectParam = SelectParamPriv.<T>builder()
-                    .querySpec(querySpec)
-                    .start(0)
-                    .numRows(1)
-                    .build();
-            return transactionExecutor.<List<T>, SelectParamPriv<T>, Boolean>execute(dao.sessionFactory,
-                                                                                     true,
-                                                                                     dao::select,
-                                                                                     selectParam,
-                                                                                     (List<T> entityList) -> {
-                                                                                         if (entityList == null || entityList.isEmpty()) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         T oldEntity =
-                                                                                                 entityList.get(0);
-                                                                                         if (null == oldEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         T newEntity = updater.apply(
-                                                                                                 oldEntity);
-                                                                                         if (null == newEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         dao.update(oldEntity,
-                                                                                                    newEntity);
-                                                                                         return true;
-                                                                                     },
-                                                                                     "update",
-                                                                                     shardId);
-        }
-        catch (Exception e) {
+            return transactionExecutor.execute(dao.sessionFactory,
+                true,
+                "update",
+                opContext,
+                shardId);
+        } catch (Exception e) {
             throw new RuntimeException("Error updating entity with criteria: " + querySpec, e);
         }
     }
@@ -849,19 +792,20 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public int updateUsingQuery(String parentKey, UpdateOperationMeta updateOperationMeta) {
         int shardId = shardCalculator.shardId(parentKey);
         val dao = daos.get(shardId);
-        return transactionExecutor.execute(dao.sessionFactory, false, dao::update, updateOperationMeta,
-                                           "updateUsingQuery", shardId);
+        val opContext = UpdateByQuery.builder()
+            .updater(dao::update).updateOperationMeta(updateOperationMeta).build();
+        return transactionExecutor.execute(dao.sessionFactory, false, "updateUsingQuery", opContext, shardId);
     }
 
     public <U> int updateUsingQuery(LockedContext<U> lockedContext, UpdateOperationMeta updateOperationMeta) {
         val dao = daos.get(lockedContext.getShardId());
+        val opContext = UpdateByQuery.builder()
+            .updater(dao::update).updateOperationMeta(updateOperationMeta).build();
         return transactionExecutor.execute(lockedContext.getSessionFactory(),
                                            false,
-                                           dao::update,
-                                           updateOperationMeta,
-                                           false,
                                            "updateUsingQuery",
-                                           lockedContext.getShardId());
+                                           opContext,
+                                           lockedContext.getShardId(),false);
     }
 
     public LockedContext<T> lockAndGetExecutor(String parentKey, DetachedCriteria criteria) {
@@ -916,67 +860,71 @@ public class RelationalDao<T> implements ShardedDao<T> {
     }
 
     <U> boolean createOrUpdate(
-            LockedContext<U> context,
-            DetachedCriteria criteria,
-            UnaryOperator<T> updater,
-            U parent,
-            Function<U, T> entityGenerator) {
+        LockedContext<U> context,
+        DetachedCriteria criteria,
+        UnaryOperator<T> updater,
+        U parent,
+        Function<U, T> entityGenerator) {
         final RelationalDaoPriv dao = daos.get(context.getShardId());
+        val selectParam = SelectParam.<T>builder()
+            .criteria(criteria)
+            .start(0)
+            .numRows(1)
+            .build();
+
+        val opContext = CreateOrUpdateInLockedContext.<T, U>builder()
+            .lockedEntity(parent)
+            .selector(dao::select)
+            .selectParam(selectParam)
+            .entityGenerator(entityGenerator)
+            .saver(dao::save)
+            .mutator(updater)
+            .updater(dao::update)
+            .build();
 
         try {
-            final SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
-                    .criteria(criteria)
-                    .start(0)
-                    .numRows(1)
-                    .build();
-
-            return transactionExecutor.<List<T>, SelectParamPriv<T>, Boolean>execute(context.getSessionFactory(),
-                                                                                     true,
-                                                                                     dao::select,
-                                                                                     selectParam,
-                                                                                     (List<T> entityList) -> {
-                                                                                         if (entityList == null || entityList.isEmpty()) {
-                                                                                             Preconditions.checkNotNull(
-                                                                                                     entityGenerator,
-                                                                                                     "Entity generator " +
-                                                                                                             "can't " +
-                                                                                                             "be " +
-                                                                                                             "null");
-                                                                                             final T newEntity =
-                                                                                                     entityGenerator.apply(
-                                                                                                             parent);
-                                                                                             Preconditions.checkNotNull(
-                                                                                                     newEntity,
-                                                                                                     "Generated entity " +
-                                                                                                             "can't " +
-                                                                                                             "be " +
-                                                                                                             "null");
-                                                                                             dao.save(newEntity);
-                                                                                             return true;
-                                                                                         }
-
-                                                                                         final T oldEntity =
-                                                                                                 entityList.get(
-                                                                                                         0);
-                                                                                         if (null == oldEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         final T newEntity =
-                                                                                                 updater.apply(
-                                                                                                         oldEntity);
-                                                                                         if (null == newEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         dao.update(oldEntity,
-                                                                                                    newEntity);
-                                                                                         return true;
-                                                                                     },
-                                                                                     false,
-                                                                                     "createOrUpdate",
-                                                                                     context.getShardId());
+            return transactionExecutor.execute(context.getSessionFactory(),
+                true,
+                "createOrUpdate",
+                opContext,
+                context.getShardId(), false);
         }
         catch (Exception e) {
             throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
+        }
+    }
+
+    <U> boolean createOrUpdate(
+        LockedContext<U> context,
+        QuerySpec<T, T> querySpec,
+        UnaryOperator<T> updater,
+        U parent,
+        Function<U, T> entityGenerator) {
+        final RelationalDaoPriv dao = daos.get(context.getShardId());
+        val selectParam = SelectParam.<T>builder()
+            .querySpec(querySpec)
+            .start(0)
+            .numRows(1)
+            .build();
+
+        val opContext = CreateOrUpdateInLockedContext.<T, U>builder()
+            .lockedEntity(parent)
+            .selector(dao::select)
+            .selectParam(selectParam)
+            .entityGenerator(entityGenerator)
+            .saver(dao::save)
+            .mutator(updater)
+            .updater(dao::update)
+            .build();
+
+        try {
+            return transactionExecutor.execute(context.getSessionFactory(),
+                true,
+                "createOrUpdate",
+                opContext,
+                context.getShardId(), false);
+        } catch (Exception e) {
+            throw new RuntimeException("Error updating entity with criteria: " + querySpec, e);
         }
     }
 
@@ -1002,58 +950,10 @@ public class RelationalDao<T> implements ShardedDao<T> {
     <U> boolean createOrUpdate(
             LockedContext<U> context,
             QuerySpec<T, T> querySpec,
-            Function<T, T> updater,
+            UnaryOperator<T> updater,
+            U parent,
             Supplier<T> entityGenerator) {
-        final RelationalDaoPriv dao = daos.get(context.getShardId());
-
-        try {
-            val selectParam = SelectParamPriv.<T>builder()
-                    .querySpec(querySpec)
-                    .start(0)
-                    .numRows(1)
-                    .build();
-
-            return transactionExecutor.<List<T>, SelectParamPriv<T>, Boolean>execute(context.getSessionFactory(),
-                                                                                     true,
-                                                                                     dao::select,
-                                                                                     selectParam,
-                                                                                     (List<T> entityList) -> {
-                                                                                         if (entityList == null || entityList.isEmpty()) {
-                                                                                             Preconditions.checkNotNull(
-                                                                                                     entityGenerator,
-                                                                                                     "Entity generator can't be null");
-                                                                                             final T newEntity =
-                                                                                                     entityGenerator.get();
-                                                                                             Preconditions.checkNotNull(
-                                                                                                     newEntity,
-                                                                                                     "Generated entity can't be null");
-                                                                                             dao.save(newEntity);
-                                                                                             return true;
-                                                                                         }
-
-                                                                                         final T oldEntity =
-                                                                                                 entityList.get(
-                                                                                                         0);
-                                                                                         if (null == oldEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         final T newEntity =
-                                                                                                 updater.apply(
-                                                                                                         oldEntity);
-                                                                                         if (null == newEntity) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         dao.update(oldEntity,
-                                                                                                    newEntity);
-                                                                                         return true;
-                                                                                     },
-                                                                                     false,
-                                                                                     "createOrUpdate",
-                                                                                     context.getShardId());
-        }
-        catch (Exception e) {
-            throw new RuntimeException("Error updating entity with criteria: " + querySpec, e);
-        }
+        return createOrUpdate(context, querySpec, updater, parent, e ->  entityGenerator.get());
     }
 
 
@@ -1066,39 +966,18 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         try {
-            val selectParam = SelectParamPriv.<T>builder()
-                    .criteria(criteria)
-                    .start(start)
-                    .numRows(numRows)
-                    .build();
-            return transactionExecutor.<List<T>, SelectParamPriv<T>, Boolean>execute(dao.sessionFactory,
-                                                                                     true,
-                                                                                     dao::select,
-                                                                                     selectParam,
-                                                                                     entityList -> {
-                                                                                         if (entityList == null || entityList.isEmpty()) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         for (T oldEntity :
-                                                                                                 entityList) {
-                                                                                             if (null == oldEntity) {
-                                                                                                 return false;
-                                                                                             }
-                                                                                             T newEntity =
-                                                                                                     updater.apply(
-                                                                                                             oldEntity);
-                                                                                             if (null == newEntity) {
-                                                                                                 return false;
-                                                                                             }
-                                                                                             dao.update(oldEntity,
-                                                                                                        newEntity);
-                                                                                         }
-                                                                                         return true;
-                                                                                     },
-                                                                                     "updateAll",
-                                                                                     shardId);
-        }
-        catch (Exception e) {
+            val opContext = UpdateAll.<T>builder()
+                .selectParam(
+                    SelectParam.<T>builder()
+                        .criteria(criteria)
+                        .start(start)
+                        .numRows(numRows).build())
+                .selector(dao::select)
+                .mutator(updater)
+                .updater(dao::update).build();
+            return transactionExecutor.<Boolean>execute(dao.sessionFactory, true, "updateAll",
+                opContext, shardId);
+        } catch (Exception e) {
             throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
         }
     }
@@ -1132,39 +1011,18 @@ public class RelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
         try {
-            val selectParam = SelectParamPriv.<T>builder()
-                    .querySpec(querySpec)
-                    .start(start)
-                    .numRows(numResults)
-                    .build();
-            return transactionExecutor.<List<T>, SelectParamPriv<T>, Boolean>execute(dao.sessionFactory,
-                                                                                     true,
-                                                                                     dao::select,
-                                                                                     selectParam,
-                                                                                     entityList -> {
-                                                                                         if (entityList == null || entityList.isEmpty()) {
-                                                                                             return false;
-                                                                                         }
-                                                                                         for (T oldEntity :
-                                                                                                 entityList) {
-                                                                                             if (null == oldEntity) {
-                                                                                                 return false;
-                                                                                             }
-                                                                                             T newEntity =
-                                                                                                     updater.apply(
-                                                                                                             oldEntity);
-                                                                                             if (null == newEntity) {
-                                                                                                 return false;
-                                                                                             }
-                                                                                             dao.update(oldEntity,
-                                                                                                        newEntity);
-                                                                                         }
-                                                                                         return true;
-                                                                                     },
-                                                                                     "updateAll",
-                                                                                     shardId);
-        }
-        catch (Exception e) {
+            val opContext = UpdateAll.<T>builder()
+                .selectParam(
+                    SelectParam.<T>builder()
+                        .querySpec(querySpec)
+                        .start(start)
+                        .numRows(numResults).build())
+                .selector(dao::select)
+                .mutator(updater)
+                .updater(dao::update).build();
+            return transactionExecutor.<Boolean>execute(dao.sessionFactory, true, "updateAll",
+                opContext, shardId);
+        } catch (Exception e) {
             throw new RuntimeException("Error updating entity with criteria: " + querySpec, e);
         }
     }
@@ -1202,18 +1060,21 @@ public class RelationalDao<T> implements ShardedDao<T> {
 
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
-        SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
+        val opContext = Select.<T, U>builder()
+            .getter(dao::select)
+            .selectParam(SelectParam.<T>builder()
                 .criteria(criteria)
                 .start(start)
                 .numRows(numResults)
-                .build();
+                .build())
+            .afterSelect(handler)
+            .build();
         return transactionExecutor.execute(dao.sessionFactory,
-                                           true,
-                                           dao::select,
-                                           selectParam,
-                                           handler,
-                                           "select",
-                                           shardId);
+            true,
+            "select",
+            opContext,
+            shardId);
+
     }
 
     /**
@@ -1244,29 +1105,44 @@ public class RelationalDao<T> implements ShardedDao<T> {
             Function<List<T>, U> handler) throws Exception {
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
-        SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
+        val opContext = Select.<T, U>builder()
+            .getter(dao::select)
+            .selectParam(SelectParam.<T>builder()
                 .querySpec(querySpec)
                 .start(start)
                 .numRows(numResults)
-                .build();
+                .build())
+            .afterSelect(handler)
+            .build();
         return transactionExecutor.execute(dao.sessionFactory,
-                                           true,
-                                           dao::select,
-                                           selectParam,
-                                           handler,
-                                           "select",
-                                           shardId);
+            true,
+            "select",
+            opContext,
+            shardId);
     }
 
-    public long count(String parentKey, DetachedCriteria criteria) {
+    public long count (String parentKey, DetachedCriteria criteria){
         int shardId = shardCalculator.shardId(parentKey);
         RelationalDaoPriv dao = daos.get(shardId);
-        return transactionExecutor.<Long, DetachedCriteria>execute(dao.sessionFactory,
-                                                                   true,
-                                                                   dao::count,
-                                                                   criteria,
-                                                                   "count",
-                                                                   shardId);
+        val opContext = Count.builder().counter(dao::count).criteria(criteria).build();
+        return transactionExecutor.<Long>execute(dao.sessionFactory,
+            true,
+            "count", opContext,
+            shardId);
+    }
+    public boolean exists (String parentKey, Object key){
+        int shardId = shardCalculator.shardId(parentKey);
+        RelationalDaoPriv dao = daos.get(shardId);
+        val opContext = Get.<T, T>builder()
+            .criteria(dao.getDetachedCriteria(key))
+            .getter(dao::get).build();
+        Optional<T>
+            result = Optional.ofNullable(transactionExecutor.execute(dao.sessionFactory,
+            true,
+            "exists",
+            opContext,
+            shardId));
+        return result.isPresent();
     }
 
     /**
@@ -1286,21 +1162,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public long count(String parentKey, QuerySpec<T, Long> querySpec) {
         val shardId = shardCalculator.shardId(parentKey);
         val dao = daos.get(shardId);
-        return transactionExecutor.<Long, QuerySpec<T, Long>>execute(dao.sessionFactory, true, dao::count, querySpec,
-                                                                     "count", shardId);
-    }
-
-
-    public boolean exists(String parentKey, Object key) {
-        int shardId = shardCalculator.shardId(parentKey);
-        RelationalDaoPriv dao = daos.get(shardId);
-        val result = transactionExecutor.executeAndResolve(dao.sessionFactory,
-                                                           true,
-                                                           dao::get,
-                                                           key,
-                                                           "exists",
-                                                           shardId);
-        return result.isPresent();
+        val opContext = CountByQuerySpec.builder()
+            .counter(dao::count)
+            .querySpec(querySpec)
+            .build();
+        return transactionExecutor.<Long>execute(dao.sessionFactory,
+            true,
+            "count", opContext,
+            shardId);
     }
 
     /**
@@ -1311,42 +1180,46 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param criteria The select criteria
      * @return List of counts in each shard
      */
-    public List<Long> countScatterGather(DetachedCriteria criteria) {
+    public List<Long> countScatterGather (DetachedCriteria criteria){
 
         return IntStream.range(0, daos.size())
-                .mapToObj(shardId -> {
-                    val dao = daos.get(shardId);
-                    try {
-                        return transactionExecutor.execute(dao.sessionFactory, true, dao::count, criteria,
-                                                           "countScatterGather", shardId);
-                    }
-                    catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).collect(Collectors.toList());
+            .mapToObj(shardId -> {
+                val dao = daos.get(shardId);
+                try {
+                    val opContext = Count.builder()
+                        .counter(dao::count).criteria(criteria).build();
+                    return transactionExecutor.execute(dao.sessionFactory, true,
+                        "countScatterGather", opContext, shardId);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).collect(Collectors.toList());
     }
 
-    public List<T> scatterGather(DetachedCriteria criteria, int start, int numRows) {
+    public List<T> scatterGather (DetachedCriteria criteria,int start, int numRows){
         return IntStream.range(0, daos.size())
-                .mapToObj(shardId -> {
-                    val dao = daos.get(shardId);
-                    try {
-                        SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
-                                .criteria(criteria)
-                                .start(start)
-                                .numRows(numRows)
-                                .build();
-                        return transactionExecutor.execute(dao.sessionFactory,
-                                                           true,
-                                                           dao::select,
-                                                           selectParam,
-                                                           "scatterGather",
-                                                           shardId);
-                    }
-                    catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).flatMap(Collection::stream).collect(Collectors.toList());
+            .mapToObj(shardId -> {
+                val dao = daos.get(shardId);
+                try {
+                    val opContext = Select.<T, List<T>>builder()
+                        .getter(dao::select)
+                        .selectParam(SelectParam.<T>builder()
+                            .criteria(criteria)
+                            .start(start)
+                            .numRows(numRows)
+                            .build())
+                        .build();
+                    return transactionExecutor.execute(dao.sessionFactory,
+                        true,
+                        "scatterGather",
+                        opContext,
+                        shardId);
+                }
+                catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).flatMap(Collection::stream).collect(Collectors.toList());
     }
 
     /**
@@ -1365,13 +1238,19 @@ public class RelationalDao<T> implements ShardedDao<T> {
                 .mapToObj(shardId -> {
                     val dao = daos.get(shardId);
                     try {
-                        SelectParamPriv<T> selectParam = SelectParamPriv.<T>builder()
+                        val opContext = Select.<T, List<T>>builder()
+                            .getter(dao::select)
+                            .selectParam(SelectParam.<T>builder()
                                 .querySpec(querySpec)
                                 .start(start)
                                 .numRows(numRows)
-                                .build();
-                        return transactionExecutor.execute(dao.sessionFactory, true, dao::select, selectParam,
-                                                           "scatterGather", shardId);
+                                .build())
+                            .build();
+                        return transactionExecutor.execute(dao.sessionFactory,
+                            true,
+                            "scatterGather",
+                            opContext,
+                            shardId);
                     }
                     catch (Exception e) {
                         throw new RuntimeException(e);
@@ -1396,15 +1275,17 @@ public class RelationalDao<T> implements ShardedDao<T> {
                 .flatMap(dao -> {
                     val currIdx = daoIndex.getAndIncrement();
                     val criteria = criteriaMutator.apply(InternalUtils.cloneObject(inCriteria));
-                    return transactionExecutor.execute(dao.sessionFactory,
-                                                       true,
-                                                       queryCriteria -> dao.select(
-                                                               SelectParamPriv.<T>builder()
-                                                                       .criteria(queryCriteria)
-                                                                       .start(pointer.getCurrOffset(currIdx))
-                                                                       .numRows(pageSize)
-                                                                       .build()),
-                                                       criteria, methodName, currIdx)
+                    val opContext = Select.<T, List<T>>builder()
+                        .getter(dao::select)
+                        .selectParam(SelectParam.<T>builder()
+                            .criteria(criteria)
+                            .start(pointer.getCurrOffset(currIdx))
+                            .numRows(pageSize)
+                            .build())
+                        .build();
+                    return transactionExecutor
+                            .execute(dao.sessionFactory, true,
+                                methodName, opContext, currIdx)
                             .stream()
                             .map(item -> new ScrollResultItem<>(item, currIdx));
                 })
@@ -1418,16 +1299,5 @@ public class RelationalDao<T> implements ShardedDao<T> {
             pointer.advance(result.getShardIdx(), 1);// will get advanced
         });
         return new ScrollResult<>(pointer, outputBuilder.build());
-    }
-
-    private Query<T> createQuery(
-            final Session session,
-            final Class<T> entityClass,
-            final QuerySpec<T, T> querySpec) {
-        CriteriaBuilder builder = session.getCriteriaBuilder();
-        CriteriaQuery<T> criteria = builder.createQuery(entityClass);
-        Root<T> root = criteria.from(entityClass);
-        querySpec.apply(root, criteria, builder);
-        return session.createQuery(criteria);
     }
 }

@@ -1,10 +1,16 @@
 package io.appform.dropwizard.sharding.utils;
 
+import io.appform.dropwizard.sharding.query.QuerySpec;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Root;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.val;
 
 import java.io.*;
+import org.hibernate.Session;
+import org.hibernate.query.Query;
 
 /**
  * Utilities for internal use
@@ -22,5 +28,16 @@ public class InternalUtils {
                 return (T) ois.readObject();
             }
         }
+    }
+
+    public  <T> Query<T> createQuery(
+        final Session session,
+        final Class<T> entityClass,
+        final QuerySpec<T, T> querySpec) {
+        CriteriaBuilder builder = session.getCriteriaBuilder();
+        CriteriaQuery<T> criteria = builder.createQuery(entityClass);
+        Root<T> root = criteria.from(entityClass);
+        querySpec.apply(root, criteria, builder);
+        return session.createQuery(criteria);
     }
 }
