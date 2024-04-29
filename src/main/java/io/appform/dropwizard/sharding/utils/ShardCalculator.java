@@ -35,8 +35,16 @@ public class ShardCalculator<T> {
         this.extractor = extractor;
     }
 
+    public int getBucketId(T key) {
+        return extractor.bucketId(key);
+    }
+
+    public int getBucketCount() {
+        return shardManager.numBuckets();
+    }
+
     public int shardId(T key) {
-        int bucketId = extractor.bucketId(key);
+        int bucketId = getBucketId(key);
         return shardManager.shardForBucket(bucketId);
     }
 
