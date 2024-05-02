@@ -39,17 +39,17 @@ public class ShardCalculator<T> {
         return extractor.bucketId(key);
     }
 
-    public int getBucketCount() {
-        return shardManager.numBuckets();
-    }
-
     public int shardId(T key) {
         int bucketId = getBucketId(key);
         return shardManager.shardForBucket(bucketId);
     }
 
+    public boolean isBucketValid(int bucketId) {
+        return shardManager.isMappedToValidShard(bucketId);
+    }
+
     public boolean isOnValidShard(T key) {
         int bucketId = extractor.bucketId(key);
-        return shardManager.isMappedToValidShard(bucketId);
+        return isBucketValid(bucketId);
     }
 }
