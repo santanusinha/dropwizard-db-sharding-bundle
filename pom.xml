@@ -201,7 +201,7 @@
                     <configuration>
                         <source>17</source>
                         <target>17</target>
-                        <release>11</release>
+                        <release>17</release>
                         <annotationProcessors>
                             <annotationProcessor>lombok.launch.AnnotationProcessorHider$AnnotationProcessor
                             </annotationProcessor>
