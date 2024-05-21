@@ -6,7 +6,7 @@
 
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>2.1.10-4</version>
+    <version>3.0.7-1</version>
     <name>Dropwizard Database Sharding Bundle</name>
     <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>
     <description>Application layer database sharding over SQL dbs</description>
@@ -71,7 +71,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <dropwizard.version>2.1.10</dropwizard.version>
+        <dropwizard.version>3.0.7</dropwizard.version>
         <lombok.version>1.18.22</lombok.version>
         <cglib.version>3.3.0</cglib.version>
         <guava.version>30.1.1-jre</guava.version>
