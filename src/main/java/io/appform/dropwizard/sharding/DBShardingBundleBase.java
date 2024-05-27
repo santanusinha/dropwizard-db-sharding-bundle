@@ -48,6 +48,7 @@ import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingSto
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
+import io.appform.dropwizard.sharding.utils.BucketCalculator;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
@@ -291,6 +292,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 this.shardingOptions,
                 shardInfoProvider,
                 rootObserver);
+    }
+
+    public BucketCalculator<String> bucketCalculator() {
+        return new BucketCalculator<>(new ConsistentHashBucketIdExtractor<>(this.shardManager));
     }
 
     public <EntityType, T extends Configuration>

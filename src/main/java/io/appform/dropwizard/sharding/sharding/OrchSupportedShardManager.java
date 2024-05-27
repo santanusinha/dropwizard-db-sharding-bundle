@@ -4,6 +4,9 @@ import lombok.Builder;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Manages Shard to Bucket Mapping based on Orchestrator
  */
@@ -35,7 +38,12 @@ public class OrchSupportedShardManager extends ShardManager {
 
     @Override
     protected int shardForBucketImpl(int bucketId) {
+
        //Integration with Orchestrator to give the bucketId corresponding to ShardId
-        return 29;
+        Map<Integer, Integer> bucketShardMapping = new HashMap<>();
+        for(int i = 0; i < 1024; i++){
+            bucketShardMapping.put(i, 1);
+        }
+        return bucketShardMapping.get(bucketId);
     }
 }

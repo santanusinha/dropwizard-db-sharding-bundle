@@ -36,16 +36,13 @@ import javax.persistence.Id;
 import java.lang.reflect.Field;
 import java.util.Collection;
 
-@RequiredArgsConstructor(onConstructor_ = @Inject)
 @Slf4j
 public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     private static final String OPERATION_NOT_SUPPORTED = " operation not supported";
-    @Getter
-    private static BucketCalculator<String> bucketCalculator;
-    private static final String KEY_CONCATENATOR = ":";
+    private BucketCalculator<String> bucketCalculator;
 
-    BucketIdSaver(BucketCalculator<String> bucketCalculator) {
-        BucketIdSaver.bucketCalculator = bucketCalculator;
+    public BucketIdSaver(BucketCalculator<String> bucketCalculator) {
+        this.bucketCalculator = bucketCalculator;
     }
 
     @Override
@@ -218,14 +215,12 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
         Preconditions.checkArgument(idFields.length == 1, "Only one field can be designated as @Id");
         val keyField = idFields[0];
         val bucketIdField = bucketIdFields[0];
-        if (!keyField.isAccessible()) {
-            try {
-                keyField.setAccessible(true);
-            } catch (SecurityException e) {
-                //TODO:RIDHIMA
-            }
-        }
-        val bucketId = bucketCalculator.bucketId(keyField.get(entity).toString());
-        bucketIdField.set(bucketIdField, bucketId);
+        keyField.setAccessible(true);
+        bucketIdField.setAccessible(true);
+
+        val id = keyField.get(entity).toString();
+        val bucketId = bucketCalculator.bucketId(id);
+        bucketIdField.set(entity, bucketId);
+        log.info("Added bucketId after computing");
     }
 }

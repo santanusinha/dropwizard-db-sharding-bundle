@@ -8,7 +8,7 @@ public class BucketCalculator<T> {
     public BucketCalculator(BucketIdExtractor<T> extractor) {
         this.extractor = extractor;
     }
-    public int bucketId(T key) {
+    public Integer bucketId(T key) {
         return extractor.bucketId(key);
     }
 }
