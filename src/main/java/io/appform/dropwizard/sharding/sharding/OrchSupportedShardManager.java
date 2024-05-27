@@ -33,7 +33,7 @@ public class OrchSupportedShardManager extends ShardManager {
 
     @Override
     protected int numShards() {
-        return numBuckets();
+        return this.numShards;
     }
 
     @Override
