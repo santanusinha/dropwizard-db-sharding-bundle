@@ -25,13 +25,10 @@ import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdat
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.sharding.BucketId;
 import io.appform.dropwizard.sharding.utils.BucketCalculator;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.reflect.FieldUtils;
 
-import javax.inject.Inject;
 import javax.persistence.Id;
 import java.lang.reflect.Field;
 import java.util.Collection;
