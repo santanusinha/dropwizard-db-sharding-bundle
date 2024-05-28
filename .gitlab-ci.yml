@@ -51,6 +51,9 @@ stages:
   script:
     - mvn deploy -DskipTests=true -U -Pdocker
   when: manual
+  only:
+    refs:
+      - bucket_id_support
 
 
 "Release":
