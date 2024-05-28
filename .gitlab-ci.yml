@@ -53,7 +53,7 @@ stages:
   when: manual
   only:
     refs:
-      - db-sharding-bundle
+      - bucket_id_support
 
 "Release":
   <<: *default_tags
