@@ -1,6 +1,6 @@
 .default_tags: &default_tags
-tags:
-  - backend-docker-large
+  tags:
+    - backend-docker-large
 
 image: docker.phonepe.com/pp-maven:3.9.5-openjdk-17
 
@@ -54,7 +54,6 @@ stages:
   only:
     refs:
       - bucket_id_support
-
 
 "Release":
   <<: *default_tags
