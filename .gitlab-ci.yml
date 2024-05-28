@@ -1,95 +1,83 @@
-.default_tags: &default_tags
+.default: &default
+  only:
+    - merge_requests
+    - web
+
+.default_tag: &default_tag
   tags:
     - backend-docker-large
-
-image: docker.phonepe.com/pp-maven:3.9.5-openjdk-17
-
-
+  image: docker.phonepe.com:5000/pp-maven:3.8.4-openjdk-17
 
 stages:
   - build
-  - merge
+  - quality
   - deploy
+  - merge
   - release
 
-"Compile":
-  <<: *default_tags
+compile:
   stage: build
+  <<: *default
+  <<: *default_tag
   script:
-    - mvn clean package -DskipTests
-  only:
-    - merge_requests
+    - mvn -U compile
   except:
     - master
-    - develop
-  when: manual
 
-
-"Test cases - PR":
-  <<: *default_tags
-  stage: merge
-  allow_failure: false
-  only:
-    - merge_requests
-  except:
-    - master
-    - develop
+quality_check:
+  stage: quality
+  <<: *default
+  <<: *default_tag
   when: manual
+  before_script:
+    - export MAVEN_OPTS="--add-opens java.base/java.lang=ALL-UNNAMED"
   script:
-    - export MAVEN_OPTS="-Xms4g -Xmx4g"
-    - mvn verify -U -Pquality_check -Psirius -Dsonar.java.experimental.batchModeSizeInKB=1024 -Dsonar.pullrequest.key="$CI_MERGE_REQUEST_IID" -Dsonar.pullrequest.branch="$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" -Dsonar.pullrequest.base="$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    - mvn clean install -U -Pquality_check -Dproject.version='CI-TEST-${CI_JOB_ID}-SNAPSHOT' -Dsonar.pullrequest.key=$CI_MERGE_REQUEST_IID -Dsonar.pullrequest.branch=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME -Dsonar.pullrequest.base=$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+    - cat dropwizard-db-sharding-bundle/target/site/jacoco/index.html
   artifacts:
     reports:
       junit:
-        - target/surefire-reports/TEST-*.xml
-  tags:
-    - backend-docker-large
+        - dropwizard-db-sharding-bundle/target/surefire-reports/TEST-*.xml
 
-"Deploy snapshot":
-  <<: *default_tags
+deploy_artifacts:
   stage: deploy
-  script:
-    - mvn deploy -DskipTests=true -U -Pdocker
+  <<: *default
+  <<: *default_tag
   when: manual
-  only:
-    refs:
-      - bucket_id_support
-
-"Release":
-  <<: *default_tags
-  stage: release
+  allow_failure: true
   script:
-    - export MAVEN_OPTS="-Xms4g -Xmx4g"
+    - mvn clean deploy -U -DskipTests
+  except:
+    - master
+    - develop
+
+stage_merge_status:
+  stage: merge
+  <<: *default
+  <<: *default_tag
+  allow_failure: false
+  script:
+    - git fetch
+    - git merge-base --is-ancestor $CI_COMMIT_SHA origin/stage
+  only:
+    - merge_requests
+  except:
+    - master
+    - develop
+
+release_library:
+  stage: release
+  <<: *default_tag
+  script:
     - git remote set-url origin "git@gitlab.phonepe.com:${CI_PROJECT_PATH}.git"
     - git checkout master
-    - git pull origin master
+    - git pull
     - git checkout develop
-    - git pull origin develop
-    - mvn -U -Pdocker -Dsonar.branch.name=develop -Dsonar.java.experimental.batchModeSizeInKB=1024 jgitflow:release-start jgitflow:release-finish -D maven.release.ignore.snapshots=true
+    - git pull
+    - mvn -U jgitflow:release-start jgitflow:release-finish -DgenerateChangelog
     - git push --all
     - git push --tags origin
   when: manual
   only:
     refs:
       - develop
-  tags:
-    - backend-docker-large
-
-
-"Bump Version":
-  <<: *default_tags
-  stage: release
-  script:
-    - git remote set-url origin "git@gitlab.phonepe.com:${CI_PROJECT_PATH}.git"
-    - git checkout develop
-    - git pull origin develop
-    - mvn build-helper:parse-version versions:set -DnewVersion="\${parsedVersion.majorVersion}.\${parsedVersion.minorVersion}.\${parsedVersion.nextIncrementalVersion}\${parsedVersion.qualifier?}" versions:commit
-    - VERSION="$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)"
-    - git commit -am "[Gitlab CI] Version bumped to ${VERSION} by ${GITLAB_USER_NAME}"
-    - git push origin develop
-  only:
-    refs:
-      - develop
-    variables:
-      - $BUMP_VERSION == "true"
-  when: manual
