@@ -6,7 +6,7 @@
 
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>2.1.10-4-BUCKET-SNAPSHOT</version>
+    <version>2.1.10-4</version>
     <name>Dropwizard Database Sharding Bundle</name>
     <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>
     <description>Application layer database sharding over SQL dbs</description>
@@ -59,17 +59,15 @@
     </ciManagement>
 
     <distributionManagement>
-        <repository>
-            <id>phonepe-releases</id>
-            <name>releases</name>
-            <url>https://artifactory.phonepe.com/repository/releases</url>
-        </repository>
         <snapshotRepository>
-            <id>phonepe-snapshots</id>
-            <url>https://artifactory.phonepe.com/repository/snapshots</url>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
     </distributionManagement>
-
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
