@@ -89,19 +89,7 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
 
         switch (contextMode) {
             case READ:
-                val oldGetter = opContext.getGetter();
-                opContext.setGetter(() -> {
-                    T result = oldGetter.get();
-                    if (null != result) {
-                        try {
-                            addBucketId(result);
-                        } catch (IllegalAccessException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                    return result;
-                });
-                break;
+                return null;
             case INSERT:
                 val oldSaver = opContext.getSaver();
                 opContext.setSaver(oldSaver.compose((T entity) -> {
