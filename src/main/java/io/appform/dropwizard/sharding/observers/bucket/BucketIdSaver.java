@@ -101,6 +101,7 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
                     }
                     return result;
                 });
+                break;
             case INSERT:
                 val oldSaver = opContext.getSaver();
                 opContext.setSaver(oldSaver.compose((T entity) -> {
@@ -111,9 +112,11 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
                     }
                     return entity;
                 }));
+                break;
             default:
                 throw new UnsupportedOperationException(contextMode + OPERATION_NOT_SUPPORTED);
         }
+        return null;
     }
 
     @Override
