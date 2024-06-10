@@ -96,7 +96,7 @@ public class LockTest {
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
-        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions(true);
+        final ShardingBundleOptions shardingOptions = ShardingBundleOptions.builder().skipReadOnlyTransaction(true).build();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, shardingOptions,
                 shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));

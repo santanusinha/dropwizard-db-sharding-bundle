@@ -11,4 +11,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ShardingBundleOptions {
     private boolean skipReadOnlyTransaction = false;
+
+    @Builder.Default
+    private boolean encryptionSupport = false;
+
+    private String encryptionAlgorithm;
+
+    private String encryptionPassword;
+
+    private String encryptionIv;
+
 }

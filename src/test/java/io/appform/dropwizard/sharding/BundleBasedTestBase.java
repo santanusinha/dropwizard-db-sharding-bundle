@@ -28,7 +28,8 @@ public abstract class BundleBasedTestBase {
     protected static class TestConfig extends Configuration {
         @Getter
         private ShardedHibernateFactory shards = ShardedHibernateFactory.builder()
-                .shardingOptions(new ShardingBundleOptions(false))
+                .shardingOptions(ShardingBundleOptions.builder()
+                        .build())
                 .build();
 
     }

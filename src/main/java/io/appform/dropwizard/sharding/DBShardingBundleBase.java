@@ -62,6 +62,9 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
+import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
+import org.jasypt.hibernate5.encryptor.HibernatePBEEncryptorRegistry;
+import org.jasypt.iv.StringFixedIvGenerator;
 import org.reflections.Reflections;
 
 import javax.persistence.Entity;
@@ -160,6 +163,16 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 shardInfoProvider,
                 blacklistingStore,
                 shardManager);
+        //Encryption Support through jasypt-hibernate5
+        if(shardingOptions.isEncryptionSupport()) {
+            Preconditions.checkArgument(shardingOptions.getEncryptionIv().length() == 16, "Encryption IV Should be 16 bytes long");
+            StandardPBEStringEncryptor strongEncryptor = new StandardPBEStringEncryptor();
+            HibernatePBEEncryptorRegistry encryptorRegistry = HibernatePBEEncryptorRegistry.getInstance();
+            strongEncryptor.setAlgorithm(shardingOptions.getEncryptionAlgorithm());
+            strongEncryptor.setPassword(shardingOptions.getEncryptionPassword());
+            strongEncryptor.setIvGenerator(new StringFixedIvGenerator(shardingOptions.getEncryptionIv()));
+            encryptorRegistry.registerPBEStringEncryptor("encryptedString", strongEncryptor);
+        }
         IntStream.range(0, numShards).forEach(
                 shard -> shardBundles.add(new HibernateBundle<T>(inEntities, new SessionFactoryFactory()) {
                     @Override
