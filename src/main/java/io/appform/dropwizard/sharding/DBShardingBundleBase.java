@@ -40,6 +40,8 @@ import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.metrics.TransactionMetricManager;
 import io.appform.dropwizard.sharding.metrics.TransactionMetricObserver;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
+import io.appform.dropwizard.sharding.observers.bucket.BucketIdObserver;
+import io.appform.dropwizard.sharding.observers.bucket.BucketIdSaver;
 import io.appform.dropwizard.sharding.observers.internal.FilteringObserver;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
@@ -48,6 +50,7 @@ import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingSto
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
+import io.appform.dropwizard.sharding.utils.BucketCalculator;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
@@ -257,6 +260,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
         return Objects.nonNull(shardingOptions) ? shardingOptions : new ShardingBundleOptions();
     }
 
+    public BucketCalculator<String> bucketCalculator() {
+        return new BucketCalculator<>(new ConsistentHashBucketIdExtractor<>(this.shardManager));
+    }
+
     public <EntityType, T extends Configuration>
     LookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
         return new LookupDao<>(this.sessionFactories, clazz,
@@ -400,6 +407,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
             }
             this.rootObserver = observer.setNext(rootObserver);
         }
+        rootObserver =  new BucketIdObserver(new BucketIdSaver(bucketCalculator()));
         rootObserver = new TransactionMetricObserver(new TransactionMetricManager(getMetricConfig(config),
                 metricRegistry)).setNext(rootObserver);
         rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
