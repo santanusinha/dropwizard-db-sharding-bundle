@@ -175,16 +175,43 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(CreateOrUpdateByLookupKey<T> createOrUpdateByLookupKey) {
+        val oldSaver = createOrUpdateByLookupKey.getSaver();
+        createOrUpdateByLookupKey.setSaver((T t) -> {
+            try {
+                addBucketId(createOrUpdateByLookupKey.getEntityGenerator().get());
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+            return oldSaver.apply(createOrUpdateByLookupKey.getEntityGenerator().get());
+        });
         return null;
     }
 
     @Override
     public <T> Void visit(io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate<T> createOrUpdate) {
+        val oldSaver = createOrUpdate.getSaver();
+        createOrUpdate.setSaver((T t) -> {
+            try {
+                addBucketId(createOrUpdate.getEntityGenerator().get());
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+            return oldSaver.apply(createOrUpdate.getEntityGenerator().get());
+        });
         return null;
     }
 
     @Override
     public <T, U> Void visit(CreateOrUpdateInLockedContext<T, U> createOrUpdateInLockedContext) {
+        val oldSaver = createOrUpdateInLockedContext.getSaver();
+        createOrUpdateInLockedContext.setSaver((T t) -> {
+            try {
+                addBucketId(createOrUpdateInLockedContext.getLockedEntity());
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+            return oldSaver.apply((T) createOrUpdateInLockedContext.getLockedEntity());
+        });
         return null;
     }
 
