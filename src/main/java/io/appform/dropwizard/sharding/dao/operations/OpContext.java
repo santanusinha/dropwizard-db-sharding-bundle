@@ -33,25 +33,25 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T, R> P visit(Get<T, R> opContext);
 
-    <T> P visit(GetAndUpdate<T> opContext);
+    <T> P visit(GetAndUpdate<T> opContext) throws Exception;
 
     <T, R> P visit(GetByLookupKey<T, R> opContext);
 
-    <T> P visit(GetAndUpdateByLookupKey<T> opContext);
+    <T> P visit(GetAndUpdateByLookupKey<T> opContext) throws Exception;
 
     <T> P visit(ReadOnlyForLookupDao<T> opContext);
 
     <T> P visit(ReadOnlyForRelationalDao<T> opContext);
 
-    <T> P visit(LockAndExecute<T> opContext);
+    <T> P visit(LockAndExecute<T> opContext) throws Exception;
 
-    P visit(UpdateByQuery opContext);
+    P visit(UpdateByQuery opContext) throws Exception;
 
-    <T> P visit(UpdateWithScroll<T> opContext);
+    <T> P visit(UpdateWithScroll<T> opContext) throws Exception;
 
-    <T> P visit(UpdateAll<T> opContext);
+    <T> P visit(UpdateAll<T> opContext) throws Exception;
 
-    <T> P visit(SelectAndUpdate<T> opContext);
+    <T> P visit(SelectAndUpdate<T> opContext) throws Exception;
 
     <T> P visit(RunInSession<T> opContext);
 
@@ -59,15 +59,15 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     P visit(DeleteByLookupKey opContext);
 
-    <U, V> P visit(Save<U, V> opContext);
+    <U, V> P visit(Save<U, V> opContext) throws Exception;
 
-    <T> P visit(SaveAll<T> opContext);
+    <T> P visit(SaveAll<T> opContext) throws Exception;
 
-    <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
+    <T> P visit(CreateOrUpdateByLookupKey<T> opContext) throws Exception;
 
-    <T> P visit(CreateOrUpdate<T> opContext);
+    <T> P visit(CreateOrUpdate<T> opContext) throws Exception;
 
-    <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
+    <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext) throws Exception;
 
     <T, R> P visit(Select<T, R> opContext);
 

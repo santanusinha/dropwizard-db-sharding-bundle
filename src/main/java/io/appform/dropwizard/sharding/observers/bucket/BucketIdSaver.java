@@ -23,12 +23,12 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.R
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.sharding.BucketId;
+import io.appform.dropwizard.sharding.sharding.ShardingKey;
 import io.appform.dropwizard.sharding.utils.BucketCalculator;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.reflect.FieldUtils;
 
-import javax.persistence.Id;
 import java.lang.reflect.Field;
 import java.util.Collection;
 
@@ -57,7 +57,8 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(GetAndUpdate<T> opContext) {
+    public <T> Void visit(GetAndUpdate<T> opContext) throws Exception {
+        validateIncomingBucketId(opContext.getUpdater());
         return null;
     }
 
@@ -67,7 +68,8 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(GetAndUpdateByLookupKey<T> getAndUpdateByLookupKey) {
+    public <T> Void visit(GetAndUpdateByLookupKey<T> getAndUpdateByLookupKey) throws Exception {
+        validateIncomingBucketId(getAndUpdateByLookupKey.getUpdater());
         return null;
     }
 
@@ -82,7 +84,7 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(LockAndExecute<T> opContext) {
+    public <T> Void visit(LockAndExecute<T> opContext) throws Exception {
 
         val contextMode = opContext.getMode();
 
@@ -90,6 +92,7 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
             case READ:
                 return null;
             case INSERT:
+                validateIncomingBucketId(opContext.getSaver());
                 val oldSaver = opContext.getSaver();
                 opContext.setSaver(oldSaver.compose((T entity) -> {
                     try {
@@ -107,22 +110,26 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public Void visit(UpdateByQuery updateByQuery) {
+    public Void visit(UpdateByQuery updateByQuery) throws Exception {
+        validateIncomingBucketId(updateByQuery.getUpdater());
         return null;
     }
 
     @Override
-    public <T> Void visit(UpdateWithScroll<T> updateWithScroll) {
+    public <T> Void visit(UpdateWithScroll<T> updateWithScroll) throws Exception {
+        validateIncomingBucketId(updateWithScroll.getUpdater());
         return null;
     }
 
     @Override
-    public <T> Void visit(UpdateAll<T> updateAll) {
+    public <T> Void visit(UpdateAll<T> updateAll) throws Exception {
+        validateIncomingBucketId(updateAll.getUpdater());
         return null;
     }
 
     @Override
-    public <T> Void visit(SelectAndUpdate<T> selectAndUpdate) {
+    public <T> Void visit(SelectAndUpdate<T> selectAndUpdate) throws Exception {
+        validateIncomingBucketId(selectAndUpdate.getUpdater());
         return null;
     }
 
@@ -142,7 +149,8 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T, R> Void visit(Save<T, R> opContext) {
+    public <T, R> Void visit(Save<T, R> opContext) throws Exception {
+        validateIncomingBucketId(opContext.getSaver());
         val oldSaver = opContext.getSaver();
         opContext.setSaver((T t) -> {
             try {
@@ -156,7 +164,8 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(SaveAll<T> opContext) {
+    public <T> Void visit(SaveAll<T> opContext) throws Exception {
+        validateIncomingBucketId(opContext.getSaver());
         val oldSaver = opContext.getSaver();
         val beforeExecute = oldSaver.compose((Collection<T> entities) -> {
             opContext.getEntities().stream().forEach(entity -> {
@@ -173,7 +182,9 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(CreateOrUpdateByLookupKey<T> createOrUpdateByLookupKey) {
+    public <T> Void visit(CreateOrUpdateByLookupKey<T> createOrUpdateByLookupKey) throws Exception {
+        validateIncomingBucketId(createOrUpdateByLookupKey.getUpdater());
+        validateIncomingBucketId(createOrUpdateByLookupKey.getSaver());
         val oldSaver = createOrUpdateByLookupKey.getSaver();
         createOrUpdateByLookupKey.setSaver((T t) -> {
             try {
@@ -187,7 +198,9 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate<T> createOrUpdate) {
+    public <T> Void visit(io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate<T> createOrUpdate) throws Exception {
+        validateIncomingBucketId(createOrUpdate.getUpdater());
+        validateIncomingBucketId(createOrUpdate.getSaver());
         val oldSaver = createOrUpdate.getSaver();
         createOrUpdate.setSaver((T t) -> {
             try {
@@ -201,7 +214,9 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T, U> Void visit(CreateOrUpdateInLockedContext<T, U> createOrUpdateInLockedContext) {
+    public <T, U> Void visit(CreateOrUpdateInLockedContext<T, U> createOrUpdateInLockedContext) throws Exception {
+        validateIncomingBucketId(createOrUpdateInLockedContext.getUpdater());
+        validateIncomingBucketId(createOrUpdateInLockedContext.getSaver());
         val oldSaver = createOrUpdateInLockedContext.getSaver();
         createOrUpdateInLockedContext.setSaver((T t) -> {
             try {
@@ -219,6 +234,28 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
         return null;
     }
 
+    private <T> void validateIncomingBucketId(T entity) throws Exception {
+        if(entity == null) {
+            return;
+        }
+        val entityClass = entity.getClass();
+        Field[] bucketIdFields = FieldUtils.getFieldsWithAnnotation(entityClass, BucketId.class);
+        if(bucketIdFields.length == 0) {
+            //no bucket_id annotation present
+            return;
+        }
+        val keyField = bucketIdFields[0];
+        keyField.setAccessible(true);
+        val bucketId = keyField.get(entity);
+        if(bucketId == null) {
+            return;
+        }
+        val expectedBucketId = bucketCalculator.bucketId(shardingkey(entity));
+        if(expectedBucketId != bucketId ){
+            throw new Exception("BucketId sent is not correct");
+        }
+    }
+
     private <T> void addBucketId(T entity) throws IllegalAccessException {
         val entityClass = entity.getClass();
         Field[] bucketIdFields = FieldUtils.getFieldsWithAnnotation(entityClass, BucketId.class);
@@ -226,18 +263,22 @@ public class BucketIdSaver implements OpContext.OpContextVisitor<Void> {
             //no bucket_id annotation present
             return;
         }
-        Preconditions.checkArgument(bucketIdFields.length == 1, "Only one field can be designated as @bucketId");
-        Field[] idFields = FieldUtils.getFieldsWithAnnotation(entityClass, Id.class);
+        val bucketIdField = bucketIdFields[0];
+        bucketIdField.setAccessible(true);
+
+        val shardingkey = shardingkey(entity);
+        val bucketId = bucketCalculator.bucketId(shardingkey);
+        bucketIdField.set(entity, bucketId);
+    }
+
+    private <T> String shardingkey(T entity) throws IllegalAccessException {
+        val entityClass = entity.getClass();
+        Field[] idFields = FieldUtils.getFieldsWithAnnotation(entityClass, ShardingKey.class);
         Preconditions.checkArgument(idFields.length != 0, "A field needs to be designated as @Id");
         Preconditions.checkArgument(idFields.length == 1, "Only one field can be designated as @Id");
         val keyField = idFields[0];
-        val bucketIdField = bucketIdFields[0];
         keyField.setAccessible(true);
-        bucketIdField.setAccessible(true);
 
-        val id = keyField.get(entity).toString();
-        val bucketId = bucketCalculator.bucketId(id);
-        bucketIdField.set(entity, bucketId);
-        log.info("Added bucketId after computing");
+        return keyField.get(entity).toString();
     }
 }
