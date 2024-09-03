@@ -1,20 +1,26 @@
 package io.appform.dropwizard.sharding.dao;
 
-import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.dao.operations.OpContext;
+import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecute;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import lombok.Getter;
+import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
-import java.util.function.BooleanSupplier;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
 
 /**
  * The `LockedContext` class encapsulates the context for locked operations on an entity in a specific shard.
@@ -25,20 +31,14 @@ import java.util.function.Supplier;
  */
 @Getter
 public class LockedContext<T> {
+
     @FunctionalInterface
     public interface Mutator<T> {
         void mutator(T parent);
     }
 
-    enum Mode {READ, INSERT}
-
     private final int shardId;
     private final SessionFactory sessionFactory;
-    private final List<Function<T, Void>> operations = Lists.newArrayList();
-    private Supplier<T> getter;
-    private Function<T, T> saver;
-    private T entity;
-    private final Mode mode;
     private final TransactionExecutionContext executionContext;
     private final TransactionObserver observer;
 
@@ -65,10 +65,11 @@ public class LockedContext<T> {
             TransactionObserver observer) {
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
-        this.getter = getter;
         this.observer = observer;
-        this.mode = Mode.READ;
-        this.executionContext = buildExecutionContext(shardInfoProvider, entityClass);
+        val opContext = LockAndExecute.<T>buildForRead()
+            .getter(getter)
+            .build();
+        this.executionContext = buildExecutionContext(shardInfoProvider, entityClass, opContext);
     }
 
     /**
@@ -96,16 +97,17 @@ public class LockedContext<T> {
             TransactionObserver observer) {
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
-        this.saver = saver;
-        this.entity = entity;
         this.observer = observer;
-        this.mode = Mode.INSERT;
-        this.executionContext = buildExecutionContext(shardInfoProvider, entityClass);
+        val opContext = LockAndExecute.<T>buildForInsert()
+            .saver(saver)
+            .entity(entity)
+            .build();
+        this.executionContext = buildExecutionContext(shardInfoProvider, entityClass, opContext);
     }
+
     /**
      * Applies a mutation operation to the current context using a provided mutator.
      *
-     * @param <T> The type parameter representing the parent entity.
      * @param mutator The mutator responsible for applying the mutation operation to the context.
      * @return A reference to this LockedContext, enabling method chaining.
      *
@@ -116,7 +118,7 @@ public class LockedContext<T> {
      *
      * <p>
      * The {@code mutator} parameter represents an instance of a {@link Mutator} interface, which defines the
-     * mutation logic to be executed on the context. The {@link Mutator#mutate(LockedContext)} method of the
+     * mutation logic to be executed on the context. The {@link Mutator#mutator(Object)} )} method of the
      * mutator is invoked, allowing custom mutations to be performed on the context.
      * </p>
      *
@@ -126,25 +128,21 @@ public class LockedContext<T> {
      * </p>
      */
     public LockedContext<T> mutate(Mutator<T> mutator) {
-        return apply(parent -> {
-            mutator.mutator(parent);
-            return null;
-        });
+        return apply(parent -> mutator.mutator(parent));
     }
 
     /**
      * Applies a handler function to the current entity within a locked context.
      *
      * This method allows you to apply a handler function to the current entity within the context of a locked transaction.
-     * The handler function is provided as a {@code Function}
+     * The handler function is provided as a {@code Consumer}
      * The handler is added to a list of operations to be executed within the locked context.
      *
-     * @param <T> The type parameter representing the parent entity.
      * @param handler The handler function to apply to the current entity.
      * @return A locked context for the current entity type, allowing for further chained operations within a locked transaction.
      */
-    public LockedContext<T> apply(Function<T, Void> handler) {
-        this.operations.add(handler);
+    public LockedContext<T> apply(Consumer<T> handler) {
+        ((LockAndExecute) this.executionContext.getOpContext()).getOperations().add(handler);
         return this;
     }
 
@@ -170,7 +168,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -198,7 +195,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -225,7 +221,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -251,7 +246,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -294,7 +288,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -334,15 +327,28 @@ public class LockedContext<T> {
     public <U> LockedContext<T> createOrUpdate(
             RelationalDao<U> relationalDao,
             DetachedCriteria criteria,
-            Function<U, U> updater,
+            UnaryOperator<U> updater,
             Supplier<U> entityGenerator) {
         return apply(parent -> {
             try {
-                relationalDao.createOrUpdate(this, criteria, updater, entityGenerator);
+                relationalDao.createOrUpdate(this, criteria, updater, parent, p -> entityGenerator.get());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
+        });
+    }
+
+    public <U> LockedContext<T> createOrUpdate(
+            RelationalDao<U> relationalDao,
+            DetachedCriteria criteria,
+            UnaryOperator<U> updater,
+            Function<T, U> entityGenerator) {
+        return apply(parent -> {
+            try {
+                relationalDao.createOrUpdate(this, criteria, updater, parent, entityGenerator);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         });
     }
 
@@ -359,22 +365,21 @@ public class LockedContext<T> {
      *                        It takes an existing entity as input and returns the updated entity.
      * @param entityGenerator A supplier function that provides a new entity to be created if the entity
      *                        specified by the query specification does not exist.
-     * @return A LockedContext<T> representing the result of the create or update operation.
+     * @return A LockedContext representing the result of the create or update operation.
      * @throws RuntimeException If an exception occurs during the create or update operation, it is wrapped
      *                          in a RuntimeException and thrown.
      */
     public <U> LockedContext<T> createOrUpdate(
             RelationalDao<U> relationalDao,
             QuerySpec<U, U> querySpec,
-            Function<U, U> updater,
+            UnaryOperator<U> updater,
             Supplier<U> entityGenerator) {
         return apply(parent -> {
             try {
-                relationalDao.createOrUpdate(this, querySpec, updater, entityGenerator);
+                relationalDao.createOrUpdate(this, querySpec, updater, parent, entityGenerator);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -395,14 +400,14 @@ public class LockedContext<T> {
      *                      matching entity. If this supplier returns true, the update operation
      *                      continues to the next matching entity; if it returns false, the operation
      *                      stops.
-     * @return A LockedContext<T> representing the result of the update operation
+     * @return A LockedContext representing the result of the update operation
      * @throws RuntimeException If an exception occurs during the update operation, it is wrapped
      *                          in a RuntimeException and thrown.
      */
     public <U> LockedContext<T> update(
             RelationalDao<U> relationalDao,
             DetachedCriteria criteria,
-            Function<U, U> updater,
+            UnaryOperator<U> updater,
             BooleanSupplier updateNext) {
         return apply(parent -> {
             try {
@@ -410,7 +415,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -431,14 +435,14 @@ public class LockedContext<T> {
      *                      matching entity. If this supplier returns true, the update operation
      *                      continues to the next matching entity; if it returns false, the operation
      *                      stops.
-     * @return A LockedContext<T> representing the result of the update operation.
+     * @return A LockedContext representing the result of the update operation.
      * @throws RuntimeException If an exception occurs during the update operation, it is wrapped
      *                          in a RuntimeException and thrown.
      */
     public <U> LockedContext<T> update(
             RelationalDao<U> relationalDao,
             QuerySpec<U, U> criteria,
-            Function<U, U> updater,
+            UnaryOperator<U> updater,
             BooleanSupplier updateNext) {
         return apply(parent -> {
             try {
@@ -446,7 +450,6 @@ public class LockedContext<T> {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            return null;
         });
     }
 
@@ -484,7 +487,6 @@ public class LockedContext<T> {
             if (!result) {
                 throw failureException;
             }
-            return null;
         });
     }
 
@@ -504,10 +506,8 @@ public class LockedContext<T> {
             TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false);
             transactionHandler.beforeStart();
             try {
-                T result = generateEntity();
-                operations
-                        .forEach(operation -> operation.apply(result));
-                return result;
+                val opContext = (LockAndExecute<T>) executionContext.getOpContext();
+                return opContext.apply(transactionHandler.getSession());
             } catch (Exception e) {
                 transactionHandler.onError();
                 throw e;
@@ -517,33 +517,18 @@ public class LockedContext<T> {
         });
     }
 
-    private TransactionExecutionContext buildExecutionContext(final ShardInfoProvider shardInfoProvider,
-                                                              final Class<T> entityClass) {
+    private TransactionExecutionContext buildExecutionContext(
+        final ShardInfoProvider shardInfoProvider,
+        final Class<T> entityClass, final OpContext opContext) {
         return TransactionExecutionContext.builder()
-                .shardName(shardInfoProvider.shardName(shardId))
-                .lockedContextMode(mode.name())
-                .entityClass(entityClass)
-                .daoClass(getClass())
-                .opType("execute")
-                .build();
+            .commandName("execute")
+            .shardName(shardInfoProvider.shardName(shardId))
+            .entityClass(entityClass)
+            .daoClass(getClass())
+            .opContext(opContext)
+            .build();
     }
 
-    private T generateEntity() {
-        T result = null;
-        switch (mode) {
-            case READ:
-                result = getter.get();
-                if (result == null) {
-                    throw new RuntimeException("Entity doesn't exist");
-                }
-                break;
-            case INSERT:
-                result = saver.apply(entity);
-                break;
-            default:
-                break;
+    public enum Mode {READ, INSERT}
 
-        }
-        return result;
-    }
 }

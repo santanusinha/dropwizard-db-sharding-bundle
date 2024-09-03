@@ -45,7 +45,7 @@ public class ErrorListenerTest extends BundleBasedTestBase {
         public void afterException(TransactionExecutionContext listenerContext, Throwable e) {
             log.error("Error in function: {}.{}",
                     listenerContext.getEntityClass().getSimpleName(),
-                    listenerContext.getOpType());
+                    listenerContext.getCommandName());
             errorCounter.incrementAndGet();
         }
     }

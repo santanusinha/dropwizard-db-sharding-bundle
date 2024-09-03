@@ -3,6 +3,8 @@ package io.appform.dropwizard.sharding.metrics;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.Timer;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
+import io.appform.dropwizard.sharding.dao.operations.Save;
+import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecute;
 import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntity;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import lombok.val;
@@ -28,12 +30,24 @@ class TransactionMetricObserverTest {
     void testExecuteWhenMetricNotApplicable() {
         Mockito.doReturn(false).when(metricManager).isMetricApplicable(null);
         assertEquals(terminate(),
-                transactionMetricObserver.execute(TransactionExecutionContext.builder().build(), this::terminate));
+                transactionMetricObserver.execute(TransactionExecutionContext.builder()
+                                                          .commandName("testCommand")
+                                                          .shardName("testshard1")
+                                                          .daoClass(RelationalDao.class)
+                                                          .entityClass(RelationalEntity.class)
+                                                          .opContext(Save.<String, String>builder()
+                                                                               .entity("dummy")
+                                                                               .saver(t->t)
+                                                                               .build())
+                    .build(), this::terminate));
     }
 
     @Test
     void testExecuteWithNoException() {
         val context = TransactionExecutionContext.builder()
+                .commandName("testCommand")
+                .shardName("testshard1")
+                .opContext(Save.<String, String>builder().entity("dummy").saver(t->t).build())
                 .entityClass(RelationalDao.class)
                 .shardName("shard")
                 .daoClass(RelationalEntity.class)
@@ -63,6 +77,9 @@ class TransactionMetricObserverTest {
     @Test
     void testExecuteWithException() {
         val context = TransactionExecutionContext.builder()
+                .commandName("testCommand")
+                .shardName("testshard1")
+                .opContext(Save.<String, String>builder().entity("dummy").saver(t->t).build())
                 .entityClass(RelationalDao.class)
                 .shardName("shard")
                 .daoClass(RelationalEntity.class)
@@ -97,8 +114,9 @@ class TransactionMetricObserverTest {
         assertEquals(entityOpMetricData, transactionMetricObserver.getEntityOpMetricCache().get(EntityOpMetricKey.builder()
                 .entityClass(context.getEntityClass())
                 .daoClass(context.getDaoClass())
-                .lockedContextMode(context.getLockedContextMode())
-                .opType(context.getOpType())
+                .lockedContextMode(context.getOpContext() instanceof LockAndExecute ?
+                    ((LockAndExecute)context.getOpContext()).getMode().name() : null)
+                .commandName(context.getCommandName())
                 .build()));
 
         assertEquals(1, transactionMetricObserver.getShardMetricCache().size());

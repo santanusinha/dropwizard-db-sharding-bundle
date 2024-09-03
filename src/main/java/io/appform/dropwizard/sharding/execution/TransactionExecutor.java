@@ -18,14 +18,14 @@
 package io.appform.dropwizard.sharding.execution;
 
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
+import java.util.Optional;
+import java.util.function.Function;
 import lombok.val;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-
-import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * Utility functional class for running transactions.
@@ -47,70 +47,34 @@ public class TransactionExecutor {
         this.observer = observer;
     }
 
-    public <T, U> Optional<T> executeAndResolve(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg,
-                                                String opType,
-                                                int shardId) {
-        T result = execute(sessionFactory, readOnly, function, arg, opType, shardId);
-        return Optional.ofNullable(result);
+    public <T> T execute(SessionFactory sessionFactory,
+        boolean readOnly,
+        String commandName,
+        OpContext<T> opContext,
+        int shardId) {
+        return execute(sessionFactory, readOnly, commandName, opContext, shardId, true);
     }
 
-    public <T, U> T execute(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg,
-                            String opType,
-                            int shardId) {
-        return execute(sessionFactory, readOnly, function, arg, t -> t, opType, shardId);
-    }
-
-    public <T, U> T execute(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg, boolean completeTransaction,
-                            String opType,
-                            int shardId) {
-        return execute(sessionFactory, readOnly, function, arg, t -> t, completeTransaction, opType, shardId);
-    }
-
-    public <T, U, V> V execute(SessionFactory sessionFactory, boolean readOnly, Function<U, T> function, U arg, Function<T, V> handler,
-                               String opType,
-                               int shardId) {
-        return execute(sessionFactory, readOnly, function, arg, handler, true, opType, shardId);
-    }
-
-    public <T, U, V> V execute(SessionFactory sessionFactory,
-                               boolean readOnly,
-                               Function<U, T> function,
-                               U arg,
-                               Function<T, V> handler,
-                               boolean completeTransaction,
-                               String opType,
-                               int shardId) {
-        return execute(sessionFactory,
-                readOnly,
-                session -> {
-                    T result = function.apply(arg);
-                    return handler.apply(result);
-                },
-                completeTransaction,
-                opType,
-                shardId);
-    }
-
-    public <T> T execute(
-            SessionFactory sessionFactory,
-            boolean readOnly,
-            Function<Session, T> handler,
-            boolean completeTransaction,
-            String opType,
-            int shardId) {
+    public <T> T execute(SessionFactory sessionFactory,
+        boolean readOnly,
+        String commandName,
+        OpContext<T> opContext,
+        int shardId,
+        boolean completeTransaction) {
         val context = TransactionExecutionContext.builder()
-                .daoClass(daoClass)
-                .entityClass(entityClass)
-                .shardName(shardInfoProvider.shardName(shardId))
-                .opType(opType)
-                .build();
+            .commandName(commandName)
+            .daoClass(daoClass)
+            .entityClass(entityClass)
+            .shardName(shardInfoProvider.shardName(shardId))
+            .opContext(opContext)
+            .build();
         return observer.execute(context, () -> {
             val transactionHandler = new TransactionHandler(sessionFactory, readOnly);
             if (completeTransaction) {
                 transactionHandler.beforeStart();
             }
             try {
-                T result = handler.apply(transactionHandler.getSession());
+                T result = opContext.apply(transactionHandler.getSession());
                 if (completeTransaction) {
                     transactionHandler.afterEnd();
                 }

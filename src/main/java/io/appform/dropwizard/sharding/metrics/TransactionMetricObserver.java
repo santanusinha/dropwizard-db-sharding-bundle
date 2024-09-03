@@ -2,6 +2,7 @@ package io.appform.dropwizard.sharding.metrics;
 
 import com.codahale.metrics.Timer;
 import com.google.common.collect.ImmutableList;
+import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecute;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import lombok.Getter;
@@ -51,14 +52,15 @@ public class TransactionMetricObserver extends TransactionObserver {
 
     private List<MetricData> getMetrics(final TransactionExecutionContext context) {
         val entityOpMetricData = entityOpMetricCache.computeIfAbsent(EntityOpMetricKey.builder()
-                        .lockedContextMode(context.getLockedContextMode())
-                        .opType(context.getOpType())
+                        .lockedContextMode(context.getOpContext() instanceof LockAndExecute ?
+                                ((LockAndExecute<?>)context.getOpContext()).getMode().name() : null)
+                        .commandName(context.getCommandName())
                         .daoClass(context.getDaoClass())
                         .entityClass(context.getEntityClass())
                         .build(),
                 key -> metricManager.getEntityOpMetricData(context));
         val shardMetricData = shardMetricCache.computeIfAbsent(context.getShardName(),
                 key -> metricManager.getShardMetricData(context.getShardName()));
-        return ImmutableList.of(entityOpMetricData, shardMetricData);
+        return List.of(entityOpMetricData, shardMetricData);
     }
 }

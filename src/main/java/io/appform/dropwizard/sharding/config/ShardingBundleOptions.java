@@ -15,4 +15,14 @@ public class ShardingBundleOptions {
      Whether to skip transaction in a read only operation.
      */
     private boolean skipReadOnlyTransaction = false;
+
+    @Builder.Default
+    private boolean encryptionSupportEnabled = false;
+
+    private String encryptionAlgorithm;
+
+    private String encryptionPassword;
+
+    private String encryptionIv;
+
 }

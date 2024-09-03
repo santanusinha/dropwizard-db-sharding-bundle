@@ -149,9 +149,29 @@ The project dependencies are:
 <dependency>
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>2.1.10-1</version>
+    <version>2.1.10-5</version>
 </dependency>
 ```
+
+Set the Number of Shards property by setting Java property while starting the application.
+
+### Example:
+
+- Initiating Sharding Bundle with namespace
+
+```
+BalancedDBShardingBundle<Configuration> dbShardingBundle = new BalancedDBShardingBundle<Configuration>(
+        "your_namespace", // This is optional
+        List.of("com.example.server.core.entities")
+      ) {
+            @Override
+            protected ShardedHibernateFactory getConfig(Configuration appConfig) {
+                return appConfig.getShards();
+            }
+    };
+```
+
+While running your application, ensure to set `-Dyour_namespace.db.shards=32` property. By default `db.shards=2`
 
 # NOTE
 

@@ -62,6 +62,9 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
+import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
+import org.jasypt.hibernate5.encryptor.HibernatePBEEncryptorRegistry;
+import org.jasypt.iv.StringFixedIvGenerator;
 import org.reflections.Reflections;
 
 import javax.persistence.Entity;
@@ -95,7 +98,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     @Getter
     private int numShards;
     @Getter
-    private ShardingBundleOptions shardingOptions;
+    private ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
 
     private ShardInfoProvider shardInfoProvider;
 
@@ -106,6 +109,8 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     private final List<TransactionObserver> observers = new ArrayList<>();
 
+    private final List<Class<?>> initialisedEntities;
+
     private TransactionObserver rootObserver;
 
     protected DBShardingBundleBase(
@@ -114,6 +119,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
             Class<?>... entities) {
         this.dbNamespace = dbNamespace;
         val inEntities = ImmutableList.<Class<?>>builder().add(entity).add(entities).build();
+        this.initialisedEntities = inEntities;
         init(inEntities);
     }
 
@@ -124,6 +130,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 String.format("No entity class found at %s",
                         String.join(",", classPathPrefixList)));
         val inEntities = ImmutableList.<Class<?>>builder().addAll(entities).build();
+        this.initialisedEntities = inEntities;
         init(inEntities);
     }
 
@@ -133,6 +140,13 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     protected DBShardingBundleBase(String... classPathPrefixes) {
         this(DEFAULT_NAMESPACE, Arrays.asList(classPathPrefixes));
+    }
+
+    public List<Class<?>> getInitialisedEntities() {
+        if(this.initialisedEntities == null){
+            throw new RuntimeException("DB sharding bundle is not initialised !");
+        }
+        return this.initialisedEntities;
     }
 
     protected abstract ShardManager createShardManager(int numShards, ShardBlacklistingStore blacklistingStore);
@@ -149,6 +163,16 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 shardInfoProvider,
                 blacklistingStore,
                 shardManager);
+        //Encryption Support through jasypt-hibernate5
+        if(shardingOptions.isEncryptionSupportEnabled()) {
+            Preconditions.checkArgument(shardingOptions.getEncryptionIv().length() == 16, "Encryption IV Should be 16 bytes long");
+            StandardPBEStringEncryptor strongEncryptor = new StandardPBEStringEncryptor();
+            HibernatePBEEncryptorRegistry encryptorRegistry = HibernatePBEEncryptorRegistry.getInstance();
+            strongEncryptor.setAlgorithm(shardingOptions.getEncryptionAlgorithm());
+            strongEncryptor.setPassword(shardingOptions.getEncryptionPassword());
+            strongEncryptor.setIvGenerator(new StringFixedIvGenerator(shardingOptions.getEncryptionIv()));
+            encryptorRegistry.registerPBEStringEncryptor("encryptedString", strongEncryptor);
+        }
         IntStream.range(0, numShards).forEach(
                 shard -> shardBundles.add(new HibernateBundle<T>(inEntities, new SessionFactoryFactory()) {
                     @Override
@@ -302,6 +326,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
         return new RelationalDao<>(this.sessionFactories, clazz,
                 new ShardCalculator<>(this.shardManager,
                         new ConsistentHashBucketIdExtractor<>(this.shardManager)),
+                this.shardingOptions,
                 shardInfoProvider,
                 rootObserver);
     }
@@ -316,6 +341,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 new ShardCalculator<>(this.shardManager,
                         new ConsistentHashBucketIdExtractor<>(this.shardManager)),
                 cacheManager,
+                this.shardingOptions,
                 shardInfoProvider,
                 rootObserver);
     }
@@ -328,6 +354,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
         return new RelationalDao<>(this.sessionFactories,
                 clazz,
                 new ShardCalculator<>(this.shardManager, bucketIdExtractor),
+                this.shardingOptions,
                 shardInfoProvider,
                 rootObserver);
     }
@@ -341,6 +368,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 clazz,
                 new ShardCalculator<>(this.shardManager, bucketIdExtractor),
                 cacheManager,
+                this.shardingOptions,
                 shardInfoProvider,
                 rootObserver);
     }

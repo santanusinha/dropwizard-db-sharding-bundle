@@ -29,7 +29,7 @@ public class TimerObserver extends TransactionObserver {
         } finally {
             log.info("Method {}::{} took: {}ms",
                     context.getDaoClass().getSimpleName(),
-                    context.getOpType(),
+                    context.getCommandName(),
                     w.elapsed());
         }
     }

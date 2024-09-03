@@ -90,6 +90,7 @@ public class CacheableLookupDaoTest {
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
+        final ShardingBundleOptions shardingBundleOptions = new ShardingBundleOptions();
         lookupDao = new CacheableLookupDao<>(
                 sessionFactories,
                 TestEntity.class,
@@ -113,7 +114,7 @@ public class CacheableLookupDaoTest {
                         return cache.get(key);
                     }
                 },
-                new ShardingBundleOptions(), shardInfoProvider, new TerminalTransactionObserver());
+                shardingBundleOptions, shardInfoProvider, new TerminalTransactionObserver());
         phoneDao = new CacheableLookupDao<>(sessionFactories,
                 Phone.class,
                 new ShardCalculator<>(shardManager,
@@ -137,7 +138,7 @@ public class CacheableLookupDaoTest {
                         return cache.get(key);
                     }
                 },
-                new ShardingBundleOptions(), shardInfoProvider, new TerminalTransactionObserver());
+                shardingBundleOptions, shardInfoProvider, new TerminalTransactionObserver());
         transactionDao = new CacheableRelationalDao<>(sessionFactories,
                 Transaction.class,
                 new ShardCalculator<>(shardManager,
@@ -204,7 +205,7 @@ public class CacheableLookupDaoTest {
                                 numResults,
                                 ':'));
                     }
-                }, shardInfoProvider, new TerminalTransactionObserver());
+                }, shardingBundleOptions, shardInfoProvider, new TerminalTransactionObserver());
         auditDao = new CacheableRelationalDao<>(sessionFactories,
                 Audit.class,
                 new ShardCalculator<>(shardManager,
@@ -258,7 +259,7 @@ public class CacheableLookupDaoTest {
                                 numResults,
                                 ':'));
                     }
-                }, shardInfoProvider, new TerminalTransactionObserver());
+                }, shardingBundleOptions, shardInfoProvider, new TerminalTransactionObserver());
     }
 
     @AfterEach

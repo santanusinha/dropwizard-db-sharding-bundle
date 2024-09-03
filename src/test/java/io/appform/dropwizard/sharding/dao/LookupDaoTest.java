@@ -20,6 +20,7 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.dao.testdata.entities.*;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
@@ -62,6 +63,7 @@ public class LookupDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
     private LookupDao<TestEntity> lookupDao;
+    private LookupDao<TestEntityWithAIId> lookupDaoForAI;
     private LookupDao<Phone> phoneDao;
     private RelationalDao<Transaction> transactionDao;
     private RelationalDao<Audit> auditDao;
@@ -78,6 +80,7 @@ public class LookupDaoTest {
         configuration.setProperty("hibernate.show_sql", "true");
         configuration.setProperty("hibernate.format_sql", "true");
         configuration.addAnnotatedClass(TestEntity.class);
+        configuration.addAnnotatedClass(TestEntityWithAIId.class);
         configuration.addAnnotatedClass(Phone.class);
         configuration.addAnnotatedClass(Transaction.class);
         configuration.addAnnotatedClass(Audit.class);
@@ -96,18 +99,23 @@ public class LookupDaoTest {
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
-                new ConsistentHashBucketIdExtractor<>(
-                        shardManager));
-        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
+                                                                              new ConsistentHashBucketIdExtractor<>(
+                                                                                      shardManager));
+
+        final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = new LookupDao<>(sessionFactories, TestEntity.class, shardCalculator, shardingOptions,
-                shardInfoProvider, observer);
+                                    shardInfoProvider, observer);
+
+        lookupDaoForAI = new LookupDao<>(sessionFactories, TestEntityWithAIId.class, shardCalculator, shardingOptions,
+                                         shardInfoProvider, observer);
+
         phoneDao = new LookupDao<>(sessionFactories, Phone.class, shardCalculator, shardingOptions,
                 shardInfoProvider, observer);
-        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator,
+        transactionDao = new RelationalDao<>(sessionFactories, Transaction.class, shardCalculator, shardingOptions,
                 shardInfoProvider, observer);
-        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator,
+        auditDao = new RelationalDao<>(sessionFactories, Audit.class, shardCalculator, shardingOptions,
                 shardInfoProvider, observer);
     }
 
@@ -163,6 +171,30 @@ public class LookupDaoTest {
         });
 
         assertFalse(updateStatus);
+    }
+
+    @Test
+    public void testCreateOrUpdate() {
+        val saved = lookupDaoForAI.createOrUpdate("testId",
+                                                  e -> e.setText("Some Other Text"),
+                                                  () -> TestEntityWithAIId.builder()
+                                                          .externalId("testId")
+                                                          .text("Some New Text")
+                                                          .build())
+                .orElse(null);
+        assertNotNull(saved);
+        assertEquals("Some New Text", saved.getText());
+
+        val updated = lookupDaoForAI.createOrUpdate("testId",
+                                                    e -> e.setText("Some Other Text"),
+                                                    () -> TestEntityWithAIId.builder()
+                                                            .externalId("testId")
+                                                            .text("Some New Text")
+                                                            .build())
+                .orElse(null);
+        assertNotNull(updated);
+        assertEquals(saved.getId(), updated.getId());
+        assertEquals("Some Other Text", updated.getText());
     }
 
     @Test
@@ -246,7 +278,7 @@ public class LookupDaoTest {
         int rowsUpdated = lookupDao.updateUsingQuery(id, UpdateOperationMeta.builder()
                 .queryName("testTextUpdateQuery")
                 .params(ImmutableMap.of("externalId", id,
-                        "text", newText))
+                                        "text", newText))
                 .build());
         assertEquals(1, rowsUpdated);
 
@@ -268,7 +300,7 @@ public class LookupDaoTest {
         int rowsUpdated = lookupDao.updateUsingQuery(id, UpdateOperationMeta.builder()
                 .queryName("testTextUpdateQuery")
                 .params(ImmutableMap.of("externalId", UUID.randomUUID().toString(),
-                        "text", newText))
+                                        "text", newText))
                 .build());
         assertEquals(0, rowsUpdated);
 
@@ -417,6 +449,5 @@ public class LookupDaoTest {
                 1L,
                 (long) lookupDao.count(criteria).stream().reduce(0L, Long::sum)
         );
-
     }
 }

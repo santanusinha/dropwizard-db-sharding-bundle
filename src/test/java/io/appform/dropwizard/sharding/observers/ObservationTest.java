@@ -41,7 +41,7 @@ public class ObservationTest extends BundleBasedTestBase {
             } finally {
                 log.info("Incrementing counter for {}.{}. New Value: {}",
                         context.getDaoClass().getSimpleName(),
-                        context.getOpType(),
+                        context.getCommandName(),
                         callCounter.incrementAndGet());
             }
         }
