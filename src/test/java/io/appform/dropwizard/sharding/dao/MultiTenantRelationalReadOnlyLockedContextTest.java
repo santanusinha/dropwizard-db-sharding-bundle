@@ -132,9 +132,9 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         .build();
 
     val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentCriteria, 0, 4)
-        .readAugmentParent("TENANT1", departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
+        .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
-        .readAugmentParent("TENANT1", ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
+        .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
             (parent, childList) -> {
               parent.setCeo(childList.stream().findAny().orElse(null));
             })
@@ -186,9 +186,9 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         .build();
 
     val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentCriteria, 0, 4)
-        .readAugmentParent("TENANT1", departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
+        .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
-        .readAugmentParent("TENANT1", ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
+        .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
             (parent, childList) -> {
               parent.setCeo(childList.stream().findAny().orElse(null));
             }).execute()
@@ -227,9 +227,9 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey,
             (queryRoot, query, criteriaBuilder) -> query.where(
                 criteriaBuilder.equal(queryRoot.get("companyUsageId"), companyToRetrieve)), 0, 1)
-        .readAugmentParent("TENANT1", departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
+        .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
-        .readAugmentParent("TENANT1", ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
+        .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
             (parent, childList) -> {
               parent.setCeo(childList.stream().findAny().orElse(null));
             }).execute()
@@ -281,14 +281,14 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         .build();
 
     val lockedContext1 = companyRelationalDao.saveAndGetExecutor("TENANT1", parentKey, company1);
-    lockedContext1.save("TENANT1", departmentRelationalDao, eng1 -> eng);
-    lockedContext1.save("TENANT1", departmentRelationalDao, fin1 -> fin);
-    lockedContext1.save("TENANT1", ceoRelationalDao, ceo -> ceo1);
+    lockedContext1.save( departmentRelationalDao, eng1 -> eng);
+    lockedContext1.save( departmentRelationalDao, fin1 -> fin);
+    lockedContext1.save( ceoRelationalDao, ceo -> ceo1);
     lockedContext1.execute();
 
     val lockedContext2 = companyRelationalDao.saveAndGetExecutor("TENANT1", parentKey, company2);
-    lockedContext2.save("TENANT1", departmentRelationalDao, hr1 -> hr);
-    lockedContext2.save("TENANT1", ceoRelationalDao, ceo -> ceo2);
+    lockedContext2.save(departmentRelationalDao, hr1 -> hr);
+    lockedContext2.save(ceoRelationalDao, ceo -> ceo2);
     lockedContext2.execute();
   }
 

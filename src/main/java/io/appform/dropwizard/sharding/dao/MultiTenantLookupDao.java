@@ -434,7 +434,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     int shardId = shardCalculator.shardId(tenantId, id);
     LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new LockedContext<>(shardId, dao.sessionFactory, () -> dao.getLockedForWrite(id),
+    return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(id),
         entityClass, shardInfoProviders.get(tenantId), observer);
 
   }
@@ -462,7 +462,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     int shardId = shardCalculator.shardId(tenantId, id);
     LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new ReadOnlyContext<>(shardId,
+    return new ReadOnlyContext<>(tenantId, shardId,
         dao.sessionFactory,
         key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
         null,
@@ -499,7 +499,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     int shardId = shardCalculator.shardId(tenantId, id);
     LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new ReadOnlyContext<>(shardId,
+    return new ReadOnlyContext<>(tenantId, shardId,
         dao.sessionFactory,
         key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
         entityPopulator,
@@ -531,7 +531,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     }
     int shardId = shardCalculator.shardId(tenantId, id);
     LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new LockedContext<>(shardId, dao.sessionFactory, dao::save, entity,
+    return new LockedContext<>(tenantId, shardId, dao.sessionFactory, dao::save, entity,
         entityClass, shardInfoProviders.get(tenantId), observer);
   }
 
@@ -935,6 +935,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
   @Getter
   public static class ReadOnlyContext<T> {
 
+    private final String tenantId;
     private final int shardId;
     private final SessionFactory sessionFactory;
     private final Supplier<Boolean> entityPopulator;
@@ -943,6 +944,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     private final TransactionObserver observer;
 
     public ReadOnlyContext(
+        String tenantId,
         int shardId,
         SessionFactory sessionFactory,
         Function<String, T> getter,
@@ -952,6 +954,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         final ShardInfoProvider shardInfoProvider,
         final Class<?> entityClass,
         TransactionObserver observer) {
+      this.tenantId = tenantId;
       this.shardId = shardId;
       this.sessionFactory = sessionFactory;
       this.entityPopulator = entityPopulator;
@@ -996,7 +999,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * function to augment it with related child entity. The consumer function is applied to parent
      * entity.</p>
      *
-     * @param tenantId      Tenant id
      * @param <U>           The type of child entities.
      * @param relationalDao The relational data access object used to retrieve child entities.
      * @param criteria      The DetachedCriteria for selecting and composing parent entities.
@@ -1006,11 +1008,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException if an error occurs during the read operation or when applying the
      *                          consumer function.
      */
-    public <U> ReadOnlyContext<T> readOneAugmentParent(String tenantId,
-        MultiTenantRelationalDao<U> relationalDao,
-        DetachedCriteria criteria,
-        BiConsumer<T, List<U>> consumer) {
-      return readAugmentParent(tenantId, relationalDao, criteria, 0, 1, consumer, p -> true);
+    public <U> ReadOnlyContext<T> readOneAugmentParent(
+            MultiTenantRelationalDao<U> relationalDao,
+            DetachedCriteria criteria,
+            BiConsumer<T, List<U>> consumer) {
+      return readAugmentParent(relationalDao, criteria, 0, 1, consumer, p -> true);
     }
 
     /**
@@ -1021,7 +1023,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * retrieving only a single child entity, and then applies the provided {@code consumer}
      * function to augment parent with the retrieved child entity.</p>
      *
-     * @param tenantId      Tenant id
      * @param <U>           The type of child entities.
      * @param relationalDao The relational data access object used to retrieve child entities.
      * @param querySpec     The QuerySpec for selecting and composing parent entities.
@@ -1031,11 +1032,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException if an error occurs during the read operation or when applying the
      *                          consumer function.
      */
-    public <U> ReadOnlyContext<T> readOneAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readOneAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         QuerySpec<U, U> querySpec,
         BiConsumer<T, List<U>> consumer) {
-      return readAugmentParent(tenantId, relationalDao, querySpec, 0, 1, consumer, p -> true);
+      return readAugmentParent(relationalDao, querySpec, 0, 1, consumer, p -> true);
     }
 
     /**
@@ -1046,7 +1047,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * specified {@code criteria} The provided {@code consumer} function is then applied to augment
      * the selected parent entity with related child entities.</p>
      *
-     * @param tenantId      Tenant id
      * @param <U>           The type of child entities.
      * @param relationalDao The relational data access object used to retrieve child entities.
      * @param criteria      The DetachedCriteria for selecting and composing parent entities.
@@ -1058,14 +1058,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException if an error occurs during the read operation or when applying the
      *                          consumer function.
      */
-    public <U> ReadOnlyContext<T> readAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         DetachedCriteria criteria,
         int first,
         int numResults,
         BiConsumer<T, List<U>> consumer) {
-      return readAugmentParent(tenantId, relationalDao, criteria, first, numResults, consumer,
-          p -> true);
+      return readAugmentParent(relationalDao, criteria, first, numResults, consumer, p -> true);
     }
 
     /**
@@ -1076,7 +1075,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * {@link QuerySpec} The provided {@code consumer} function is then applied to augment the
      * selected parent entity with related child entities.</p>
      *
-     * @param tenantId      Tenant id
      * @param <U>           The type of child entities.
      * @param relationalDao The relational data access object used to retrieve child entities.
      * @param querySpec     The QuerySpec for selecting and composing parent entities.
@@ -1088,13 +1086,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException if an error occurs during the read operation or when applying the
      *                          consumer function.
      */
-    public <U> ReadOnlyContext<T> readAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         QuerySpec<U, U> querySpec,
         int first,
         int numResults,
         BiConsumer<T, List<U>> consumer) {
-      return readAugmentParent(tenantId, relationalDao, querySpec, first, numResults, consumer,
+      return readAugmentParent(relationalDao, querySpec, first, numResults, consumer,
           p -> true);
     }
 
@@ -1107,7 +1105,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * augment the selected parent entity with related child entities.</p> The filter function
      * selectively applies the consumer function to the chosen parent entity.
      *
-     * @param tenantId      Tenant id
      * @param <U>           The type of child entities.
      * @param relationalDao The relational data access object used to retrieve child entities.
      * @param criteria      The DetachedCriteria for selecting parent entities.
@@ -1120,12 +1117,12 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *                          consumer function. {@code readOneAugmentParent} method that accepts
      *                          a {@code QuerySpec} for better query composition and type-safety.
      */
-    public <U> ReadOnlyContext<T> readOneAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readOneAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         DetachedCriteria criteria,
         BiConsumer<T, List<U>> consumer,
         Predicate<T> filter) {
-      return readAugmentParent(tenantId, relationalDao, criteria, 0, 1, consumer, filter);
+      return readAugmentParent(relationalDao, criteria, 0, 1, consumer, filter);
     }
 
     /**
@@ -1137,7 +1134,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * the selected parent entity with related child entities.</p> The filter function selectively
      * applies the consumer function to the chosen parent entity.
      *
-     * @param tenantId      Tenant id
      * @param <U>           The type of child entities.
      * @param relationalDao The relational data access object used to retrieve child entities.
      * @param querySpec     The query specification for selecting parent entities.
@@ -1149,15 +1145,15 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException if an error occurs during the read operation or when applying the
      *                          consumer function.
      */
-    public <U> ReadOnlyContext<T> readOneAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readOneAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         QuerySpec<U, U> querySpec,
         BiConsumer<T, List<U>> consumer,
         Predicate<T> filter) {
-      return readAugmentParent(tenantId, relationalDao, querySpec, 0, 1, consumer, filter);
+      return readAugmentParent(relationalDao, querySpec, 0, 1, consumer, filter);
     }
 
-    public <U> ReadOnlyContext<T> readAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         DetachedCriteria criteria,
         int first,
@@ -1168,7 +1164,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         if (filter.test(parent)) {
           try {
             consumer.accept(parent,
-                relationalDao.select(tenantId, this, criteria, first, numResults));
+                relationalDao.select(this, criteria, first, numResults));
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -1186,7 +1182,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * and, if the filter condition is met, executes a query to retrieve related child entities. The
      * retrieved child entities are then passed to a consumer function for further processing </p>
      *
-     * @param tenantId      Tenant id
      * @param relationalDao A RelationalDao representing the DAO for retrieving child entities.
      * @param querySpec     A QuerySpec specifying the criteria for selecting child entities.
      * @param first         The index of the first result to retrieve (pagination).
@@ -1198,7 +1193,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If any exception occurs during the execution of the query or
      *                          processing of the parent and child entities.
      */
-    public <U> ReadOnlyContext<T> readAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readAugmentParent(
         MultiTenantRelationalDao<U> relationalDao,
         QuerySpec<U, U> querySpec,
         int first,
@@ -1209,7 +1204,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         if (filter.test(parent)) {
           try {
             consumer.accept(parent,
-                relationalDao.select(tenantId, this, querySpec, first, numResults));
+                relationalDao.select(this, querySpec, first, numResults));
           } catch (Exception e) {
             throw new RuntimeException(e);
           }

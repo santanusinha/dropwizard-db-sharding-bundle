@@ -439,16 +439,16 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         shardId));
   }
 
-  public <U> void save(String tenantId, LockedContext<U> context, T entity) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+  public <U> void save(LockedContext<U> context, T entity) {
+    val tenantId = context.getTenantId();
     RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
     val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).build();
     transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
         context.getShardId(), false);
   }
 
-  <U> void save(String tenantId, LockedContext<U> context, T entity, Function<T, T> handler) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+  <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
+    val tenantId = context.getTenantId();
     RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
     val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).afterSave(handler).build();
     transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
@@ -464,14 +464,13 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * delegates the update operation to the DAO associated with the locked context and returns a
    * boolean indicating the success of the update operation.
    *
-   * @param tenantId The tenant ID associated with the entity.
    * @param context  The locked context within which the entity is updated.
    * @param id       The ID of the entity to be updated.
    * @param updater  A function that takes the current entity and returns the updated entity.
    * @return `true` if the entity is successfully updated, or `false` if the update operation fails.
    */
-  <U> boolean update(String tenantId, LockedContext<U> context, Object id, Function<T, T> updater) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+  <U> boolean update(LockedContext<U> context, Object id, Function<T, T> updater) {
+    val tenantId = context.getTenantId();
     RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
     return update(tenantId, context.getShardId(), context.getSessionFactory(), dao, id, updater, false);
   }
@@ -486,7 +485,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * each entity, and performs the update operation. The update process continues as long as the
    * `updateNext` supplier returns `true` and there are more matching entities.
    *
-   * @param tenantId   The tenant ID associated with the entity.
    * @param context    The locked context within which entities are updated.
    * @param criteria   A DetachedCriteria object representing the criteria for filtering entities to
    *                   update.
@@ -497,12 +495,12 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * updated or the update process fails.
    * @throws RuntimeException If an error occurs during the update process.
    */
-  <U> boolean update(String tenantId,
+  <U> boolean update(
       LockedContext<U> context,
       DetachedCriteria criteria,
       UnaryOperator<T> updater,
       BooleanSupplier updateNext) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    val tenantId = context.getTenantId();
     val dao = daos.get(tenantId).get(context.getShardId());
     val opContext = UpdateWithScroll.<T>builder()
         .scroll(dao::scroll)
@@ -533,7 +531,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * entities and applies the provided updater function to update each entity. The scrolling
    * mechanism allows for processing a large number of results efficiently.
    *
-   * @param tenantId   The tenant ID associated with the entity.
    * @param context    A LockedContext<U> object containing shard information and a session
    *                   factory.
    * @param querySpec  A QuerySpec object specifying the query criteria.
@@ -545,12 +542,12 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * @throws RuntimeException If any exception occurs during the update operation with scrolling or
    *                          if criteria are not met during the process.
    */
-  <U> boolean update(String tenantId,
+  <U> boolean update(
       LockedContext<U> context,
       QuerySpec<T, T> querySpec,
       UnaryOperator<T> updater,
       BooleanSupplier updateNext) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    val tenantId = context.getTenantId();
     val dao = daos.get(tenantId).get(context.getShardId());
     val opContext = UpdateWithScroll.<T>builder()
         .scroll(dao::scroll)
@@ -572,12 +569,12 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     }
   }
 
-  <U> List<T> select(String tenantId,
+  <U> List<T> select(
       MultiTenantLookupDao.ReadOnlyContext<U> context,
       DetachedCriteria criteria,
       int start,
       int numResults) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    val tenantId = context.getTenantId();
     final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
     val opContext = Select.<T, List<T>>builder()
         .getter(dao::select)
@@ -589,6 +586,25 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         .build();
     return transactionExecutor.get(tenantId).execute(context.getSessionFactory(), true,
         "select", opContext, context.getShardId(), false);
+  }
+
+  <U> List<T> select(
+          MultiTenantRelationalDao.ReadOnlyContext<U> context,
+          DetachedCriteria criteria,
+          int start,
+          int numResults) {
+    val tenantId = context.getTenantId();
+    final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+    val opContext = Select.<T, List<T>>builder()
+            .getter(dao::select)
+            .selectParam(SelectParam.<T>builder()
+                    .criteria(criteria)
+                    .start(start)
+                    .numRows(numResults)
+                    .build())
+            .build();
+    return transactionExecutor.get(tenantId).execute(context.getSessionFactory(), true,
+            "select", opContext, context.getShardId(), false);
   }
 
 
@@ -607,9 +623,10 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * @param numResults The number of results to retrieve from the query (pagination).
    * @return A List of query results of type T.
    */
-  <U> List<T> select(String tenantId, MultiTenantLookupDao.ReadOnlyContext<U> context,
+  <U> List<T> select(MultiTenantLookupDao.ReadOnlyContext<U> context,
       QuerySpec<T, T> querySpec, int start,
       int numResults) {
+    val tenantId = context.getTenantId();
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
     val opContext = Select.<T, List<T>>builder()
@@ -624,6 +641,26 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         .execute(context.getSessionFactory(), true, "select", opContext,
             context.getShardId(),
             false);
+  }
+
+  <U> List<T> select(MultiTenantRelationalDao.ReadOnlyContext<U> context,
+                     QuerySpec<T, T> querySpec, int start,
+                     int numResults) {
+    val tenantId = context.getTenantId();
+    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+    val opContext = Select.<T, List<T>>builder()
+            .getter(dao::select)
+            .selectParam(SelectParam.<T>builder()
+                    .querySpec(querySpec)
+                    .start(start)
+                    .numRows(numResults)
+                    .build())
+            .build();
+    return transactionExecutor.get(tenantId)
+            .execute(context.getSessionFactory(), true, "select", opContext,
+                    context.getShardId(),
+                    false);
   }
 
   /**
@@ -925,9 +962,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             shardId);
   }
 
-  public <U> int updateUsingQuery(String tenantId, LockedContext<U> lockedContext,
-      UpdateOperationMeta updateOperationMeta) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+  public <U> int updateUsingQuery(LockedContext<U> lockedContext, UpdateOperationMeta updateOperationMeta) {
+    val tenantId = lockedContext.getTenantId();
     val dao = daos.get(tenantId).get(lockedContext.getShardId());
     val opContext = UpdateByQuery.builder()
         .updater(dao::update).updateOperationMeta(updateOperationMeta).build();
@@ -943,7 +979,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     int shardId = shardCalculator.shardId(tenantId, parentKey);
     RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new LockedContext<>(shardId, dao.sessionFactory, () -> dao.getLockedForWrite(criteria),
+    return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(criteria),
         entityClass, shardInfoProviders.get(tenantId), observer);
   }
 
@@ -970,7 +1006,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     int shardId = shardCalculator.shardId(tenantId, parentKey);
     RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new LockedContext<>(shardId, dao.sessionFactory, () -> dao.getLockedForWrite(querySpec),
+    return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(querySpec),
         entityClass, shardInfoProviders.get(tenantId), observer);
   }
 
@@ -993,18 +1029,18 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     int shardId = shardCalculator.shardId(tenantId, parentKey);
     RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-    return new LockedContext<>(shardId, dao.sessionFactory, dao::save, entity,
+    return new LockedContext<>(tenantId, shardId, dao.sessionFactory, dao::save, entity,
         entityClass, shardInfoProviders.get(tenantId), observer);
   }
 
-  <U> boolean createOrUpdate(final String tenantId,
+  <U> boolean createOrUpdate(
       LockedContext<U> context,
       DetachedCriteria criteria,
       UnaryOperator<T> updater,
       U parent,
       Function<U, T> entityGenerator) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-    final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+    val tenantId = context.getTenantId();
+    val dao = daos.get(tenantId).get(context.getShardId());
     val selectParam = SelectParam.<T>builder()
         .criteria(criteria)
         .start(0)
@@ -1031,14 +1067,14 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     }
   }
 
-  <U> boolean createOrUpdate(final String tenantId,
+  <U> boolean createOrUpdate(
       LockedContext<U> context,
       QuerySpec<T, T> querySpec,
       UnaryOperator<T> updater,
       U parent,
       Function<U, T> entityGenerator) {
-    Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-    final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+    val tenantId = context.getTenantId();
+    val dao = daos.get(tenantId).get(context.getShardId());
     val selectParam = SelectParam.<T>builder()
         .querySpec(querySpec)
         .start(0)
@@ -1076,7 +1112,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * a new entity using the entity generator and saves it. - If an entity is found, it applies the
    * provided updater function to update the entity.
    *
-   * @param tenantId        The tenant ID associated with the entity.
    * @param context         A LockedContext object containing information about the shard and
    *                        session factory.
    * @param querySpec       A QuerySpec object specifying the criteria for selecting an entity.
@@ -1088,13 +1123,13 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    * @throws RuntimeException If any exception occurs during the create/update operation or if
    *                          criteria are not met during the process.
    */
-  <U> boolean createOrUpdate(final String tenantId,
+  <U> boolean createOrUpdate(
       LockedContext<U> context,
       QuerySpec<T, T> querySpec,
       UnaryOperator<T> updater,
       U parent,
       Supplier<T> entityGenerator) {
-    return createOrUpdate(tenantId, context, querySpec, updater, parent,
+    return createOrUpdate(context, querySpec, updater, parent,
         e -> entityGenerator.get());
   }
 
@@ -1502,7 +1537,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
     val shardId = shardCalculator.shardId(tenantId, parentKey);
     val dao = daos.get(tenantId).get(shardId);
-    return new ReadOnlyContext<>(shardId,
+    return new ReadOnlyContext<>(tenantId, shardId,
         dao.sessionFactory,
         () -> Lists.newArrayList(dao.getLocked(key, criteriaUpdater, LockMode.NONE)),
         entityPopulator,
@@ -1550,7 +1585,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         .start(first)
         .numRows(numResults)
         .build();
-    return new ReadOnlyContext<>(shardId,
+    return new ReadOnlyContext<>(tenantId, shardId,
         dao.sessionFactory,
         () -> dao.select(selectParam),
         entityPopulator,
@@ -1585,7 +1620,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
    *                        performed.
    * @return A new ReadOnlyContext for executing read operations on the selected entities.
    */
-  public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
+  public ReadOnlyContext<T> readOnlyExecutor(final String tenantId,
+                                             final String parentKey,
       final QuerySpec<T, T> querySpec,
       final int first,
       final int numResults,
@@ -1598,7 +1634,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         .start(first)
         .numRows(numResults)
         .build();
-    return new ReadOnlyContext<>(shardId,
+    return new ReadOnlyContext<>(tenantId, shardId,
         dao.sessionFactory,
         () -> dao.select(selectParam),
         entityPopulator,
@@ -1654,6 +1690,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
   @Getter
   public static class ReadOnlyContext<T> {
 
+    private final String tenantId;
     private final int shardId;
     private final SessionFactory sessionFactory;
     private final Supplier<Boolean> entityPopulator;
@@ -1662,6 +1699,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     private final TransactionObserver observer;
 
     public ReadOnlyContext(
+        final String tenantId,
         final int shardId,
         final SessionFactory sessionFactory,
         final Supplier<List<T>> getter,
@@ -1671,6 +1709,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         final Class<?> entityClass,
         final TransactionObserver observer
     ) {
+      this.tenantId = tenantId;
       this.shardId = shardId;
       this.sessionFactory = sessionFactory;
       this.entityPopulator = entityPopulator;
@@ -1696,14 +1735,13 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
       return this;
     }
 
-    public <U> ReadOnlyContext<T> readAugmentParent(String tenantId,
+    public <U> ReadOnlyContext<T> readAugmentParent(
         final MultiTenantRelationalDao<U> relationalDao,
         final QueryFilterSpec<U> queryFilterSpec,
         final int first,
         final int numResults,
         final BiConsumer<T, List<U>> consumer) {
-      return readAugmentParent(tenantId, relationalDao, queryFilterSpec, first, numResults, consumer,
-          p -> true);
+      return readAugmentParent(relationalDao, queryFilterSpec, first, numResults, consumer, p -> true);
     }
 
     /**
@@ -1729,7 +1767,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If any exception occurs during the execution of the query or
      *                          processing of the parent and child entities.
      */
-    private <U> ReadOnlyContext<T> readAugmentParent(String tenantId,
+    private <U> ReadOnlyContext<T> readAugmentParent(
         final MultiTenantRelationalDao<U> relationalDao,
         final QueryFilterSpec<U> queryFilterSpec,
         final int first,

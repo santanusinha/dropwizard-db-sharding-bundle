@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.sharding.ShardedTransaction;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
@@ -44,6 +45,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao<T> {
 
+    private String dbNamespace;
     private List<DaoType> daos;
     @Getter
     private final ShardCalculator<String> shardCalculator;
@@ -55,8 +57,17 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @param daoClass         Class for the dao.
      * @param shardCalculator  {@link ShardCalculator} for finding shard
      */
-    public WrapperDao(List<SessionFactory> sessionFactories, Class<DaoType> daoClass, ShardCalculator<String> shardCalculator) {
-        this(sessionFactories, daoClass, null, null, shardCalculator);
+    public WrapperDao(List<SessionFactory> sessionFactories,
+                      Class<DaoType> daoClass,
+                      ShardCalculator<String> shardCalculator) {
+        this(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, daoClass, shardCalculator);
+    }
+
+    public WrapperDao(String dbNamespace,
+                      List<SessionFactory> sessionFactories,
+                      Class<DaoType> daoClass,
+                      ShardCalculator<String> shardCalculator) {
+        this(dbNamespace, sessionFactories, daoClass, null, null, shardCalculator);
     }
 
     /**
@@ -69,9 +80,11 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @param shardCalculator              {@link ShardCalculator} for finding shard
      */
     public WrapperDao(
+            String dbNamespace,
             List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
             Class[] extraConstructorParamClasses,
             Class[] extraConstructorParamObjects, ShardCalculator<String> shardCalculator) {
+        this.dbNamespace = dbNamespace;
         this.shardCalculator = shardCalculator;
         this.daos = sessionFactories.stream().map((SessionFactory sessionFactory) -> {
             Enhancer enhancer = new Enhancer();
@@ -107,7 +120,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @return Wrapper for parent dao
      */
     public DaoType forParent(final String parentKey) {
-        return daos.get(shardCalculator.shardId(parentKey));
+        return daos.get(shardCalculator.shardId(dbNamespace, parentKey));
     }
 
     @SuppressWarnings("unchecked")

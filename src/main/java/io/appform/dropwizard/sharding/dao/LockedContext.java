@@ -35,6 +35,7 @@ public class LockedContext<T> {
         void mutator(T parent);
     }
 
+    private final String tenantId;
     private final int shardId;
     private final SessionFactory sessionFactory;
     private final TransactionExecutionContext executionContext;
@@ -55,12 +56,14 @@ public class LockedContext<T> {
      * @param observer An observer for monitoring transaction events.
      */
     public LockedContext(
+            String tenantId,
             int shardId,
             SessionFactory sessionFactory,
             Supplier<T> getter,
             Class<T> entityClass,
             ShardInfoProvider shardInfoProvider,
             TransactionObserver observer) {
+        this.tenantId = tenantId;
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
         this.observer = observer;
@@ -86,6 +89,7 @@ public class LockedContext<T> {
      * @param observer An observer for monitoring transaction events.
      */
     public LockedContext(
+            String tenantId,
             int shardId,
             SessionFactory sessionFactory,
             Function<T, T> saver,
@@ -93,6 +97,7 @@ public class LockedContext<T> {
             Class<T> entityClass,
             ShardInfoProvider shardInfoProvider,
             TransactionObserver observer) {
+        this.tenantId = tenantId;
         this.shardId = shardId;
         this.sessionFactory = sessionFactory;
         this.observer = observer;
@@ -173,7 +178,6 @@ public class LockedContext<T> {
      * Generates entity of type {@code U} using entityGenerator and then persists them
      *
      * @param <U>             The type of the associated entity to be saved.
-     * @param tenantId        Tenant Id
      * @param relationalDao   The relational DAO responsible for saving the associated entity.
      * @param entityGenerator A function that generates the associated entity based on the parent entity.
      * @return A reference to this LockedContext, enabling method chaining.
@@ -184,11 +188,11 @@ public class LockedContext<T> {
      * @throws IllegalArgumentException if the provided relational DAO or entity generator function is null.
      *                                  This exception indicates invalid or missing inputs.
      */
-    public <U> LockedContext<T> save(String tenantId, MultiTenantRelationalDao<U> relationalDao, Function<T, U> entityGenerator) {
+    public <U> LockedContext<T> save(MultiTenantRelationalDao<U> relationalDao, Function<T, U> entityGenerator) {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
-                relationalDao.save(tenantId, this, entity);
+                relationalDao.save(this, entity);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -226,7 +230,6 @@ public class LockedContext<T> {
      * Generates list of entity of type {@code U} using entityGenerator and then persists them in bulk
      *
      * @param <U>             The type of the associated entity to be saved.
-     * @param tenantId        Tenant Id
      * @param relationalDao   The relational DAO responsible for saving the associated entity.
      * @param entityGenerator A function that generates the associated entity based on the parent entity.
      * @return A reference to this LockedContext, enabling method chaining.
@@ -237,12 +240,12 @@ public class LockedContext<T> {
      * @throws IllegalArgumentException if the provided relational DAO or entity generator function is null.
      *                                  This exception indicates invalid or missing inputs.
      */
-    public <U> LockedContext<T> saveAll(String tenantId, MultiTenantRelationalDao<U> relationalDao, Function<T, List<U>> entityGenerator) {
+    public <U> LockedContext<T> saveAll(MultiTenantRelationalDao<U> relationalDao, Function<T, List<U>> entityGenerator) {
         return apply(parent -> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
-                    relationalDao.save(tenantId, this, entity);
+                    relationalDao.save(this, entity);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
