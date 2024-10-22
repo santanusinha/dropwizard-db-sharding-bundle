@@ -1,10 +1,10 @@
 package io.appform.dropwizard.sharding.dao.operations;
 
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.Function;
 
@@ -15,25 +15,25 @@ import java.util.function.Function;
  */
 @Data
 @Builder
-public class RunWithCriteria<T> extends OpContext<T> {
+public class RunWithCriteria<T, R> extends OpContext<T> {
 
-  @NonNull
-  private Function<DetachedCriteria, T> handler;
-  @NonNull
-  private DetachedCriteria detachedCriteria;
+    @NonNull
+    private QuerySpec<T, R> detachedCriteria;
+    @NonNull
+    private Function<QuerySpec<T, R>, T> handler;
 
-  @Override
-  public T apply(Session session) {
-    return handler.apply(detachedCriteria);
-  }
+    @Override
+    public T apply(Session session) {
+        return handler.apply(detachedCriteria);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.RUN_WITH_CRITERIA;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.RUN_WITH_CRITERIA;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

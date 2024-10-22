@@ -346,56 +346,9 @@ public class LockedContext<T> {
         });
     }
 
-    /**
-     * Creates or updates an associated entity using a relational DAO, criteria, an updater function, and an entity generator.
-     *
-     * @param <U>           The type of the parent entity associated with LockedContext
-     * @param relationalDao The relational DAO responsible for creating or updating the associated entity.
-     * @param criteria      The criteria used to determine whether to create or update the entity.
-     * @param updater       A function that can modify the associated entity before updating or creating.
-     * @param entityGenerator A supplier function that generates a new entity if needed.
-     * @return A reference to this LockedContext, enabling method chaining.
-     *
-     * <p>
-     * This method allows for the creation or updating of an associated entity using a provided relational DAO, criteria,
-     * an updater function, and an entity generator. The criteria are used to determine whether to create a new entity or
-     * update an existing one.
-     * </p>
-     *
-     * <p>
-     * The {@code relationalDao} parameter represents an instance of a {@link RelationalDao} responsible for the
-     * create or update operation. The {@code criteria} parameter defines the criteria for determining whether to
-     * create or update the entity. The {@code updater} function can modify the associated entity before the create or
-     * update operation is performed, and the {@code entityGenerator} is used to supply a new entity if creation is required.
-     * </p>
-     *
-     * <p>
-     * After the create or update operation is applied, this method returns a reference to the current LockedContext,
-     * enabling method chaining or further operations on the context.
-     * </p>
-     *
-     * <p>
-     * If an exception occurs during the create or update operation, it is wrapped in a {@link RuntimeException},
-     * indicating that the operation was unsuccessful.
-     * </p>
-     */
     public <U> LockedContext<T> createOrUpdate(
             RelationalDao<U> relationalDao,
-            DetachedCriteria criteria,
-            UnaryOperator<U> updater,
-            Supplier<U> entityGenerator) {
-        return apply(parent -> {
-            try {
-                relationalDao.createOrUpdate(this, criteria, updater, parent, p -> entityGenerator.get());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
-    public <U> LockedContext<T> createOrUpdate(
-            RelationalDao<U> relationalDao,
-            DetachedCriteria criteria,
+            QuerySpec<T, U> criteria,
             UnaryOperator<U> updater,
             Function<T, U> entityGenerator) {
         return apply(parent -> {

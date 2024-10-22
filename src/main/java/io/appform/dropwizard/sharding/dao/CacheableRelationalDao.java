@@ -22,9 +22,9 @@ import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import org.hibernate.SessionFactory;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
 import java.util.Map;
@@ -93,7 +93,7 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
     }
 
     @Override
-    public List<T> select(String parentKey, DetachedCriteria criteria, int first, int numResults) throws Exception {
+    public List<T> select(String parentKey, QuerySpec<T, T> criteria, int first, int numResults) throws Exception {
         return delegate.select(dbNamespace, parentKey, criteria, first, numResults);
     }
 

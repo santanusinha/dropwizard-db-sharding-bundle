@@ -71,7 +71,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <dropwizard.version>2.1.10</dropwizard.version>
+        <dropwizard.version>4.0.8</dropwizard.version>
         <lombok.version>1.18.34</lombok.version>
         <cglib.version>3.3.0</cglib.version>
         <guava.version>33.2.1-jre</guava.version>

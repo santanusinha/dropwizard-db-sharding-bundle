@@ -21,56 +21,55 @@ import java.util.function.Function;
  */
 @Data
 public abstract class OpContext<T> implements Function<Session, T> {
-  public abstract OpType getOpType();
 
-  public abstract <P> P visit(OpContextVisitor<P> visitor);
+    public abstract OpType getOpType();
 
-  public interface OpContextVisitor<P> {
+    public abstract <P> P visit(OpContextVisitor<P> visitor);
 
-    P visit(Count opContext);
+    public interface OpContextVisitor<P> {
 
-    P visit(CountByQuerySpec opContext);
+        <T> P visit(Count<T> opContext);
 
-    <T, R> P visit(Get<T, R> opContext);
+        <T, R> P visit(Get<T, R> opContext);
 
-    <T> P visit(GetAndUpdate<T> opContext);
+        <T> P visit(GetAndUpdate<T> opContext);
 
-    <T, R> P visit(GetByLookupKey<T, R> opContext);
+        <T, R> P visit(GetByLookupKey<T, R> opContext);
 
-    <T> P visit(GetAndUpdateByLookupKey<T> opContext);
+        <T> P visit(GetAndUpdateByLookupKey<T> opContext);
 
-    <T> P visit(ReadOnlyForLookupDao<T> opContext);
+        <T> P visit(ReadOnlyForLookupDao<T> opContext);
 
-    <T> P visit(ReadOnlyForRelationalDao<T> opContext);
+        <T> P visit(ReadOnlyForRelationalDao<T> opContext);
 
-    <T> P visit(LockAndExecute<T> opContext);
+        <T> P visit(LockAndExecute<T> opContext);
 
-    P visit(UpdateByQuery opContext);
+        P visit(UpdateByQuery opContext);
 
-    <T> P visit(UpdateWithScroll<T> opContext);
+        <T> P visit(UpdateWithScroll<T> opContext);
 
-    <T> P visit(UpdateAll<T> opContext);
+        <T> P visit(UpdateAll<T> opContext);
 
-    <T> P visit(SelectAndUpdate<T> opContext);
+        <T> P visit(SelectAndUpdate<T> opContext);
 
-    <T> P visit(RunInSession<T> opContext);
+        <T> P visit(RunInSession<T> opContext);
 
-    <T> P visit(RunWithCriteria<T> opContext);
+        <T> P visit(RunWithCriteria<T> opContext);
 
-    P visit(DeleteByLookupKey opContext);
+        P visit(DeleteByLookupKey opContext);
 
-    <U, V> P visit(Save<U, V> opContext);
+        <U, V> P visit(Save<U, V> opContext);
 
-    <T> P visit(SaveAll<T> opContext);
+        <T> P visit(SaveAll<T> opContext);
 
-    <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
+        <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
 
-    <T> P visit(CreateOrUpdate<T> opContext);
+        <T> P visit(CreateOrUpdate<T> opContext);
 
-    <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
+        <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
-    <T, R> P visit(Select<T, R> opContext);
+        <T, R> P visit(Select<T, R> opContext);
 
-  }
+    }
 
 }
