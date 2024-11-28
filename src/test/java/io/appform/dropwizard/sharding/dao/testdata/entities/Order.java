@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao.testdata.entities;
 
+import io.appform.dropwizard.sharding.sharding.BucketId;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -51,6 +52,10 @@ public class Order {
     @Column(name = "id")
     private long id;
 
+    @BucketId
+    @Column(name = "bucket_id")
+    public int bucketId;
+
     @Column(name = "order_ext_id", unique = true)
     private String orderId;
 
@@ -74,11 +79,11 @@ public class Order {
             return false;
         }
         Class<?> oEffectiveClass = o instanceof HibernateProxy
-                                   ? ((HibernateProxy) o).getHibernateLazyInitializer()
-                                           .getPersistentClass() : o.getClass();
+                ? ((HibernateProxy) o).getHibernateLazyInitializer()
+                .getPersistentClass() : o.getClass();
         Class<?> thisEffectiveClass = this instanceof HibernateProxy
-                                      ? ((HibernateProxy) this).getHibernateLazyInitializer()
-                                              .getPersistentClass() : this.getClass();
+                ? ((HibernateProxy) this).getHibernateLazyInitializer()
+                .getPersistentClass() : this.getClass();
         if (thisEffectiveClass != oEffectiveClass) {
             return false;
         }
