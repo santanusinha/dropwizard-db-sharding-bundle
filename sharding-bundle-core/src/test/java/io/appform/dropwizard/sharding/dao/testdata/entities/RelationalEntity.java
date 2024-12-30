@@ -26,6 +26,7 @@ public class RelationalEntity {
     @Column(name = "`key`", nullable = false, unique = true)
     private String key;
 
+    @Column(name = "keyTwo")
     private String keyTwo;
 
     @Column(name = "`value`")
