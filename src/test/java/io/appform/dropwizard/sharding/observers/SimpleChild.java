@@ -34,7 +34,7 @@ public class SimpleChild {
     @Column
     private String parent;
 
-    @Column
+    @Column (name = "`value`")
     private String value;
 
     @Override
