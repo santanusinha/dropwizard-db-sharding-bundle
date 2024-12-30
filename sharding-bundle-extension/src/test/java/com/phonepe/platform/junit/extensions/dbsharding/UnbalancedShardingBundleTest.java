@@ -1,7 +1,5 @@
 package com.phonepe.platform.junit.extensions.dbsharding;
 
-import com.phonepe.platform.junit.extensions.dropwizard.DropwizardStarterExtension;
-import io.appform.dropwizard.sharding.BalancedDBShardingBundle;
 import io.appform.dropwizard.sharding.DBShardingBundle;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
@@ -11,7 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@ExtendWith({DropwizardStarterExtension.class, DBShardingExtension.class})
+@ExtendWith({DBShardingExtension.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Disabled
 public class UnbalancedShardingBundleTest {

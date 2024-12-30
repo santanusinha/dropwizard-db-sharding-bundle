@@ -116,7 +116,7 @@ public class LockTest {
         assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         assertEquals("Changed", lookupDao.get("0").get().getName());
         assertEquals(6, relationDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class), 0, 10).size());
-        assertEquals("Hello", relationDao.get("0", 1L).get().getVal());
+        assertEquals("Hello", relationDao.get("0", 1L).get().getValue());
     }
 
     @Test
@@ -177,7 +177,7 @@ public class LockTest {
         lookupDao.saveAndGetExecutor(p1)
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
                 .update(relationDao, c1.getId(), child -> {
-                    child.setVal("Hello Changed");
+                    child.setValue("Hello Changed");
                     return child;
                 })
                 .mutate(parent -> parent.setName("Changed"))
@@ -185,7 +185,7 @@ public class LockTest {
 
         assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         assertEquals("Changed", lookupDao.get("0").get().getName());
-        assertEquals("Hello Changed", relationDao.get("0", 1L).get().getVal());
+        assertEquals("Hello Changed", relationDao.get("0", 1L).get().getValue());
     }
 
     @Test
@@ -212,7 +212,7 @@ public class LockTest {
 
         assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         assertEquals("Changed", lookupDao.get("0").get().getName());
-        assertEquals("Hello Changed", relationDao.get("0", 1L).get().getVal());
+        assertEquals("Hello Changed", relationDao.get("0", 1L).get().getValue());
     }
 
     @Test
@@ -295,14 +295,14 @@ public class LockTest {
                 .mutate(parentObj -> parentObj.setName(parentModifiedValue))
                 .execute();
 
-        assertEquals(childModifiedValue, relationDao.get(parent.getMyId(), child.getId()).get().getVal());
+        assertEquals(childModifiedValue, relationDao.get(parent.getMyId(), child.getId()).get().getValue());
         assertEquals(parentModifiedValue, lookupDao.get(parentId).get().getName());
 
         //test non existing entity creation
         final String newChildValue = "Newly created child";
         final String newParentValue = "New parent Value";
         final DetachedCriteria creationCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("val", newChildValue));
+                .add(Restrictions.eq("value", newChildValue));
 
         lookupDao.lockAndGetExecutor(parent.getMyId())
                 .createOrUpdate(relationDao, creationCriteria, childObj -> {
@@ -323,7 +323,7 @@ public class LockTest {
                 .stream()
                 .findFirst()
                 .get();
-        assertEquals(newChildValue, savedChild.getVal());
+        assertEquals(newChildValue, savedChild.getValue());
         assertNotEquals(child.getId(), savedChild.getId());
         assertEquals(newParentValue, lookupDao.get(parentId).get().getName());
     }
@@ -348,7 +348,7 @@ public class LockTest {
                 .updateUsingQuery(relationDao,
                         UpdateOperationMeta.builder()
                                 .queryName("testUpdateUsingMyId")
-                                .params(ImmutableMap.of("val",
+                                .params(ImmutableMap.of("value",
                                         childModifiedValue,
                                         "myId",
                                         parent.getMyId()))
@@ -357,7 +357,7 @@ public class LockTest {
 
         val updatedChild = relationDao.get(parent.getMyId(), child.getId()).orElse(null);
         assertNotNull(updatedChild);
-        assertEquals(childModifiedValue, updatedChild.getVal());
+        assertEquals(childModifiedValue, updatedChild.getValue());
     }
 
 
@@ -403,17 +403,17 @@ public class LockTest {
 
         lookupDao.lockAndGetExecutor(parent1.getMyId())
                 .update(relationDao, allSelectCriteria, entityObj -> {
-                    entityObj.setVal(childModifiedValue);
+                    entityObj.setValue(childModifiedValue);
                     return entityObj;
                 }, () -> true)
                 .mutate(parent -> parent.setName(parentModifiedValue))
                 .execute();
 
-        assertEquals(childModifiedValue, relationDao.get(parent1.getMyId(), child1.getId()).get().getVal());
-        assertEquals(childModifiedValue, relationDao.get(parent1.getMyId(), child2.getId()).get().getVal());
+        assertEquals(childModifiedValue, relationDao.get(parent1.getMyId(), child1.getId()).get().getValue());
+        assertEquals(childModifiedValue, relationDao.get(parent1.getMyId(), child2.getId()).get().getValue());
         assertEquals(parentModifiedValue, lookupDao.get(parent1Id).get().getName());
 
-        assertEquals("Hello3", relationDao.get(parent2.getMyId(), child3.getId()).get().getVal());
+        assertEquals("Hello3", relationDao.get(parent2.getMyId(), child3.getId()).get().getValue());
         assertEquals("Parent 2", lookupDao.get(parent2Id).get().getName());
 
         final boolean[] shouldUpdateNext = new boolean[1];

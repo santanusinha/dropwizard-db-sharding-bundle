@@ -51,8 +51,8 @@ public class ScrollTestEntity {
     @Column(name = "ext_id", unique = true)
     private String externalId;
 
-    @Column(name = "val", nullable = false)
-    private int val;
+    @Column(name = "`value`", nullable = false)
+    private int value;
 
     @Override
     public boolean equals(Object o) {

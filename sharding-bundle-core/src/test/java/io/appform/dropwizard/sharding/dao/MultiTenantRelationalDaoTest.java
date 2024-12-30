@@ -126,12 +126,12 @@ public class MultiTenantRelationalDaoTest {
   public void testBulkSave() throws Exception {
     String key = "testPhone";
     RelationalEntity entityOne = RelationalEntity.builder()
-        .keyOne("1")
-        .val("abcd")
+        .key("1")
+        .value("abcd")
         .build();
     RelationalEntity entityTwo = RelationalEntity.builder()
-        .keyOne("2")
-        .val("abcd")
+        .key("2")
+        .value("abcd")
         .build();
     relationalDao.saveAll("TENANT1", key, Lists.newArrayList(entityOne, entityTwo));
     relationalDao.saveAll("TENANT1", key, Lists.newArrayList(entityOne, entityTwo));
@@ -148,28 +148,28 @@ public class MultiTenantRelationalDaoTest {
     val saved = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
             DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
                 .add(Property.forName("key").eq("testId")),
-            e -> e.setVal("Some Other Text"),
+            e -> e.setValue("Some Other Text"),
             () -> RelationalEntityWithAIKey.builder()
-                .keyOne("testId")
-                .val("Some New Text")
+                .key("testId")
+                .value("Some New Text")
                 .build())
         .orElse(null);
     assertNotNull(saved);
-    assertEquals("Some New Text", saved.getVal());
+    assertEquals("Some New Text", saved.getValue());
 
     val updated = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
             DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
                 .add(Property.forName("key").eq("testId")),
-            e -> e.setVal("Some Other Text"),
+            e -> e.setValue("Some Other Text"),
             () -> RelationalEntityWithAIKey.builder()
-                .keyOne("testId")
-                .val("Some New Text")
+                .key("testId")
+                .value("Some New Text")
                 .build())
         .orElse(null);
     ;
     assertNotNull(updated);
     assertEquals(saved.getId(), updated.getId());
-    assertEquals("Some Other Text", updated.getVal());
+    assertEquals("Some Other Text", updated.getValue());
   }
 
   @Test
@@ -177,23 +177,23 @@ public class MultiTenantRelationalDaoTest {
     val relationalKey = UUID.randomUUID().toString();
 
     val entityOne = RelationalEntity.builder()
-        .keyOne("1")
+        .key("1")
         .keyTwo("1")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     relationalDao.save("TENANT1", relationalKey, entityOne);
 
     val entityTwo = RelationalEntity.builder()
-        .keyOne("2")
+        .key("2")
         .keyTwo("2")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     relationalDao.save("TENANT1", relationalKey, entityTwo);
 
     val entityThree = RelationalEntity.builder()
-        .keyOne("3")
+        .key("3")
         .keyTwo("2")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     relationalDao.save("TENANT1", relationalKey, entityThree);
 
@@ -202,18 +202,18 @@ public class MultiTenantRelationalDaoTest {
         UpdateOperationMeta.builder()
             .queryName("testUpdateUsingKeyTwo")
             .params(ImmutableMap.of("keyTwo", "2",
-                "val", newValue))
+                "value", newValue))
             .build()
     );
     assertEquals(2, rowsUpdated);
 
     val persistedEntityTwo = relationalDao.get("TENANT1", relationalKey, "2").orElse(null);
     assertNotNull(persistedEntityTwo);
-    assertEquals(newValue, persistedEntityTwo.getVal());
+    assertEquals(newValue, persistedEntityTwo.getValue());
 
     val persistedEntityThree = relationalDao.get("TENANT1", relationalKey, "3").orElse(null);
     assertNotNull(persistedEntityThree);
-    assertEquals(newValue, persistedEntityThree.getVal());
+    assertEquals(newValue, persistedEntityThree.getValue());
 
 
   }
@@ -223,23 +223,23 @@ public class MultiTenantRelationalDaoTest {
     val relationalKey = UUID.randomUUID().toString();
 
     val entityOne = RelationalEntity.builder()
-        .keyOne("1")
+        .key("1")
         .keyTwo("1")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     relationalDao.save("TENANT1", relationalKey, entityOne);
 
     val entityTwo = RelationalEntity.builder()
-        .keyOne("2")
+        .key("2")
         .keyTwo("2")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     relationalDao.save("TENANT1", relationalKey, entityTwo);
 
     val entityThree = RelationalEntity.builder()
-        .keyOne("3")
+        .key("3")
         .keyTwo("2")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     relationalDao.save("TENANT1", relationalKey, entityThree);
 
@@ -249,7 +249,7 @@ public class MultiTenantRelationalDaoTest {
             .queryName("testUpdateUsingKeyTwo")
             .params(ImmutableMap.of("keyTwo",
                 UUID.randomUUID().toString(),
-                "val",
+                "value",
                 newValue))
             .build()
     );
@@ -257,15 +257,15 @@ public class MultiTenantRelationalDaoTest {
 
     val persistedEntityOne = relationalDao.get("TENANT1", relationalKey, "1").orElse(null);
     assertNotNull(persistedEntityOne);
-    assertEquals(entityOne.getVal(), persistedEntityOne.getVal());
+    assertEquals(entityOne.getValue(), persistedEntityOne.getValue());
 
     val persistedEntityTwo = relationalDao.get("TENANT1", relationalKey, "2").orElse(null);
     assertNotNull(persistedEntityTwo);
-    assertEquals(entityTwo.getVal(), persistedEntityTwo.getVal());
+    assertEquals(entityTwo.getValue(), persistedEntityTwo.getValue());
 
     val persistedEntityThree = relationalDao.get("TENANT1", relationalKey, "3").orElse(null);
     assertNotNull(persistedEntityThree);
-    assertEquals(entityThree.getVal(), persistedEntityThree.getVal());
+    assertEquals(entityThree.getValue(), persistedEntityThree.getValue());
   }
 
   @Test
@@ -273,9 +273,9 @@ public class MultiTenantRelationalDaoTest {
     val relationalKey = UUID.randomUUID().toString();
 
     val entityOne = RelationalEntity.builder()
-        .keyOne("1")
+        .key("1")
         .keyTwo("1")
-        .val(UUID.randomUUID().toString())
+        .value(UUID.randomUUID().toString())
         .build();
     MDC.clear();
     relationalDao.save("TENANT1", relationalKey, entityOne);
@@ -292,8 +292,8 @@ public class MultiTenantRelationalDaoTest {
             ids.add(id);
             relationalDao.save("TENANT1", UUID.randomUUID().toString(),
                 RelationalEntity.builder()
-                    .keyOne(id)
-                    .val("abcd" + i)
+                    .key(id)
+                    .value("abcd" + i)
                     .build());
           } catch (Exception e) {
             throw new RuntimeException(e);
@@ -307,7 +307,7 @@ public class MultiTenantRelationalDaoTest {
         nextPtr = relationalDao.scrollUp("TENANT1",
             DetachedCriteria.forClass(RelationalEntity.class),
             null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
-        nextPtr.getResult().forEach(e -> receivedIds.add(e.getKeyOne()));
+        nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
       }
       while (!nextPtr.getResult().isEmpty());
       assertEquals(ids, receivedIds);
@@ -320,7 +320,7 @@ public class MultiTenantRelationalDaoTest {
         nextPtr = relationalDao.scrollDown("TENANT1",
             DetachedCriteria.forClass(RelationalEntity.class),
             null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
-        nextPtr.getResult().forEach(e -> receivedIds.add(e.getKeyOne()));
+        nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
       }
       while (!nextPtr.getResult().isEmpty());
       assertEquals(ids, receivedIds);
@@ -337,8 +337,8 @@ public class MultiTenantRelationalDaoTest {
             ids.add(id);
             relationalDao.save("TENANT1", UUID.randomUUID().toString(),
                 RelationalEntity.builder()
-                    .keyOne(id)
-                    .val("abcd" + i)
+                    .key(id)
+                    .value("abcd" + i)
                     .build());
           } catch (Exception e) {
             throw new RuntimeException(e);
@@ -349,7 +349,7 @@ public class MultiTenantRelationalDaoTest {
             .values()
             .stream()
             .flatMap(Collection::stream)
-            .map(v -> ((RelationalEntity) v).getKeyOne())
+            .map(v -> ((RelationalEntity) v).getKey())
             .collect(Collectors.toSet()));
   }
 
@@ -360,9 +360,9 @@ public class MultiTenantRelationalDaoTest {
     val relationalKeys = generateIdsInSameShard(numOfRecords, "TENANT1");
     for (String relationalKey : relationalKeys) {
       relationalDao.save("TENANT1", relationalKey, RelationalEntity.builder()
-          .keyOne(relationalKey)
+          .key(relationalKey)
           .keyTwo(relationalKey)
-          .val(UUID.randomUUID().toString())
+          .value(UUID.randomUUID().toString())
           .build());
     }
 

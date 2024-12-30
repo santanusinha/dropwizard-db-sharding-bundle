@@ -49,12 +49,12 @@ public class SomeOtherObject {
     @Column(name = "my_id")
     private String myId;
 
-    @Column(name = "val")
-    private String val;
+    @Column(name = "`value`")
+    private String value;
 
     @Builder
     public SomeOtherObject(String myId, String value) {
         this.myId = myId;
-        this.val = value;
+        this.value = value;
     }
 }

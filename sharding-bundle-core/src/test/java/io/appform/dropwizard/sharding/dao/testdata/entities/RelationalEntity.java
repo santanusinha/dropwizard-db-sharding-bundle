@@ -19,16 +19,17 @@ import javax.persistence.Table;
 @Builder
 @Table(name = "relations")
 @NamedQueries({
-        @NamedQuery(name = "testUpdateUsingKeyTwo", query = "update RelationalEntity set val = :val where key_two =:keyTwo")})
+        @NamedQuery(name = "testUpdateUsingKeyTwo", query = "update RelationalEntity set value = :value where keyTwo =:keyTwo")})
 public class RelationalEntity {
 
     @Id
-    @Column(name = "key_one", nullable = false, unique = true)
-    private String keyOne;
+    @Column(name = "`key`", nullable = false, unique = true)
+    private String key;
 
-    @Column(name = "key_two")
+    @Column(name = "keyTwo")
     private String keyTwo;
 
-    private String val;
+    @Column(name = "`value`")
+    private String value;
 
 }
