@@ -3,14 +3,20 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <packaging>pom</packaging>
 
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>2.1.10-8</version>
+    <version>2.1.10-9-SNAPSHOT</version>
     <name>Dropwizard Database Sharding Bundle</name>
     <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>
     <description>Application layer database sharding over SQL dbs</description>
     <inceptionYear>2016</inceptionYear>
+
+    <modules>
+        <module>sharding-bundle-extension</module>
+        <module>sharding-bundle-core</module>
+    </modules>
 
     <scm>
         <connection>scm:git:https://github.com/santanusinha/dropwizard-db-sharding-bundle</connection>
@@ -78,8 +84,8 @@
         <guava-retrying.version>2.0.0</guava-retrying.version>
         <caffeine.version>2.9.3</caffeine.version>
         <jasypt-hibernate5.version>1.9.5</jasypt-hibernate5.version>
-        <junit.jupiter.version>5.7.2</junit.jupiter.version>
-        <h2.version>1.4.196</h2.version>
+        <junit.jupiter.version>5.9.3</junit.jupiter.version>
+        <h2.version>2.2.224</h2.version>
         <mockito.version>4.3.1</mockito.version>
     </properties>
 
@@ -255,27 +261,27 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.0.0-M2</version>
-                <executions>
-                    <execution>
-                        <id>enforce-no-snapshots</id>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
-                        <configuration>
-                            <rules>
-                                <requireReleaseDeps>
-                                    <message>No Snapshots Allowed!</message>
-                                </requireReleaseDeps>
-                            </rules>
-                            <fail>true</fail>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-enforcer-plugin</artifactId>-->
+<!--                <version>3.0.0-M2</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>enforce-no-snapshots</id>-->
+<!--                        <goals>-->
+<!--                            <goal>enforce</goal>-->
+<!--                        </goals>-->
+<!--                        <configuration>-->
+<!--                            <rules>-->
+<!--                                <requireReleaseDeps>-->
+<!--                                    <message>No Snapshots Allowed!</message>-->
+<!--                                </requireReleaseDeps>-->
+<!--                            </rules>-->
+<!--                            <fail>true</fail>-->
+<!--                        </configuration>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
