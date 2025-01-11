@@ -69,8 +69,8 @@ public class LegacyShardManager extends ShardManager {
             assignedBuckets.put(Range.closed(start, end), shardCounter);
         }
         Preconditions.checkArgument(assignedBuckets.asMapOfRanges().size() == numShards,
-                                    "There is an issue in shard allocation. " +
-                                            "Not all shards have been allocated to. Please contact devs.");
+                "There is an issue in shard allocation. " +
+                        "Not all shards have been allocated to. Please contact devs.");
         buckets.putAll(assignedBuckets);
         log.info("Buckets to shard allocation: {}", buckets);
     }
@@ -88,9 +88,9 @@ public class LegacyShardManager extends ShardManager {
 
     @Override
     protected int shardForBucketImpl(int bucketId) {
-        Preconditions.checkArgument(bucketId >=MIN_BUCKET && bucketId <= MAX_BUCKET, "Bucket id can only be in the range of [1-1000] (inclusive)");
+        Preconditions.checkArgument(bucketId >= MIN_BUCKET && bucketId <= MAX_BUCKET, "Bucket id can only be in the range of [1-1000] (inclusive)");
         val entry = buckets.getEntry(bucketId);
-        if(null == entry) {
+        if (null == entry) {
             throw new IllegalAccessError("Bucket not mapped to any shard");
         }
         return entry.getValue();

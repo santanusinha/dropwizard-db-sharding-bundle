@@ -18,9 +18,14 @@
 package io.appform.dropwizard.sharding.utils;
 
 import lombok.Getter;
-import org.hibernate.*;
+import org.hibernate.CacheMode;
+import org.hibernate.FlushMode;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.hibernate.context.internal.ManagedSessionContext;
 import org.hibernate.resource.transaction.spi.TransactionStatus;
+import org.jboss.logging.MDC;
 
 /**
  * A transaction handler utility class
@@ -28,28 +33,38 @@ import org.hibernate.resource.transaction.spi.TransactionStatus;
 public class TransactionHandler {
 
 
+    public static final String TENANT_ID = "tenant.id";
     // Context variables
     @Getter
     private Session session;
     private final SessionFactory sessionFactory;
-    private boolean readOnly;
+    private final boolean readOnly;
+    private final boolean skipCommit;
 
     public TransactionHandler(SessionFactory sessionFactory, boolean readOnly) {
+        this(sessionFactory, readOnly, false);
+    }
+
+    public TransactionHandler(SessionFactory sessionFactory, boolean readOnly, boolean skipCommit) {
         this.sessionFactory = sessionFactory;
         this.readOnly = readOnly;
+        this.skipCommit = skipCommit;
     }
 
     public void beforeStart() {
-
         session = sessionFactory.openSession();
         try {
             configureSession();
             ManagedSessionContext.bind(session);
-            beginTransaction();
+            if (!skipCommit) {
+                beginTransaction();
+            }
         } catch (Throwable th) {
             session.close();
             session = null;
             ManagedSessionContext.unbind(sessionFactory);
+            //Clean up tenant id
+            MDC.remove(TENANT_ID);
             throw th;
         }
     }
@@ -58,16 +73,21 @@ public class TransactionHandler {
         if (session == null) {
             return;
         }
-
         try {
-            commitTransaction();
+            if (!skipCommit) {
+                commitTransaction();
+            }
         } catch (Exception e) {
-            rollbackTransaction();
+            if (!skipCommit) {
+                rollbackTransaction();
+            }
             throw e;
         } finally {
             session.close();
             session = null;
             ManagedSessionContext.unbind(sessionFactory);
+            //Clean up tenant id
+            MDC.remove(TENANT_ID);
         }
 
     }
@@ -76,13 +96,14 @@ public class TransactionHandler {
         if (session == null) {
             return;
         }
-
         try {
             rollbackTransaction();
         } finally {
             session.close();
             session = null;
             ManagedSessionContext.unbind(sessionFactory);
+            //Clean up tenant id
+            MDC.remove(TENANT_ID);
         }
     }
 
@@ -90,6 +111,11 @@ public class TransactionHandler {
         session.setDefaultReadOnly(readOnly);
         session.setCacheMode(CacheMode.NORMAL);
         session.setHibernateFlushMode(FlushMode.AUTO);
+        //If the bundle is initialized in multitenant mode, each session factory is tagged to
+        //a tenant id. It will be used in encryption support to fetch the appropriate encryptor for the tenant.
+        if(sessionFactory.getProperties().containsKey(TENANT_ID)) {
+            MDC.put(TENANT_ID, sessionFactory.getProperties().get(TENANT_ID).toString());
+        }
     }
 
     private void beginTransaction() {

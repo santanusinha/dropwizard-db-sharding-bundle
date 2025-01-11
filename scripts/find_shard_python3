@@ -69,4 +69,3 @@ if __name__ == '__main__':
         bucket_id = FindShard.get_bucket_id(key, options.min_bucket, options.max_bucket)
         shard = the_buckets[bucket_id]
         print("%s -> %d" % (key, shard + 1))
-

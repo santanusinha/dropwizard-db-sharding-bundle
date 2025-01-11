@@ -22,4 +22,7 @@ package io.appform.dropwizard.sharding.sharding;
  */
 public interface BucketIdExtractor<T> {
     int bucketId(T id);
+    default int bucketId(String tenantId, T id) {
+        return bucketId(id);
+    }
 }

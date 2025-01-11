@@ -18,7 +18,12 @@
 package io.appform.dropwizard.sharding.dao.testdata.entities;
 
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.Hibernate;
 import org.hibernate.validator.constraints.NotEmpty;
 
 import javax.persistence.Column;
@@ -27,22 +32,20 @@ import javax.persistence.Id;
 import javax.persistence.NamedQueries;
 import javax.persistence.NamedQuery;
 import javax.persistence.Table;
-import javax.validation.constraints.NotNull;
+import java.util.Objects;
 
 @Entity
 @Table(name = "test_entity")
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
-@EqualsAndHashCode
 @NamedQueries({
         @NamedQuery(name = "testTextUpdateQuery", query = "update TestEntity set text = :text where externalId =:externalId")})
-
 public class TestEntity {
+
     @Id
-    @NotNull
     @NotEmpty
     @LookupKey
     @Column(name = "ext_id", unique = true)
@@ -50,7 +53,22 @@ public class TestEntity {
 
     @Column(name = "text", nullable = false)
     @NotEmpty
-    @NotNull
     private String text;
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) {
+            return false;
+        }
+        TestEntity that = (TestEntity) o;
+        return getExternalId() != null && Objects.equals(getExternalId(), that.getExternalId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

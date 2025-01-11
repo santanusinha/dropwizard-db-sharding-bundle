@@ -17,25 +17,24 @@
 
 package io.appform.dropwizard.sharding.sharding;
 
-import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class LegacyShardManagerTest {
 
-   @Test(expected = IllegalArgumentException.class)
-    public void testShardForBucket() throws Exception {
-        LegacyShardManager shardManager = new LegacyShardManager(5);
+    @Test
+    public void testShardForOddBucket() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new LegacyShardManager(9));
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testShardForOddBucket() throws Exception {
-        LegacyShardManager shardManager = new LegacyShardManager(9);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testShardForEvenNon2PowerBucket() throws Exception {
-        LegacyShardManager shardManager = new LegacyShardManager(40);
+        assertThrows(IllegalArgumentException.class,
+                () -> new LegacyShardManager(40));
     }
 
     @Test

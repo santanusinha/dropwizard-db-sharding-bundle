@@ -17,28 +17,30 @@
 
 package io.appform.dropwizard.sharding.admin;
 
-import com.google.common.collect.ImmutableMultimap;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  *
  */
 @Slf4j
 public class TaskUtils {
-    private TaskUtils() {}
+    private TaskUtils() {
+    }
 
 
-    public static int parseShardParam(ImmutableMultimap<String, String> params) throws Exception {
-        if(!params.containsKey("shardId")) {
+    public static int parseShardParam(Map<String, List<String>> params) throws Exception {
+        if (!params.containsKey("shardId")) {
             log.warn("No shard specified for blacklisting");
             throw new Exception("No shard id provided");
         }
         String shardValue = params.get("shardId")
-                .asList()
                 .stream()
                 .findFirst()
                 .orElse(null);
-        if(null == shardValue) {
+        if (null == shardValue) {
             log.warn("No shard value specified for shardId during blacklisting");
             throw new Exception("Null shard id provided");
         }

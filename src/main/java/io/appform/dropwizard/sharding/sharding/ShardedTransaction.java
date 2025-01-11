@@ -16,5 +16,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 public @interface ShardedTransaction {
     String value() default HibernateBundle.DEFAULT_NAME;
+
     boolean readOnly() default false;
 }

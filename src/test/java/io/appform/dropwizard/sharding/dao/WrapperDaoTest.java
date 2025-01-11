@@ -30,13 +30,13 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class WrapperDaoTest {
 
@@ -61,18 +61,18 @@ public class WrapperDaoTest {
         return configuration.buildSessionFactory(serviceRegistry);
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         for (int i = 0; i < 2; i++) {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         dao = new WrapperDao<>(sessionFactories, OrderDao.class,
-                               new ShardCalculator<>(shardManager, new ConsistentHashBucketIdExtractor<>(shardManager)));
+                new ShardCalculator<>(shardManager, new ConsistentHashBucketIdExtractor<>(shardManager)));
 
     }
 
-    @After
+    @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
     }
@@ -83,13 +83,13 @@ public class WrapperDaoTest {
         final String customer = "customer1";
 
         Order order = Order.builder()
-                            .customerId(customer)
-                            .build();
+                .customerId(customer)
+                .build();
 
         OrderItem itemA = OrderItem.builder()
-                                .order(order)
-                                .name("Item A")
-                                .build();
+                .order(order)
+                .name("Item A")
+                .build();
         OrderItem itemB = OrderItem.builder()
                 .order(order)
                 .name("Item B")

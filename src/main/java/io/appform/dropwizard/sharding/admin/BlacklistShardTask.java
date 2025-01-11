@@ -17,12 +17,13 @@
 
 package io.appform.dropwizard.sharding.admin;
 
-import com.google.common.collect.ImmutableMultimap;
-import io.dropwizard.servlets.tasks.Task;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.dropwizard.servlets.tasks.Task;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.PrintWriter;
+import java.util.List;
+import java.util.Map;
 
 /**
  *
@@ -36,10 +37,18 @@ public class BlacklistShardTask extends Task {
         this.shardManager = shardManager;
     }
 
-    @Override
-    public void execute(ImmutableMultimap<String, String> params, PrintWriter out) throws Exception {
-        int shard = TaskUtils.parseShardParam(params);
-        shardManager.blacklistShard(shard);
+    /**
+     * This constructor is used in-multi tenant bundles which will register separate task url for each tenant
+     * Example URL: http://localhost:8081/tasks/{tenantId}.blacklist?shard=1
+     */
+    public BlacklistShardTask(String tenantId, ShardManager shardManager) {
+        super(tenantId +".blacklist");
+        this.shardManager = shardManager;
     }
 
+    @Override
+    public void execute(Map<String, List<String>> map, PrintWriter out) throws Exception {
+        int shard = TaskUtils.parseShardParam(map);
+        shardManager.blacklistShard(shard);
+    }
 }
