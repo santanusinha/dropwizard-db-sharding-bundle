@@ -26,9 +26,9 @@ import java.util.function.Supplier;
 @Data
 public class LockAndExecute<T> extends OpContext<T> {
 
-    private final List<Consumer<T>> operations = Lists.newArrayList();
+    private List<Consumer<T>> operations = Lists.newArrayList();
     @NonNull
-    private final Mode mode;
+    private Mode mode;
     private Supplier<T> getter;
     private Function<T, T> saver;
     private T entity;
