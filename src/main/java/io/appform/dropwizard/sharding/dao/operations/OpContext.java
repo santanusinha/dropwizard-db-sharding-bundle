@@ -53,6 +53,8 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(SelectAndUpdate<T> opContext);
 
+    <T> P visit(MandatorySelectAndUpdate<T> opContext);
+
     <T> P visit(RunInSession<T> opContext);
 
     <T> P visit(RunWithCriteria<T> opContext);
