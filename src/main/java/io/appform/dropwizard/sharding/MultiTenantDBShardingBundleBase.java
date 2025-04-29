@@ -36,7 +36,6 @@ import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.Configuration;
-import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.hibernate.AbstractDAO;
 import io.dropwizard.hibernate.HibernateBundle;
@@ -52,6 +51,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -97,62 +99,70 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   @Override
   public void run(T configuration, Environment environment) {
-    val tenantedConfig = getConfig(configuration);
-    tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
-      var blacklistingStore = getBlacklistingStore();
-      var shardManager = createShardManager(shardConfig.getShards().size(), blacklistingStore);
-      this.shardManagers.put(tenantId, shardManager);
-      val shardInfoProvider = new ShardInfoProvider(tenantId);
-      shardInfoProviders.put(tenantId, shardInfoProvider);
-      var healthCheckManager = new HealthCheckManager(tenantId, shardInfoProvider,
-          blacklistingStore,
-          shardManager);
-      healthCheckManagers.put(tenantId, healthCheckManager);
-      //Encryption Support through jasypt-hibernate5
-      var shardingOption = shardConfig.getShardingOptions();
-      shardingOption =
-          Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
-      List<HibernateBundle<T>> shardedBundle = IntStream.range(0, shardConfig.getShards().size())
-          .mapToObj(
-              shard ->
-                  new HibernateBundle<T>(initialisedEntities, new SessionFactoryFactory()) {
-                    @Override
-                    protected String name() {
-                      return shardInfoProvider.shardName(shard);
-                    }
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    try {
+      val tenantedConfig = getConfig(configuration);
+      tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
+        var blacklistingStore = getBlacklistingStore();
+        var shardManager = createShardManager(shardConfig.getShards().size(), blacklistingStore);
+        this.shardManagers.put(tenantId, shardManager);
+        val shardInfoProvider = new ShardInfoProvider(tenantId);
+        shardInfoProviders.put(tenantId, shardInfoProvider);
+        var healthCheckManager = new HealthCheckManager(tenantId, shardInfoProvider,
+                blacklistingStore,
+                shardManager);
+        healthCheckManagers.put(tenantId, healthCheckManager);
+        //Encryption Support through jasypt-hibernate5
+        var shardingOption = shardConfig.getShardingOptions();
+        shardingOption =
+                Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
+        List<HibernateBundle<T>> shardedBundle = IntStream.range(0, shardConfig.getShards().size())
+                .mapToObj(
+                        shard ->
+                                new HibernateBundle<T>(initialisedEntities, new SessionFactoryFactory()) {
+                                  @Override
+                                  protected String name() {
+                                    return shardInfoProvider.shardName(shard);
+                                  }
 
-                    @Override
-                    public PooledDataSourceFactory getDataSourceFactory(T t) {
-                      return shardConfig.getShards().get(shard);
-                    }
-                  }).collect(Collectors.toList());
-      shardedBundle.forEach(hibernateBundle -> {
-        try {
-          hibernateBundle.run(configuration, environment);
-        } catch (Exception e) {
-          log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
-          throw new RuntimeException(e);
+                                  @Override
+                                  public PooledDataSourceFactory getDataSourceFactory(T t) {
+                                    return shardConfig.getShards().get(shard);
+                                  }
+                                }).collect(Collectors.toList());
+
+        CompletableFuture.allOf(shardedBundle.stream()
+                .map(hibernateBundle -> CompletableFuture.runAsync(() -> {
+                  try {
+                    hibernateBundle.run(configuration, environment);
+                  } catch (Exception e) {
+                    log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
+                    throw new RuntimeException(e);
+                  }
+                }, executorService)).toArray(CompletableFuture[]::new)).join();
+        this.shardBundles.put(tenantId, shardedBundle);
+        val sessionFactory = shardedBundle.stream().map(HibernateBundle::getSessionFactory)
+                .collect(Collectors.toList());
+        sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
+        if (shardingOption.isEncryptionSupportEnabled()) {
+          Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
+                  "Encryption IV Should be 16 bytes long");
+          registerStringEncryptor(tenantId, shardingOption);
+          registerBigIntegerEncryptor(tenantId, shardingOption);
+          registerBigDecimalEncryptor(tenantId, shardingOption);
+          registerByteEncryptor(tenantId, shardingOption);
         }
+        this.sessionFactories.put(tenantId, sessionFactory);
+        this.shardingOptions.put(tenantId, shardingOption);
+        healthCheckManager.manageHealthChecks(shardConfig.getBlacklist(), environment);
+        setupObservers(shardConfig.getMetricConfig(), environment.metrics());
+        environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
+        environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
       });
-      this.shardBundles.put(tenantId, shardedBundle);
-      val sessionFactory = shardedBundle.stream().map(HibernateBundle::getSessionFactory)
-          .collect(Collectors.toList());
-      sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
-      if (shardingOption.isEncryptionSupportEnabled()) {
-        Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
-            "Encryption IV Should be 16 bytes long");
-        registerStringEncryptor(tenantId, shardingOption);
-        registerBigIntegerEncryptor(tenantId, shardingOption);
-        registerBigDecimalEncryptor(tenantId, shardingOption);
-        registerByteEncryptor(tenantId, shardingOption);
-      }
-      this.sessionFactories.put(tenantId, sessionFactory);
-      this.shardingOptions.put(tenantId, shardingOption);
-      healthCheckManager.manageHealthChecks(shardConfig.getBlacklist(), environment);
-      setupObservers(shardConfig.getMetricConfig(), environment.metrics());
-      environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
-      environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
-    });
+    }
+    finally {
+      executorService.shutdown();
+    }
   }
 
   @Override
@@ -161,8 +171,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     healthCheckManagers.values().forEach(healthCheckManager -> {
       bootstrap.getHealthCheckRegistry().addListener(healthCheckManager);
     });
-    shardBundles.values().forEach(
-        hibernateBundle -> bootstrap.addBundle((ConfiguredBundle) hibernateBundle));
   }
 
   @VisibleForTesting
