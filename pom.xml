@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.appform.dropwizard.sharding</groupId>
-    <artifactId>db-sharding-bundle</artifactId>
+    <artifactId>db-sharding-bundle-nplus1</artifactId>
     <version>2.1.10-9-SNAPSHOT</version>
     <name>Dropwizard Database Sharding Bundle</name>
     <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>
@@ -13,7 +13,7 @@
     <inceptionYear>2016</inceptionYear>
 
     <scm>
-        <connection>scm:git:https://github.com/santanusinha/dropwizard-db-sharding-bundle</connection>
+        <connection>scm:git:https://github.com/santanusinha/dropwiard-db-sharding-bundle</connection>
         <developerConnection>scm:git:https://github.com/santanusinha/dropwizard-db-sharding-bundle</developerConnection>
         <tag>HEAD</tag>
         <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>
