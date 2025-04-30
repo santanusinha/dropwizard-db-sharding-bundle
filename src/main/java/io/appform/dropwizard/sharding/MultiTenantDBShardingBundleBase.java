@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding;
 
+import com.codahale.metrics.MetricRegistry;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -33,8 +34,17 @@ import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
+import io.appform.dropwizard.sharding.metrics.TransactionMetricManager;
+import io.appform.dropwizard.sharding.metrics.TransactionMetricObserver;
+import io.appform.dropwizard.sharding.observers.bucket.BucketKeyObserver;
+import io.appform.dropwizard.sharding.observers.bucket.BucketKeyPersistor;
+import io.appform.dropwizard.sharding.observers.internal.FilteringObserver;
+import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.db.PooledDataSourceFactory;
@@ -46,6 +56,7 @@ import io.dropwizard.setup.Environment;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.apache.commons.collections.MapUtils;
 import org.hibernate.SessionFactory;
 
 import java.util.Arrays;
@@ -149,9 +160,55 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       this.sessionFactories.put(tenantId, sessionFactory);
       this.shardingOptions.put(tenantId, shardingOption);
       healthCheckManager.manageHealthChecks(shardConfig.getBlacklist(), environment);
-      setupObservers(shardConfig.getMetricConfig(), environment.metrics());
+      setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), this.shardManagers,
+              this.initialisedEntitiesMeta);
       environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
       environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
+    });
+  }
+
+  private void setupObservers(final String tenantId,
+                              final MetricConfig metricConfig,
+                              final MetricRegistry metricRegistry,
+                              final Map<String, ShardManager> shardManagers,
+                              final Map<String, EntityMeta> initialisedEntityMeta) {
+    //Observer chain starts with filters and ends with listener invocations
+    //Terminal observer calls the actual method
+    rootObserver = new TerminalTransactionObserver();
+    if (!MapUtils.isEmpty(initialisedEntityMeta)) {
+      // Only initialise if we have initialisedEntityMeta.
+      // This won't be present in case bucketKey field itself is not present, so no need to apply this observer
+      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers),
+              initialisedEntityMeta)).setNext(rootObserver);
+    }
+    rootObserver = new ListenerTriggeringObserver(rootObserver).addListeners(
+            listeners);
+
+    for (var observer : observers) {
+      if (null == observer) {
+        return;
+      }
+      this.rootObserver = observer.setNext(rootObserver);
+    }
+    rootObserver = new TransactionMetricObserver(
+            new TransactionMetricManager(() -> metricConfig,
+                    metricRegistry)).setNext(rootObserver);
+
+    rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
+    //Print the observer chain
+    log.debug("Observer chain");
+    rootObserver.visit(observer -> {
+      log.debug(" Observer: {}", observer.getClass().getSimpleName());
+      if (observer instanceof FilteringObserver) {
+        log.debug("  Filters:");
+        ((FilteringObserver) observer).getFilters()
+                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
+      }
+      if (observer instanceof ListenerTriggeringObserver) {
+        log.debug("  Listeners:");
+        ((ListenerTriggeringObserver) observer).getListeners()
+                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
+      }
     });
   }
 
