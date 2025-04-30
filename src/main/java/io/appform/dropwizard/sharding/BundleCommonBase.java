@@ -1,23 +1,25 @@
 package io.appform.dropwizard.sharding;
 
-import com.codahale.metrics.MetricRegistry;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import io.appform.dropwizard.sharding.config.MetricConfig;
+import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
-import io.appform.dropwizard.sharding.metrics.TransactionMetricManager;
-import io.appform.dropwizard.sharding.metrics.TransactionMetricObserver;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.observers.internal.FilteringObserver;
-import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
-import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.sharding.BucketKey;
+import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardingKey;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+import org.apache.commons.lang3.ClassUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.jasypt.encryption.pbe.StandardPBEBigDecimalEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEBigIntegerEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEByteEncryptor;
@@ -27,8 +29,11 @@ import org.jasypt.iv.StringFixedIvGenerator;
 import org.reflections.Reflections;
 
 import javax.persistence.Entity;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -42,10 +47,13 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
 
   protected final List<Class<?>> initialisedEntities;
 
+  protected final Map<String, EntityMeta> initialisedEntitiesMeta = Maps.newHashMap();
+
   protected TransactionObserver rootObserver;
 
   protected BundleCommonBase(Class<?> entity, Class<?>... entities) {
     this.initialisedEntities = ImmutableList.<Class<?>>builder().add(entity).add(entities).build();
+    validateAndBuildEntitiesMeta(initialisedEntities);
   }
 
   protected BundleCommonBase(List<String> classPathPrefixList) {
@@ -55,43 +63,11 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
         String.format("No entity class found at %s",
             String.join(",", classPathPrefixList)));
     this.initialisedEntities = ImmutableList.<Class<?>>builder().addAll(entities).build();
+    validateAndBuildEntitiesMeta(initialisedEntities);
   }
 
   protected ShardBlacklistingStore getBlacklistingStore() {
     return new InMemoryLocalShardBlacklistingStore();
-  }
-
-  public void setupObservers(final MetricConfig metricConfig,
-      final MetricRegistry metricRegistry) {
-    //Observer chain starts with filters and ends with listener invocations
-    //Terminal observer calls the actual method
-    rootObserver = new ListenerTriggeringObserver(new TerminalTransactionObserver()).addListeners(
-        listeners);
-    for (var observer : observers) {
-      if (null == observer) {
-        return;
-      }
-      this.rootObserver = observer.setNext(rootObserver);
-    }
-    rootObserver = new TransactionMetricObserver(
-        new TransactionMetricManager(() -> metricConfig,
-            metricRegistry)).setNext(rootObserver);
-    rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
-    //Print the observer chain
-    log.debug("Observer chain");
-    rootObserver.visit(observer -> {
-      log.debug(" Observer: {}", observer.getClass().getSimpleName());
-      if (observer instanceof FilteringObserver) {
-        log.debug("  Filters:");
-        ((FilteringObserver) observer).getFilters()
-            .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
-      }
-      if (observer instanceof ListenerTriggeringObserver) {
-        log.debug("  Listeners:");
-        ((ListenerTriggeringObserver) observer).getListeners()
-            .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
-      }
-    });
   }
 
   public List<Class<?>> getInitialisedEntities() {
@@ -189,4 +165,49 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       encryptorRegistry.registerPBEByteEncryptor("encryptedBinary", strongEncryptor);
     }
   }
+
+  private void validateAndBuildEntitiesMeta(final List<Class<?>> initialisedEntities) {
+    initialisedEntities.forEach(clazz -> {
+      val bucketKeyField = resolveFieldFromEntity(clazz, BucketKey.class,
+              entity -> validateAndResolveField(entity, BucketKey.class.getSimpleName(), Integer.class));
+      if (Objects.isNull(bucketKeyField)) {
+        return;
+      }
+
+      val lookupKeyField = resolveFieldFromEntity(clazz, LookupKey.class,
+              entity -> validateAndResolveField(entity, LookupKey.class.getSimpleName(), String.class));
+      val shardingKeyField = resolveFieldFromEntity(clazz, ShardingKey.class,
+              entity -> validateAndResolveField(entity, ShardingKey.class.getSimpleName(), String.class));
+      if (Objects.isNull(shardingKeyField) && Objects.isNull(lookupKeyField) ) {
+        throw new RuntimeException("ShardingKey or LookupKey must be present if bucketKey is present");
+      }
+
+      val entityMeta = EntityMeta.builder()
+              .bucketKeyField(bucketKeyField)
+              .shardingKeyField(Objects.isNull(shardingKeyField) ? lookupKeyField : shardingKeyField)
+              .build();
+      initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
+    });
+  }
+
+  private Field validateAndResolveField(final Field[] fields,
+                                        final String fieldType,
+                                        final Class<?> acceptableClass) {
+    if(fields.length == 0) {
+      return null;
+    }
+    Preconditions.checkArgument(fields.length == 1, String.format("Only one field can be designated " +
+            "as @%s", fieldType));
+    val keyField = fields[0];
+    Preconditions.checkArgument(ClassUtils.isAssignable(keyField.getType(), acceptableClass),
+            String.format("Key field must be of acceptable Type: %s", acceptableClass));
+    return keyField;
+  }
+
+  private Field resolveFieldFromEntity(Class<?> clazz, Class<? extends Annotation> annotationClazz,
+                                       Function<Field[], Field> validateAndResolve) {
+    val keyFields = FieldUtils.getFieldsWithAnnotation(clazz, annotationClazz);
+    return validateAndResolve.apply(keyFields);
+  }
+
 }

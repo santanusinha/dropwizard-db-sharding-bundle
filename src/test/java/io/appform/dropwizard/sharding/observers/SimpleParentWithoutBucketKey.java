@@ -1,9 +1,9 @@
 package io.appform.dropwizard.sharding.observers;
 
-import io.appform.dropwizard.sharding.sharding.BucketKey;
-import io.appform.dropwizard.sharding.sharding.ShardingKey;
+import io.appform.dropwizard.sharding.sharding.LookupKey;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.FieldNameConstants;
@@ -15,34 +15,31 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.Transient;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Objects;
 
-/**
- *
- */
 @Entity
-@Table(name = "simple_children")
-@FieldNameConstants
+@Table(name = "simple_parents_without_bucketKey")
 @Getter
 @Setter
 @ToString
-@RequiredArgsConstructor
-public class SimpleChild {
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldNameConstants
+public class SimpleParentWithoutBucketKey {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @Column
-    @ShardingKey
-    private String parent;
+    @LookupKey
+    private String name;
 
-    @Column
-    private String value;
-
-    @Column
-    @BucketKey
-    private int bucketKey;
+    @Transient
+    private Collection<SimpleChild> children = new ArrayList<>();
 
     @Override
     public final boolean equals(Object o) {
@@ -61,7 +58,7 @@ public class SimpleChild {
         if (thisEffectiveClass != oEffectiveClass) {
             return false;
         }
-        SimpleChild that = (SimpleChild) o;
+        SimpleParent that = (SimpleParent) o;
         return Objects.equals(getId(), that.getId());
     }
 
