@@ -26,7 +26,7 @@ public class QueryUtils {
     /**
      * Creates a predicate for equality filtering.
      *
-     * @param <T>            The type of the entity being queried.
+     * @param <T>             The type of the entity being queried.
      * @param criteriaBuilder The CriteriaBuilder for constructing query criteria.
      * @param queryRoot       The root entity for the query.
      * @param column          The name of the column or attribute to filter on.
@@ -43,7 +43,7 @@ public class QueryUtils {
     /**
      * Creates a predicate for inequality filtering.
      *
-     * @param <T>            The type of the entity being queried.
+     * @param <T>             The type of the entity being queried.
      * @param criteriaBuilder The CriteriaBuilder for constructing query criteria.
      * @param queryRoot       The root entity for the query.
      * @param column          The name of the column or attribute to filter on.
@@ -60,7 +60,7 @@ public class QueryUtils {
     /**
      * Creates a predicate for "in" clause filtering.
      *
-     * @param <T>     The type of the entity being queried.
+     * @param <T>       The type of the entity being queried.
      * @param queryRoot The root entity for the query.
      * @param column    The name of the column or attribute to filter on.
      * @param values    A collection of values to check for inclusion in the "in" clause.

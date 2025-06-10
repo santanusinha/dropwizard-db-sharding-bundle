@@ -28,20 +28,20 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public abstract class MultiTenantBalancedDBShardingBundle<T extends Configuration> extends
-    MultiTenantDBShardingBundleBase<T> {
+        MultiTenantDBShardingBundleBase<T> {
 
-  protected MultiTenantBalancedDBShardingBundle(Class<?> entity, Class<?>... entities) {
-    super(entity, entities);
-  }
+    protected MultiTenantBalancedDBShardingBundle(Class<?> entity, Class<?>... entities) {
+        super(entity, entities);
+    }
 
-  protected MultiTenantBalancedDBShardingBundle(String... classPathPrefixes) {
-    super(classPathPrefixes);
-  }
+    protected MultiTenantBalancedDBShardingBundle(String... classPathPrefixes) {
+        super(classPathPrefixes);
+    }
 
-  @Override
-  protected ShardManager createShardManager(int numShards,
-      ShardBlacklistingStore shardBlacklistingStore) {
-    return new BalancedShardManager(numShards, shardBlacklistingStore);
-  }
+    @Override
+    protected ShardManager createShardManager(int numShards,
+                                              ShardBlacklistingStore shardBlacklistingStore) {
+        return new BalancedShardManager(numShards, shardBlacklistingStore);
+    }
 
 }

@@ -9,19 +9,19 @@ import org.hibernate.criterion.DetachedCriteria;
 @Getter
 public class SelectParam<T> {
 
-  public DetachedCriteria criteria;
-  public QuerySpec<T, T> querySpec;
+    public DetachedCriteria criteria;
+    public QuerySpec<T, T> querySpec;
 
-  public Integer start;
-  public Integer numRows;
+    public Integer start;
+    public Integer numRows;
 
-  @Builder
-  public SelectParam(DetachedCriteria criteria, QuerySpec<T, T> querySpec, Integer start,
-      Integer numRows) {
-    Preconditions.checkArgument(criteria != null || querySpec != null);
-    this.criteria = criteria;
-    this.querySpec = querySpec;
-    this.start = start;
-    this.numRows = numRows;
-  }
+    @Builder
+    public SelectParam(DetachedCriteria criteria, QuerySpec<T, T> querySpec, Integer start,
+                       Integer numRows) {
+        Preconditions.checkArgument(criteria != null || querySpec != null);
+        this.criteria = criteria;
+        this.querySpec = querySpec;
+        this.start = start;
+        this.numRows = numRows;
+    }
 }

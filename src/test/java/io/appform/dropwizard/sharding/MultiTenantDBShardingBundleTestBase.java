@@ -81,18 +81,18 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         Optional<Order> newOrder = tenant1RelDao.save("TENANT1", "customer1", order);
         assertTrue(newOrder.isPresent());
         long generatedId = newOrder.get().getId();
-        Optional<Order> checkOrder = tenant1RelDao.get("TENANT1","customer1", generatedId);
+        Optional<Order> checkOrder = tenant1RelDao.get("TENANT1", "customer1", generatedId);
         assertEquals(100, checkOrder.get().getAmount());
-        tenant1RelDao.update("TENANT1","customer1", saveId, foundOrder -> {
+        tenant1RelDao.update("TENANT1", "customer1", saveId, foundOrder -> {
             foundOrder.setAmount(200);
             return foundOrder;
         });
-        Optional<Order> modifiedOrder = tenant1RelDao.get("TENANT1","customer1", saveId);
+        Optional<Order> modifiedOrder = tenant1RelDao.get("TENANT1", "customer1", saveId);
         assertEquals(200, modifiedOrder.get().getAmount());
         assertTrue(checkOrder.isPresent());
         assertEquals(newOrder.get().getId(), checkOrder.get().getId());
         Map<String, Object> blah = Maps.newHashMap();
-        tenant1RelDao.get("TENANT1","customer1", generatedId, foundOrder -> {
+        tenant1RelDao.get("TENANT1", "customer1", generatedId, foundOrder -> {
             if (null == foundOrder) {
                 return Collections.emptyList();
             }
@@ -101,12 +101,12 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
             return itemList;
         });
         assertEquals(2, blah.get("count"));
-        List<OrderItem> orderItems = tenant1OrderItemDao.select("TENANT1","customer1",
+        List<OrderItem> orderItems = tenant1OrderItemDao.select("TENANT1", "customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
         assertEquals(2, orderItems.size());
-        tenant1OrderItemDao.update("TENANT1","customer1",
+        tenant1OrderItemDao.update("TENANT1", "customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")),
@@ -115,7 +115,7 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
                         .order(item.getOrder())
                         .name("Item AA")
                         .build());
-        orderItems = tenant1OrderItemDao.select("TENANT1","customer1",
+        orderItems = tenant1OrderItemDao.select("TENANT1", "customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
@@ -134,6 +134,6 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         assertTrue(bundle.healthStatus()
                 .values()
                 .stream()
-                .allMatch(status -> status.values().stream().reduce(true, (a,b) -> a && b)));
+                .allMatch(status -> status.values().stream().reduce(true, (a, b) -> a && b)));
     }
 }

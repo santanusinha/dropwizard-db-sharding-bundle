@@ -21,8 +21,8 @@ public class FieldComparator<T> implements Comparator<ScrollResultItem<T>> {
     @SneakyThrows
     @SuppressWarnings("unchecked")
     public int compare(ScrollResultItem<T> lhs, ScrollResultItem<T> rhs) {
-        val lhsValue = (Comparable<T>)field.get(lhs.getData());
-        val rhsValue = (T)field.get(rhs.getData());
+        val lhsValue = (Comparable<T>) field.get(lhs.getData());
+        val rhsValue = (T) field.get(rhs.getData());
 
         return lhsValue.compareTo(rhsValue);
     }

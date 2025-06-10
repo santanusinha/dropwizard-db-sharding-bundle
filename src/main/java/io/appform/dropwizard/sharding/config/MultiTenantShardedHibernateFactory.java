@@ -21,15 +21,16 @@ import java.util.Map;
 @Builder
 public class MultiTenantShardedHibernateFactory {
 
-  @Default
-  private Map<String, ShardedHibernateFactory> tenants = Maps.newHashMap();
+    @Default
+    private Map<String, ShardedHibernateFactory> tenants = Maps.newHashMap();
 
-  /**
-   * {@summary Get the ShardedHibernateFactory configuration for the given tenantId.}
-   * @param tenantId Tenant Id
-   * @return ShardedHibernateFactory
-   */
-  public ShardedHibernateFactory config(final String tenantId) {
-    return tenants.get(tenantId);
-  }
+    /**
+     * {@summary Get the ShardedHibernateFactory configuration for the given tenantId.}
+     *
+     * @param tenantId Tenant Id
+     * @return ShardedHibernateFactory
+     */
+    public ShardedHibernateFactory config(final String tenantId) {
+        return tenants.get(tenantId);
+    }
 }

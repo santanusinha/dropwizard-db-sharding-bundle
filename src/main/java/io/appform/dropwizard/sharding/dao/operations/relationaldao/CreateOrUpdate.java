@@ -25,39 +25,40 @@ import java.util.function.UnaryOperator;
 @Builder
 public class CreateOrUpdate<T> extends OpContext<T> {
 
-  @NonNull DetachedCriteria criteria;
-  UnaryOperator<T> mutator;
-  Supplier<T> entityGenerator;
-  private Function<DetachedCriteria, T> getLockedForWrite;
-  private Function<DetachedCriteria, T> getter;
-  private Function<T, T> saver;
-  private BiConsumer<T, T> updater;
+    @NonNull
+    DetachedCriteria criteria;
+    UnaryOperator<T> mutator;
+    Supplier<T> entityGenerator;
+    private Function<DetachedCriteria, T> getLockedForWrite;
+    private Function<DetachedCriteria, T> getter;
+    private Function<T, T> saver;
+    private BiConsumer<T, T> updater;
 
-  @Override
-  public T apply(Session session) {
-    T result = getLockedForWrite.apply(criteria);
+    @Override
+    public T apply(Session session) {
+        T result = getLockedForWrite.apply(criteria);
 
-    if (null == result) {
-      val newEntity = entityGenerator.get();
-      if (null != newEntity) {
-        return saver.apply(newEntity);
-      }
-      return null;
+        if (null == result) {
+            val newEntity = entityGenerator.get();
+            if (null != newEntity) {
+                return saver.apply(newEntity);
+            }
+            return null;
+        }
+        val updated = mutator.apply(result);
+        if (null != updated) {
+            updater.accept(result, updated);
+        }
+        return getter.apply(criteria);
     }
-    val updated = mutator.apply(result);
-    if (null != updated) {
-      updater.accept(result, updated);
+
+    @Override
+    public OpType getOpType() {
+        return OpType.CREATE_OR_UPDATE;
     }
-    return getter.apply(criteria);
-  }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.CREATE_OR_UPDATE;
-  }
-
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

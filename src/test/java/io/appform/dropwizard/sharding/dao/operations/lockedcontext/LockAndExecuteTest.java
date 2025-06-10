@@ -27,9 +27,9 @@ public class LockAndExecuteTest {
         });
 
         val lockAndExecute = LockAndExecute.<Order>buildForInsert()
-            .entity(o)
-            .saver(spiedSaver)
-            .build();
+                .entity(o)
+                .saver(spiedSaver)
+                .build();
 
         lockAndExecute.getOperations().add(spiedOperation);
 
@@ -47,8 +47,8 @@ public class LockAndExecuteTest {
         });
 
         val lockAndExecute = LockAndExecute.<Order>buildForRead()
-            .getter(spiedGetter)
-            .build();
+                .getter(spiedGetter)
+                .build();
 
         lockAndExecute.getOperations().add(spiedOperation);
 
@@ -67,8 +67,8 @@ public class LockAndExecuteTest {
         });
 
         val lockAndExecute = LockAndExecute.<Order>buildForRead()
-            .getter(spiedGetter)
-            .build();
+                .getter(spiedGetter)
+                .build();
 
         lockAndExecute.getOperations().add(spiedOperation);
 

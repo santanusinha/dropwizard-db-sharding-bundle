@@ -50,7 +50,7 @@ public class LockAndExecute<T> extends OpContext<T> {
     public T apply(Session session) {
         T result = generateEntity();
         operations
-            .forEach(operation -> operation.accept(result));
+                .forEach(operation -> operation.accept(result));
         return result;
     }
 

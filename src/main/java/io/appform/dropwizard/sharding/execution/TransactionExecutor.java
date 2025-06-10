@@ -45,26 +45,26 @@ public class TransactionExecutor {
     }
 
     public <T> T execute(SessionFactory sessionFactory,
-        boolean readOnly,
-        String commandName,
-        OpContext<T> opContext,
-        int shardId) {
+                         boolean readOnly,
+                         String commandName,
+                         OpContext<T> opContext,
+                         int shardId) {
         return execute(sessionFactory, readOnly, commandName, opContext, shardId, true);
     }
 
     public <T> T execute(SessionFactory sessionFactory,
-        boolean readOnly,
-        String commandName,
-        OpContext<T> opContext,
-        int shardId,
-        boolean completeTransaction) {
+                         boolean readOnly,
+                         String commandName,
+                         OpContext<T> opContext,
+                         int shardId,
+                         boolean completeTransaction) {
         val context = TransactionExecutionContext.builder()
-            .commandName(commandName)
-            .daoType(daoType)
-            .entityClass(entityClass)
-            .shardName(shardInfoProvider.shardName(shardId))
-            .opContext(opContext)
-            .build();
+                .commandName(commandName)
+                .daoType(daoType)
+                .entityClass(entityClass)
+                .shardName(shardInfoProvider.shardName(shardId))
+                .opContext(opContext)
+                .build();
         return observer.execute(context, () -> {
             val transactionHandler = new TransactionHandler(sessionFactory, readOnly);
             if (completeTransaction) {

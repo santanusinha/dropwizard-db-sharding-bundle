@@ -19,27 +19,27 @@ import java.util.function.Function;
 @Builder
 public class Select<T, R> extends OpContext<R> {
 
-  @NonNull
-  private SelectParam<T> selectParam;
+    @NonNull
+    private SelectParam<T> selectParam;
 
-  @Builder.Default
-  private Function<List<T>, R> afterSelect = t -> (R) t;
+    @Builder.Default
+    private Function<List<T>, R> afterSelect = t -> (R) t;
 
-  @NonNull
-  private Function<SelectParam, List<T>> getter;
+    @NonNull
+    private Function<SelectParam, List<T>> getter;
 
-  @Override
-  public R apply(Session session) {
-    return afterSelect.apply(getter.apply(selectParam));
-  }
+    @Override
+    public R apply(Session session) {
+        return afterSelect.apply(getter.apply(selectParam));
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.SELECT;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.SELECT;
+    }
 
-  @Override
-  public <R1> R1 visit(OpContextVisitor<R1> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R1> R1 visit(OpContextVisitor<R1> visitor) {
+        return visitor.visit(this);
+    }
 }

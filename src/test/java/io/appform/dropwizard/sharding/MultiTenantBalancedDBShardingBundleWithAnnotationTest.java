@@ -20,16 +20,16 @@ package io.appform.dropwizard.sharding;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 
 public class MultiTenantBalancedDBShardingBundleWithAnnotationTest extends
-    MultiTenantDBShardingBundleTestBase {
+        MultiTenantDBShardingBundleTestBase {
 
-  @Override
-  protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
-    return new MultiTenantBalancedDBShardingBundle<TestConfig>(
-        "io.appform.dropwizard.sharding.dao.testdata.entities") {
-      @Override
-      protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
-        return testConfig.getShards();
-      }
-    };
-  }
+    @Override
+    protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
+        return new MultiTenantBalancedDBShardingBundle<TestConfig>(
+                "io.appform.dropwizard.sharding.dao.testdata.entities") {
+            @Override
+            protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
+                return testConfig.getShards();
+            }
+        };
+    }
 }

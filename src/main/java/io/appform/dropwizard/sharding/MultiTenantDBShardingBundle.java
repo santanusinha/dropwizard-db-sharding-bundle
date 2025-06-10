@@ -21,7 +21,9 @@ import io.appform.dropwizard.sharding.sharding.LegacyShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.Configuration;
+
 import java.util.List;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -29,23 +31,23 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public abstract class MultiTenantDBShardingBundle<T extends Configuration> extends
-    MultiTenantDBShardingBundleBase<T> {
+        MultiTenantDBShardingBundleBase<T> {
 
-  protected MultiTenantDBShardingBundle(List<String> classPathPrefixList) {
-    super(classPathPrefixList);
-  }
+    protected MultiTenantDBShardingBundle(List<String> classPathPrefixList) {
+        super(classPathPrefixList);
+    }
 
-  protected MultiTenantDBShardingBundle(Class<?> entity, Class<?>... entities) {
-    super(entity, entities);
-  }
+    protected MultiTenantDBShardingBundle(Class<?> entity, Class<?>... entities) {
+        super(entity, entities);
+    }
 
-  protected MultiTenantDBShardingBundle(String... classPathPrefixes) {
-    super(classPathPrefixes);
-  }
+    protected MultiTenantDBShardingBundle(String... classPathPrefixes) {
+        super(classPathPrefixes);
+    }
 
-  @Override
-  protected ShardManager createShardManager(int numShards,
-      ShardBlacklistingStore blacklistingStore) {
-    return new LegacyShardManager(numShards, blacklistingStore);
-  }
+    @Override
+    protected ShardManager createShardManager(int numShards,
+                                              ShardBlacklistingStore blacklistingStore) {
+        return new LegacyShardManager(numShards, blacklistingStore);
+    }
 }

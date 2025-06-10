@@ -13,55 +13,55 @@ import java.util.function.Function;
 
 class CreateOrUpdateByLookupKeyTest {
 
-  @Mock
-  Session session;
+    @Mock
+    Session session;
 
-  @Test
-  public void testCreateOrUpdateByLookupKey_creation() {
+    @Test
+    public void testCreateOrUpdateByLookupKey_creation() {
 
-    Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
-    Consumer<Order> spiedUpdater = LambdaTestUtils.spiedConsumer(o1 -> {
-    });
+        Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
+        Consumer<Order> spiedUpdater = LambdaTestUtils.spiedConsumer(o1 -> {
+        });
 
-    Order o = Order.builder().id(123).customerId("C1").build();
+        Order o = Order.builder().id(123).customerId("C1").build();
 
-    val createOrUpdateByLookupKey = CreateOrUpdateByLookupKey.<Order>builder()
-        .id("123")
-        .getLockedForWrite(s -> null)
-        .entityGenerator(() -> o)
-        .saver(spiedSaver)
-        .updater(spiedUpdater)
-        .mutator(o1 -> o.setCustomerId("C2"))
-        .getter(s -> o)
-        .build();
+        val createOrUpdateByLookupKey = CreateOrUpdateByLookupKey.<Order>builder()
+                .id("123")
+                .getLockedForWrite(s -> null)
+                .entityGenerator(() -> o)
+                .saver(spiedSaver)
+                .updater(spiedUpdater)
+                .mutator(o1 -> o.setCustomerId("C2"))
+                .getter(s -> o)
+                .build();
 
-    createOrUpdateByLookupKey.apply(session);
-    Mockito.verify(spiedSaver, Mockito.times(1)).apply(Mockito.any(Order.class));
-    Mockito.verify(spiedUpdater, Mockito.times(0)).accept(Mockito.any(Order.class));
-  }
+        createOrUpdateByLookupKey.apply(session);
+        Mockito.verify(spiedSaver, Mockito.times(1)).apply(Mockito.any(Order.class));
+        Mockito.verify(spiedUpdater, Mockito.times(0)).accept(Mockito.any(Order.class));
+    }
 
-  @Test
-  public void testCreateOrUpdateByLookupKey_updation() {
+    @Test
+    public void testCreateOrUpdateByLookupKey_updation() {
 
-    Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
-    Consumer<Order> spiedUpdater = LambdaTestUtils.spiedConsumer(o1 -> {
-    });
+        Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
+        Consumer<Order> spiedUpdater = LambdaTestUtils.spiedConsumer(o1 -> {
+        });
 
-    Order o = Order.builder().id(123).customerId("C1").build();
+        Order o = Order.builder().id(123).customerId("C1").build();
 
-    val createOrUpdateByLookupKey = CreateOrUpdateByLookupKey.<Order>builder()
-        .id("123")
-        .getLockedForWrite(s -> o)
-        .entityGenerator(() -> o)
-        .saver(spiedSaver)
-        .updater(spiedUpdater)
-        .mutator(o1 -> o.setCustomerId("C2"))
-        .getter(s -> o)
-        .build();
+        val createOrUpdateByLookupKey = CreateOrUpdateByLookupKey.<Order>builder()
+                .id("123")
+                .getLockedForWrite(s -> o)
+                .entityGenerator(() -> o)
+                .saver(spiedSaver)
+                .updater(spiedUpdater)
+                .mutator(o1 -> o.setCustomerId("C2"))
+                .getter(s -> o)
+                .build();
 
-    createOrUpdateByLookupKey.apply(session);
+        createOrUpdateByLookupKey.apply(session);
 
-    Mockito.verify(spiedSaver, Mockito.times(0)).apply(Mockito.any(Order.class));
-    Mockito.verify(spiedUpdater, Mockito.times(1)).accept(Mockito.any(Order.class));
-  }
+        Mockito.verify(spiedSaver, Mockito.times(0)).apply(Mockito.any(Order.class));
+        Mockito.verify(spiedUpdater, Mockito.times(1)).accept(Mockito.any(Order.class));
+    }
 }

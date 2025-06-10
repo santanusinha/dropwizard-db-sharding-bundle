@@ -16,59 +16,59 @@ import java.util.function.Function;
 
 class CreateOrUpdateTest {
 
-  @Mock
-  Session session;
+    @Mock
+    Session session;
 
-  @Test
-  public void testCreateOrUpdate_creation() {
+    @Test
+    public void testCreateOrUpdate_creation() {
 
-    Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
-    BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((o1, o2) -> {
-    });
+        Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
+        BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((o1, o2) -> {
+        });
 
-    Order o = Order.builder().id(123).customerId("C1").build();
+        Order o = Order.builder().id(123).customerId("C1").build();
 
-    val createOrUpdate = CreateOrUpdate.<Order>builder()
-        .criteria(DetachedCriteria.forClass(Order.class))
-        .getLockedForWrite(s -> null)
-        .entityGenerator(() -> o)
-        .saver(spiedSaver)
-        .updater(spiedUpdater)
-        .mutator(o1 -> o.setCustomerId("C2"))
-        .getter(s -> o)
-        .build();
+        val createOrUpdate = CreateOrUpdate.<Order>builder()
+                .criteria(DetachedCriteria.forClass(Order.class))
+                .getLockedForWrite(s -> null)
+                .entityGenerator(() -> o)
+                .saver(spiedSaver)
+                .updater(spiedUpdater)
+                .mutator(o1 -> o.setCustomerId("C2"))
+                .getter(s -> o)
+                .build();
 
-    Order result = createOrUpdate.apply(session);
-    Assertions.assertEquals(result, o);
-    Mockito.verify(spiedSaver, Mockito.times(1)).apply(Mockito.any(Order.class));
-    Mockito.verify(spiedUpdater, Mockito.times(0))
-        .accept(Mockito.any(Order.class), Mockito.any(Order.class));
-  }
+        Order result = createOrUpdate.apply(session);
+        Assertions.assertEquals(result, o);
+        Mockito.verify(spiedSaver, Mockito.times(1)).apply(Mockito.any(Order.class));
+        Mockito.verify(spiedUpdater, Mockito.times(0))
+                .accept(Mockito.any(Order.class), Mockito.any(Order.class));
+    }
 
-  @Test
-  public void testCreateOrUpdate_updation() {
+    @Test
+    public void testCreateOrUpdate_updation() {
 
-    Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
-    BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((o1, o2) -> {
-    });
+        Function<Order, Order> spiedSaver = LambdaTestUtils.spiedFunction((o) -> o);
+        BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((o1, o2) -> {
+        });
 
-    Order o = Order.builder().id(123).customerId("C1").build();
+        Order o = Order.builder().id(123).customerId("C1").build();
 
-    val createOrUpdate = CreateOrUpdate.<Order>builder()
-        .criteria(DetachedCriteria.forClass(Order.class))
-        .getLockedForWrite(s -> o)
-        .entityGenerator(() -> o)
-        .saver(spiedSaver)
-        .updater(spiedUpdater)
-        .mutator(o1 -> o.setCustomerId("C2"))
-        .getter(s -> o)
-        .build();
+        val createOrUpdate = CreateOrUpdate.<Order>builder()
+                .criteria(DetachedCriteria.forClass(Order.class))
+                .getLockedForWrite(s -> o)
+                .entityGenerator(() -> o)
+                .saver(spiedSaver)
+                .updater(spiedUpdater)
+                .mutator(o1 -> o.setCustomerId("C2"))
+                .getter(s -> o)
+                .build();
 
-    createOrUpdate.apply(session);
+        createOrUpdate.apply(session);
 
-    Mockito.verify(spiedSaver, Mockito.times(0)).apply(Mockito.any(Order.class));
-    Mockito.verify(spiedUpdater, Mockito.times(1))
-        .accept(Mockito.any(Order.class),
-            ArgumentMatchers.argThat((Order x) -> x.getCustomerId().equals("C2")));
-  }
+        Mockito.verify(spiedSaver, Mockito.times(0)).apply(Mockito.any(Order.class));
+        Mockito.verify(spiedUpdater, Mockito.times(1))
+                .accept(Mockito.any(Order.class),
+                        ArgumentMatchers.argThat((Order x) -> x.getCustomerId().equals("C2")));
+    }
 }

@@ -32,15 +32,15 @@ class TransactionMetricObserverTest {
         Mockito.doReturn(false).when(metricManager).isMetricApplicable(null);
         assertEquals(terminate(),
                 transactionMetricObserver.execute(TransactionExecutionContext.builder()
-                                                          .commandName("testCommand")
-                                                          .shardName("testshard1")
-                                                          .daoType(DaoType.RELATIONAL)
-                                                          .entityClass(RelationalEntity.class)
-                                                          .opContext(Save.<String, String>builder()
-                                                                               .entity("dummy")
-                                                                               .saver(t->t)
-                                                                               .build())
-                    .build(), this::terminate));
+                        .commandName("testCommand")
+                        .shardName("testshard1")
+                        .daoType(DaoType.RELATIONAL)
+                        .entityClass(RelationalEntity.class)
+                        .opContext(Save.<String, String>builder()
+                                .entity("dummy")
+                                .saver(t -> t)
+                                .build())
+                        .build(), this::terminate));
     }
 
     @Test
@@ -48,7 +48,7 @@ class TransactionMetricObserverTest {
         val context = TransactionExecutionContext.builder()
                 .commandName("testCommand")
                 .shardName("testshard1")
-                .opContext(Save.<String, String>builder().entity("dummy").saver(t->t).build())
+                .opContext(Save.<String, String>builder().entity("dummy").saver(t -> t).build())
                 .entityClass(RelationalDao.class)
                 .shardName("shard")
                 .daoType(DaoType.RELATIONAL)
@@ -80,7 +80,7 @@ class TransactionMetricObserverTest {
         val context = TransactionExecutionContext.builder()
                 .commandName("testCommand")
                 .shardName("testshard1")
-                .opContext(Save.<String, String>builder().entity("dummy").saver(t->t).build())
+                .opContext(Save.<String, String>builder().entity("dummy").saver(t -> t).build())
                 .entityClass(RelationalDao.class)
                 .shardName("shard")
                 .daoType(DaoType.RELATIONAL)
@@ -116,7 +116,7 @@ class TransactionMetricObserverTest {
                 .entityClass(context.getEntityClass())
                 .daoType(context.getDaoType())
                 .lockedContextMode(context.getOpContext() instanceof LockAndExecute ?
-                    ((LockAndExecute)context.getOpContext()).getMode().name() : null)
+                        ((LockAndExecute) context.getOpContext()).getMode().name() : null)
                 .commandName(context.getCommandName())
                 .build()));
 

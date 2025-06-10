@@ -17,23 +17,23 @@ import java.util.function.Function;
 @Builder
 public class UpdateByQuery extends OpContext<Integer> {
 
-  @NonNull
-  private Function<UpdateOperationMeta, Integer> updater;
-  @NonNull
-  private UpdateOperationMeta updateOperationMeta;
+    @NonNull
+    private Function<UpdateOperationMeta, Integer> updater;
+    @NonNull
+    private UpdateOperationMeta updateOperationMeta;
 
-  @Override
-  public Integer apply(Session session) {
-    return updater.apply(updateOperationMeta);
-  }
+    @Override
+    public Integer apply(Session session) {
+        return updater.apply(updateOperationMeta);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.UPDATE_BY_QUERY;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.UPDATE_BY_QUERY;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

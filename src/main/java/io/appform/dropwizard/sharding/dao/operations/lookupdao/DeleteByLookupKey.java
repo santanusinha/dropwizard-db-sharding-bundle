@@ -16,23 +16,23 @@ import java.util.function.Function;
 @Builder
 public class DeleteByLookupKey extends OpContext<Boolean> {
 
-  @NonNull
-  private Function<String, Boolean> handler;
-  @NonNull
-  private String id;
+    @NonNull
+    private Function<String, Boolean> handler;
+    @NonNull
+    private String id;
 
-  @Override
-  public Boolean apply(Session session) {
-    return handler.apply(id);
-  }
+    @Override
+    public Boolean apply(Session session) {
+        return handler.apply(id);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.DELETE_BY_LOOKUP_KEY;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.DELETE_BY_LOOKUP_KEY;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

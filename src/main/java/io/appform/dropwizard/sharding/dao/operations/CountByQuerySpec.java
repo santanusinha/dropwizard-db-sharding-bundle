@@ -15,24 +15,24 @@ import java.util.function.Function;
 @Builder
 public class CountByQuerySpec extends OpContext<Long> {
 
-  @NonNull
-  private QuerySpec querySpec;
+    @NonNull
+    private QuerySpec querySpec;
 
-  @NonNull
-  private Function<QuerySpec, Long> counter;
+    @NonNull
+    private Function<QuerySpec, Long> counter;
 
-  @Override
-  public Long apply(Session session) {
-    return counter.apply(querySpec);
-  }
+    @Override
+    public Long apply(Session session) {
+        return counter.apply(querySpec);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.COUNT_BY_QUERY_SPEC;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.COUNT_BY_QUERY_SPEC;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

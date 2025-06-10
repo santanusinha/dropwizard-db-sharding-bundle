@@ -9,14 +9,14 @@ import org.hibernate.criterion.DetachedCriteria;
 @Getter
 public class ScrollParam<T> {
 
-  public DetachedCriteria criteria;
-  public QuerySpec<T, T> querySpec;
+    public DetachedCriteria criteria;
+    public QuerySpec<T, T> querySpec;
 
-  @Builder
-  public ScrollParam(DetachedCriteria criteria, QuerySpec<T, T> querySpec) {
-    Preconditions.checkArgument(criteria != null || querySpec != null);
-    this.criteria = criteria;
-    this.querySpec = querySpec;
-  }
+    @Builder
+    public ScrollParam(DetachedCriteria criteria, QuerySpec<T, T> querySpec) {
+        Preconditions.checkArgument(criteria != null || querySpec != null);
+        this.criteria = criteria;
+        this.querySpec = querySpec;
+    }
 
 }

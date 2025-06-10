@@ -17,23 +17,23 @@ import java.util.function.Function;
 @Builder
 public class RunWithCriteria<T> extends OpContext<T> {
 
-  @NonNull
-  private Function<DetachedCriteria, T> handler;
-  @NonNull
-  private DetachedCriteria detachedCriteria;
+    @NonNull
+    private Function<DetachedCriteria, T> handler;
+    @NonNull
+    private DetachedCriteria detachedCriteria;
 
-  @Override
-  public T apply(Session session) {
-    return handler.apply(detachedCriteria);
-  }
+    @Override
+    public T apply(Session session) {
+        return handler.apply(detachedCriteria);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.RUN_WITH_CRITERIA;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.RUN_WITH_CRITERIA;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

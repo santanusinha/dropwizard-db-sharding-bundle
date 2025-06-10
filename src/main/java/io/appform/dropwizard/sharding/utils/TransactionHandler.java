@@ -113,7 +113,7 @@ public class TransactionHandler {
         session.setHibernateFlushMode(FlushMode.AUTO);
         //If the bundle is initialized in multitenant mode, each session factory is tagged to
         //a tenant id. It will be used in encryption support to fetch the appropriate encryptor for the tenant.
-        if(sessionFactory.getProperties().containsKey(TENANT_ID)) {
+        if (sessionFactory.getProperties().containsKey(TENANT_ID)) {
             MDC.put(TENANT_ID, sessionFactory.getProperties().get(TENANT_ID).toString());
         }
     }

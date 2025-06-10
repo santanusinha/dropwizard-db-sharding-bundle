@@ -37,7 +37,6 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
      * This constructor initializes a CacheableRelationalDao instance, which extends the functionality of a
      * RelationalDao, for working with entities of the specified class distributed across multiple shards.
      * The entity class should designate one field as the primary key using the `@Id` annotation.
-     *
      */
     public CacheableRelationalDao(String dbNamespace,
                                   MultiTenantCacheableRelationalDao<T> delegate) {
@@ -48,7 +47,7 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
 
     /**
      * Retrieves an entity from the cache or the database based on the parent key and entity key.
-     *
+     * <p>
      * This method attempts to retrieve an entity from the cache first using the provided parent key and entity key.
      * If the entity is found in the cache, it is returned as an Optional. If not found in the cache, the method falls
      * back to the parent class's (superclass) `get` method to retrieve the entity from the database. If the entity is
@@ -56,7 +55,7 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
      * or the database, an empty Optional is returned.
      *
      * @param parentKey The parent key associated with the entity.
-     * @param key The key of the entity to retrieve.
+     * @param key       The key of the entity to retrieve.
      * @return An Optional containing the retrieved entity if found, or an empty Optional if the entity is not found.
      * @throws IllegalArgumentException If the parent key or entity key is invalid.
      */

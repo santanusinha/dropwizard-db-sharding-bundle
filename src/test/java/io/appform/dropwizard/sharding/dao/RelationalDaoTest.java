@@ -70,9 +70,9 @@ public class RelationalDaoTest {
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
         configuration.setProperty("hibernate.dialect",
-                                  "org.hibernate.dialect.H2Dialect");
+                "org.hibernate.dialect.H2Dialect");
         configuration.setProperty("hibernate.connection.driver_class",
-                                  "org.h2.Driver");
+                "org.h2.Driver");
         configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
         configuration.setProperty("hibernate.hbm2ddl.auto", "create");
         configuration.setProperty("hibernate.current_session_context_class", "managed");
@@ -128,9 +128,9 @@ public class RelationalDaoTest {
                 .build();
         relationalDao.saveAll(key, Lists.newArrayList(entityOne, entityTwo));
         List<RelationalEntity> entities = relationalDao.select(key,
-                                                               DetachedCriteria.forClass(RelationalEntity.class),
-                                                               0,
-                                                               10);
+                DetachedCriteria.forClass(RelationalEntity.class),
+                0,
+                10);
         assertEquals(2, entities.size());
 
     }
@@ -138,26 +138,27 @@ public class RelationalDaoTest {
     @Test
     public void testCreateOrUpdate() throws Exception {
         val saved = relationalWithAIDao.createOrUpdate("parent",
-                                                       DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
-                                                               .add(Property.forName("key").eq("testId")),
-                                                       e -> e.setValue("Some Other Text"),
-                                                       () -> RelationalEntityWithAIKey.builder()
-                                                               .key("testId")
-                                                               .value("Some New Text")
-                                                               .build())
+                        DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
+                                .add(Property.forName("key").eq("testId")),
+                        e -> e.setValue("Some Other Text"),
+                        () -> RelationalEntityWithAIKey.builder()
+                                .key("testId")
+                                .value("Some New Text")
+                                .build())
                 .orElse(null);
         assertNotNull(saved);
         assertEquals("Some New Text", saved.getValue());
 
         val updated = relationalWithAIDao.createOrUpdate("parent",
-                                                         DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
-                                                                 .add(Property.forName("key").eq("testId")),
-                                                         e -> e.setValue("Some Other Text"),
-                                                         () -> RelationalEntityWithAIKey.builder()
-                                                                 .key("testId")
-                                                                 .value("Some New Text")
-                                                                 .build())
-                .orElse(null); ;
+                        DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
+                                .add(Property.forName("key").eq("testId")),
+                        e -> e.setValue("Some Other Text"),
+                        () -> RelationalEntityWithAIKey.builder()
+                                .key("testId")
+                                .value("Some New Text")
+                                .build())
+                .orElse(null);
+        ;
         assertNotNull(updated);
         assertEquals(saved.getId(), updated.getId());
         assertEquals("Some Other Text", updated.getValue());
@@ -191,12 +192,12 @@ public class RelationalDaoTest {
 
         val newValue = UUID.randomUUID().toString();
         int rowsUpdated = relationalDao.updateUsingQuery(relationalKey,
-                                                         UpdateOperationMeta.builder()
-                                                                 .queryName("testUpdateUsingKeyTwo")
-                                                                 .params(ImmutableMap.of("keyTwo", "2",
-                                                                                         "value", newValue))
-                                                                 .build()
-                                                        );
+                UpdateOperationMeta.builder()
+                        .queryName("testUpdateUsingKeyTwo")
+                        .params(ImmutableMap.of("keyTwo", "2",
+                                "value", newValue))
+                        .build()
+        );
         assertEquals(2, rowsUpdated);
 
         val persistedEntityTwo = relationalDao.get(relationalKey, "2").orElse(null);
@@ -238,14 +239,14 @@ public class RelationalDaoTest {
 
         val newValue = UUID.randomUUID().toString();
         int rowsUpdated = relationalDao.updateUsingQuery(relationalKey,
-                                                         UpdateOperationMeta.builder()
-                                                                 .queryName("testUpdateUsingKeyTwo")
-                                                                 .params(ImmutableMap.of("keyTwo",
-                                                                                         UUID.randomUUID().toString(),
-                                                                                         "value",
-                                                                                         newValue))
-                                                                 .build()
-                                                        );
+                UpdateOperationMeta.builder()
+                        .queryName("testUpdateUsingKeyTwo")
+                        .params(ImmutableMap.of("keyTwo",
+                                UUID.randomUUID().toString(),
+                                "value",
+                                newValue))
+                        .build()
+        );
         assertEquals(0, rowsUpdated);
 
 
@@ -285,12 +286,11 @@ public class RelationalDaoTest {
                         val id = Integer.toString(i);
                         ids.add(id);
                         relationalDao.save(UUID.randomUUID().toString(),
-                                           RelationalEntity.builder()
-                                                   .key(id)
-                                                   .value("abcd" + i)
-                                                   .build());
-                    }
-                    catch (Exception e) {
+                                RelationalEntity.builder()
+                                        .key(id)
+                                        .value("abcd" + i)
+                                        .build());
+                    } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
                 });
@@ -300,7 +300,7 @@ public class RelationalDaoTest {
 
             do {
                 nextPtr = relationalDao.scrollUp(DetachedCriteria.forClass(RelationalEntity.class),
-                                                 null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
+                        null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
                 nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
             }
             while (!nextPtr.getResult().isEmpty());
@@ -312,7 +312,7 @@ public class RelationalDaoTest {
 
             do {
                 nextPtr = relationalDao.scrollDown(DetachedCriteria.forClass(RelationalEntity.class),
-                                                 null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
+                        null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
                 nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
             }
             while (!nextPtr.getResult().isEmpty());
@@ -329,12 +329,11 @@ public class RelationalDaoTest {
                         val id = Integer.toString(i);
                         ids.add(id);
                         relationalDao.save(UUID.randomUUID().toString(),
-                                           RelationalEntity.builder()
-                                                   .key(id)
-                                                   .value("abcd" + i)
-                                                   .build());
-                    }
-                    catch (Exception e) {
+                                RelationalEntity.builder()
+                                        .key(id)
+                                        .value("abcd" + i)
+                                        .build());
+                    } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
                 });
@@ -342,7 +341,7 @@ public class RelationalDaoTest {
                 .values()
                 .stream()
                 .flatMap(Collection::stream)
-                .map(v -> ((RelationalEntity)v).getKey())
+                .map(v -> ((RelationalEntity) v).getKey())
                 .collect(Collectors.toSet()));
     }
 
@@ -371,29 +370,29 @@ public class RelationalDaoTest {
         Basic filter test to check equality constraint through QuerySpec
          */
         List<RelationalEntity> queryResultOne = relationalDao.select(randomRelationalKey,
-                                                                     (queryRoot, query, criteriaBuilder)
-                                                                             -> query.where(criteriaBuilder.equal(queryRoot.get("keyTwo"), randomRelationalKey)), 0, numOfRecords);
+                (queryRoot, query, criteriaBuilder)
+                        -> query.where(criteriaBuilder.equal(queryRoot.get("keyTwo"), randomRelationalKey)), 0, numOfRecords);
         Assertions.assertEquals(1, queryResultOne.size());
 
         /*
         Basic filter test to check in-equality constraint through QuerySpec
          */
         List<RelationalEntity> queryResultTwo = relationalDao.select(randomRelationalKey,
-                                                                     (queryRoot, query, criteriaBuilder)
-                                                                             -> query.where(criteriaBuilder.notEqual(queryRoot.get("keyTwo"), randomRelationalKey)), 0, numOfRecords);
+                (queryRoot, query, criteriaBuilder)
+                        -> query.where(criteriaBuilder.notEqual(queryRoot.get("keyTwo"), randomRelationalKey)), 0, numOfRecords);
         Assertions.assertEquals(numOfRecords - 1, queryResultTwo.size());
 
         /*
         Basic filter test to check multiple predicates through QuerySpec
          */
         List<RelationalEntity> queryResultThree = relationalDao.select(randomRelationalKey,
-                                                                       (queryRoot, query, criteriaBuilder) ->
-                                                                               query.where(
-                                                                                       criteriaBuilder.and(
-                                                                                               criteriaBuilder.equal(queryRoot.get("key"), randomRelationalKey),
-                                                                                               criteriaBuilder.notEqual(queryRoot.get("keyTwo"), randomRelationalKey)
-                                                                                                          )
-                                                                                          ), 0, numOfRecords);
+                (queryRoot, query, criteriaBuilder) ->
+                        query.where(
+                                criteriaBuilder.and(
+                                        criteriaBuilder.equal(queryRoot.get("key"), randomRelationalKey),
+                                        criteriaBuilder.notEqual(queryRoot.get("keyTwo"), randomRelationalKey)
+                                )
+                        ), 0, numOfRecords);
         Assertions.assertEquals(0, queryResultThree.size());
     }
 

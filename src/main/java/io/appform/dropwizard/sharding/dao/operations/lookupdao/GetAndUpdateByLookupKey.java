@@ -21,33 +21,33 @@ import java.util.function.Function;
 @Builder
 public class GetAndUpdateByLookupKey<T> extends OpContext<Boolean> {
 
-  @NonNull
-  private String id;
-  @NonNull
-  private Function<String, T> getter;
-  @NonNull
-  private Function<Optional<T>, T> mutator;
-  @NonNull
-  private Consumer<T> updater;
+    @NonNull
+    private String id;
+    @NonNull
+    private Function<String, T> getter;
+    @NonNull
+    private Function<Optional<T>, T> mutator;
+    @NonNull
+    private Consumer<T> updater;
 
-  @Override
-  public Boolean apply(Session session) {
-    T entity = getter.apply(id);
-    T newEntity = mutator.apply(Optional.ofNullable(entity));
-    if (null == newEntity) {
-      return false;
+    @Override
+    public Boolean apply(Session session) {
+        T entity = getter.apply(id);
+        T newEntity = mutator.apply(Optional.ofNullable(entity));
+        if (null == newEntity) {
+            return false;
+        }
+        updater.accept(entity);
+        return true;
     }
-    updater.accept(entity);
-    return true;
-  }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.GET_AND_UPDATE_BY_LOOKUP_KEY;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.GET_AND_UPDATE_BY_LOOKUP_KEY;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

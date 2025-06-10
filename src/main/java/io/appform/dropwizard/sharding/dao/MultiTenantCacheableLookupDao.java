@@ -42,129 +42,129 @@ import java.util.function.Function;
 @Slf4j
 public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
 
-  private Map<String, LookupCache<T>> cache;
+    private Map<String, LookupCache<T>> cache;
 
-  /**
-   * Constructs a CacheableLookupDao instance with caching support.
-   * <p>
-   * This constructor initializes a CacheableLookupDao instance with the provided parameters,
-   * enabling caching for improved performance and data retrieval optimization.
-   *
-   * @param sessionFactories  A list of SessionFactory instances for database access.
-   * @param entityClass       The Class representing the entity type handled by the DAO.
-   * @param shardManagers     A map of ShardManager to instantiate ShardCalculator.
-   * @param cache             The LookupCache implementation for caching entities.
-   * @param shardingOptions   ShardingBundleOptions for configuring sharding behavior.
-   * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
-   * @param observer          A TransactionObserver for observing transaction events.
-   */
-  public MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
-                                       Class<T> entityClass,
-                                       Map<String, ShardManager> shardManagers,
-                                       Map<String, LookupCache<T>> cache,
-                                       Map<String, ShardingBundleOptions> shardingOptions,
-                                       Map<String, ShardInfoProvider> shardInfoProvider,
-                                       TransactionObserver observer) {
-    super(sessionFactories, entityClass, shardManagers, shardingOptions, shardInfoProvider, observer);
-    this.cache = cache;
-  }
+    /**
+     * Constructs a CacheableLookupDao instance with caching support.
+     * <p>
+     * This constructor initializes a CacheableLookupDao instance with the provided parameters,
+     * enabling caching for improved performance and data retrieval optimization.
+     *
+     * @param sessionFactories  A list of SessionFactory instances for database access.
+     * @param entityClass       The Class representing the entity type handled by the DAO.
+     * @param shardManagers     A map of ShardManager to instantiate ShardCalculator.
+     * @param cache             The LookupCache implementation for caching entities.
+     * @param shardingOptions   ShardingBundleOptions for configuring sharding behavior.
+     * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
+     * @param observer          A TransactionObserver for observing transaction events.
+     */
+    public MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
+                                         Class<T> entityClass,
+                                         Map<String, ShardManager> shardManagers,
+                                         Map<String, LookupCache<T>> cache,
+                                         Map<String, ShardingBundleOptions> shardingOptions,
+                                         Map<String, ShardInfoProvider> shardInfoProvider,
+                                         TransactionObserver observer) {
+        super(sessionFactories, entityClass, shardManagers, shardingOptions, shardInfoProvider, observer);
+        this.cache = cache;
+    }
 
-  /**
-   * Retrieves an entity from the cache or the database based on the specified key and caches it if
-   * necessary.
-   * <p>
-   * This method first checks if the entity exists in the cache based on the provided key. If the
-   * entity is found in the cache, it is returned as an Optional. If not found in the cache, the
-   * method falls back to the superclass's `get` method to retrieve the entity from the database
-   * using the specified key. If the entity is found in the database, it is added to the cache for
-   * future access and returned as an Optional. If the entity is not found in either the cache or
-   * the database, an empty Optional is returned.
-   *
-   * @param tenantId The tenant ID of the entity to retrieve.
-   * @param key      The key or identifier of the entity to retrieve.
-   * @return An Optional containing the retrieved entity if found, or an empty Optional if the
-   * entity is not found.
-   * @throws Exception If an error occurs during the retrieval process.
-   */
-  @Override
-  public Optional<T> get(String tenantId, String key) throws Exception {
-    if (cache.get(tenantId).exists(key)) {
-      return Optional.of(cache.get(tenantId).get(key));
+    /**
+     * Retrieves an entity from the cache or the database based on the specified key and caches it if
+     * necessary.
+     * <p>
+     * This method first checks if the entity exists in the cache based on the provided key. If the
+     * entity is found in the cache, it is returned as an Optional. If not found in the cache, the
+     * method falls back to the superclass's `get` method to retrieve the entity from the database
+     * using the specified key. If the entity is found in the database, it is added to the cache for
+     * future access and returned as an Optional. If the entity is not found in either the cache or
+     * the database, an empty Optional is returned.
+     *
+     * @param tenantId The tenant ID of the entity to retrieve.
+     * @param key      The key or identifier of the entity to retrieve.
+     * @return An Optional containing the retrieved entity if found, or an empty Optional if the
+     * entity is not found.
+     * @throws Exception If an error occurs during the retrieval process.
+     */
+    @Override
+    public Optional<T> get(String tenantId, String key) throws Exception {
+        if (cache.get(tenantId).exists(key)) {
+            return Optional.of(cache.get(tenantId).get(key));
+        }
+        T entity = super.get(tenantId, key, Function.identity());
+        if (entity != null) {
+            cache.get(tenantId).put(key, entity);
+        }
+        return Optional.ofNullable(entity);
     }
-    T entity = super.get(tenantId, key, Function.identity());
-    if (entity != null) {
-      cache.get(tenantId).put(key, entity);
-    }
-    return Optional.ofNullable(entity);
-  }
 
-  /**
-   * Saves an entity to the database and caches the saved entity if successful.
-   * <p>
-   * This method attempts to save the provided entity to the database using the superclass's `save`
-   * method. If the save operation succeeds, it retrieves the saved entity from the database, caches
-   * it, and returns it wrapped in an Optional. If the save operation fails, it returns an empty
-   * Optional.
-   *
-   * @param entity The entity to be saved.
-   * @return An Optional containing the saved entity if the save operation is successful, or an
-   * empty Optional if the save operation fails.
-   * @throws Exception If an error occurs during the save operation.
-   */
-  @Override
-  public Optional<T> save(String tenantId, T entity) throws Exception {
-    T savedEntity = super.save(tenantId, entity, t -> t);
-    if (savedEntity != null) {
-      final String key = getKeyField().get(entity).toString();
-      cache.get(tenantId).put(key, entity);
+    /**
+     * Saves an entity to the database and caches the saved entity if successful.
+     * <p>
+     * This method attempts to save the provided entity to the database using the superclass's `save`
+     * method. If the save operation succeeds, it retrieves the saved entity from the database, caches
+     * it, and returns it wrapped in an Optional. If the save operation fails, it returns an empty
+     * Optional.
+     *
+     * @param entity The entity to be saved.
+     * @return An Optional containing the saved entity if the save operation is successful, or an
+     * empty Optional if the save operation fails.
+     * @throws Exception If an error occurs during the save operation.
+     */
+    @Override
+    public Optional<T> save(String tenantId, T entity) throws Exception {
+        T savedEntity = super.save(tenantId, entity, t -> t);
+        if (savedEntity != null) {
+            final String key = getKeyField().get(entity).toString();
+            cache.get(tenantId).put(key, entity);
+        }
+        return Optional.ofNullable(savedEntity);
     }
-    return Optional.ofNullable(savedEntity);
-  }
 
-  /**
-   * Updates an entity using the provided updater function and caches the updated entity.
-   * <p>
-   * This method updates an entity identified by the given ID using the provided updater function.
-   * It first attempts to update the entity using the superclass's `update` method. If the update
-   * operation succeeds, it retrieves the updated entity from the database, caches it, and returns
-   * `true`. If the update operation fails, it returns `false`.
-   *
-   * @param id      The ID of the entity to update.
-   * @param updater A function that takes an Optional of the current entity and returns the updated
-   *                entity.
-   * @return `true` if the entity is successfully updated and cached, or `false` if the update
-   * operation fails.
-   * @throws DaoFwdException If an error occurs while updating or caching the entity.
-   */
-  @Override
-  public boolean update(String tenantId, String id, Function<Optional<T>, T> updater) {
-    boolean result = super.update(tenantId, id, updater);
-    if (result) {
-      try {
-        Optional<T> updatedEntity = super.get(tenantId, id);
-        updatedEntity.ifPresent(t -> cache.get(tenantId).put(id, t));
-      } catch (Exception e) {
-        throw new DaoFwdException("Error updating entity: " + id, e);
-      }
+    /**
+     * Updates an entity using the provided updater function and caches the updated entity.
+     * <p>
+     * This method updates an entity identified by the given ID using the provided updater function.
+     * It first attempts to update the entity using the superclass's `update` method. If the update
+     * operation succeeds, it retrieves the updated entity from the database, caches it, and returns
+     * `true`. If the update operation fails, it returns `false`.
+     *
+     * @param id      The ID of the entity to update.
+     * @param updater A function that takes an Optional of the current entity and returns the updated
+     *                entity.
+     * @return `true` if the entity is successfully updated and cached, or `false` if the update
+     * operation fails.
+     * @throws DaoFwdException If an error occurs while updating or caching the entity.
+     */
+    @Override
+    public boolean update(String tenantId, String id, Function<Optional<T>, T> updater) {
+        boolean result = super.update(tenantId, id, updater);
+        if (result) {
+            try {
+                Optional<T> updatedEntity = super.get(tenantId, id);
+                updatedEntity.ifPresent(t -> cache.get(tenantId).put(id, t));
+            } catch (Exception e) {
+                throw new DaoFwdException("Error updating entity: " + id, e);
+            }
+        }
+        return result;
     }
-    return result;
-  }
 
-  /**
-   * Read through exists check on the basis of key (value of field annotated with {@link LookupKey})
-   * from cache. Cache miss will be delegated to {@link LookupDao#exists(String)} method.
-   *
-   * @param key The value of the key field to look for.
-   * @return Whether the entity exists or not
-   * @throws Exception if backing dao throws
-   */
-  @Override
-  public boolean exists(String tenantId, String key) throws Exception {
-    if (cache.get(tenantId).exists(key)) {
-      return true;
+    /**
+     * Read through exists check on the basis of key (value of field annotated with {@link LookupKey})
+     * from cache. Cache miss will be delegated to {@link LookupDao#exists(String)} method.
+     *
+     * @param key The value of the key field to look for.
+     * @return Whether the entity exists or not
+     * @throws Exception if backing dao throws
+     */
+    @Override
+    public boolean exists(String tenantId, String key) throws Exception {
+        if (cache.get(tenantId).exists(key)) {
+            return true;
+        }
+        Optional<T> entity = super.get(tenantId, key);
+        entity.ifPresent(t -> cache.get(tenantId).put(key, t));
+        return entity.isPresent();
     }
-    Optional<T> entity = super.get(tenantId, key);
-    entity.ifPresent(t -> cache.get(tenantId).put(key, t));
-    return entity.isPresent();
-  }
 }

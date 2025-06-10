@@ -18,21 +18,21 @@ import java.util.function.Function;
 @Builder
 public class RunInSession<T> extends OpContext<T> {
 
-  @NonNull
-  private Function<Session, T> handler;
+    @NonNull
+    private Function<Session, T> handler;
 
-  @Override
-  public T apply(Session session) {
-    return handler.apply(session);
-  }
+    @Override
+    public T apply(Session session) {
+        return handler.apply(session);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.RUN_IN_SESSION;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.RUN_IN_SESSION;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

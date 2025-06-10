@@ -9,11 +9,16 @@ import lombok.Value;
 @Value
 @Builder
 public class TransactionExecutionContext {
-    @NonNull String commandName; // method or command name that gets executed across shards. Ex. ScatterGather.
-    @NonNull String shardName;
-    @NonNull DaoType daoType;
-    @NonNull Class<?> entityClass;
-    @NonNull OpContext<?> opContext;
+    @NonNull
+    String commandName; // method or command name that gets executed across shards. Ex. ScatterGather.
+    @NonNull
+    String shardName;
+    @NonNull
+    DaoType daoType;
+    @NonNull
+    Class<?> entityClass;
+    @NonNull
+    OpContext<?> opContext;
 
     /**
      * @deprecated Field lockedContextMode got removed with the introduction of opcontext.

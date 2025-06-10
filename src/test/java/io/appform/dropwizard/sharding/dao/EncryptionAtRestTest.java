@@ -66,7 +66,7 @@ public class EncryptionAtRestTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
+        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,

@@ -29,19 +29,19 @@ class UpdateAllTest {
         List<Order> orders = Arrays.asList(o, o2);
 
         Function<SelectParam<Order>, List<Order>> spiedSelector = LambdaTestUtils.spiedFunction(
-            s -> orders);
+                s -> orders);
 
         BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
         });
 
         val updateAll = UpdateAll.<Order>builder().selectParam(
-                SelectParam.<Order>builder().criteria(DetachedCriteria.forClass(Order.class)).build())
-            .selector(spiedSelector).mutator(order -> order.setCustomerId("C2"))
-            .updater(spiedUpdater).build();
+                        SelectParam.<Order>builder().criteria(DetachedCriteria.forClass(Order.class)).build())
+                .selector(spiedSelector).mutator(order -> order.setCustomerId("C2"))
+                .updater(spiedUpdater).build();
 
         Assertions.assertTrue(updateAll.apply(session));
         Mockito.verify(spiedUpdater, Mockito.times(2)).accept(Mockito.any(),
-            ArgumentMatchers.argThat((Order x) -> x.getCustomerId().equals("C2")));
+                ArgumentMatchers.argThat((Order x) -> x.getCustomerId().equals("C2")));
     }
 
 
@@ -49,15 +49,15 @@ class UpdateAllTest {
     void testUpdateAll_NoResult() {
 
         Function<SelectParam<Order>, List<Order>> spiedSelector = LambdaTestUtils.spiedFunction(
-            s -> Collections.emptyList());
+                s -> Collections.emptyList());
 
         BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
         });
 
         val updateAll = UpdateAll.<Order>builder().selectParam(
-                SelectParam.<Order>builder().criteria(DetachedCriteria.forClass(Order.class)).build())
-            .selector(spiedSelector).mutator(order -> order.setCustomerId("C2"))
-            .updater(spiedUpdater).build();
+                        SelectParam.<Order>builder().criteria(DetachedCriteria.forClass(Order.class)).build())
+                .selector(spiedSelector).mutator(order -> order.setCustomerId("C2"))
+                .updater(spiedUpdater).build();
 
         Assertions.assertFalse(updateAll.apply(session));
         Mockito.verify(spiedUpdater, Mockito.times(0)).accept(Mockito.any(), Mockito.any());
@@ -71,14 +71,14 @@ class UpdateAllTest {
         List<Order> orders = Arrays.asList(o, o2);
 
         Function<SelectParam<Order>, List<Order>> spiedSelector = LambdaTestUtils.spiedFunction(
-            s -> orders);
+                s -> orders);
 
         BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
         });
 
         val updateAll = UpdateAll.<Order>builder().selectParam(
-                SelectParam.<Order>builder().criteria(DetachedCriteria.forClass(Order.class)).build())
-            .selector(spiedSelector).mutator(order -> null).updater(spiedUpdater).build();
+                        SelectParam.<Order>builder().criteria(DetachedCriteria.forClass(Order.class)).build())
+                .selector(spiedSelector).mutator(order -> null).updater(spiedUpdater).build();
 
         Assertions.assertFalse(updateAll.apply(session));
         Mockito.verify(spiedUpdater, Mockito.times(0)).accept(Mockito.any(), Mockito.any());

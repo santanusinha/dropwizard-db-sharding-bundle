@@ -34,12 +34,13 @@ import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
 import java.util.Objects;
+
 @TypeDefs({
         @TypeDef(
                 name = "EncryptedString",
                 typeClass = org.jasypt.hibernate5.type.EncryptedStringType.class,
                 parameters = {
-                        @org.hibernate.annotations.Parameter(name="encryptorRegisteredName", value = "encryptedString")
+                        @org.hibernate.annotations.Parameter(name = "encryptorRegisteredName", value = "encryptedString")
                 }
         )
 })

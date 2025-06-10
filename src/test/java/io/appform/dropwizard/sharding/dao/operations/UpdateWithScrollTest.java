@@ -20,78 +20,78 @@ import static org.mockito.Mockito.when;
 
 class UpdateWithScrollTest {
 
-  @Mock
-  Session session;
+    @Mock
+    Session session;
 
 
-  @Test
-  void testUpdateWithScroll_withMutators() {
+    @Test
+    void testUpdateWithScroll_withMutators() {
 
-    Order o = Order.builder().id(1).customerId("C1").build();
-    Order o2 = Order.builder().id(2).customerId("C2").build();
+        Order o = Order.builder().id(1).customerId("C1").build();
+        Order o2 = Order.builder().id(2).customerId("C2").build();
 
-    ScrollableResults scrollableResults = mock(ScrollableResults.class);
-    when(scrollableResults.get(0)).thenReturn(o, o2);
-    when(scrollableResults.next()).thenReturn(true, true, false);
+        ScrollableResults scrollableResults = mock(ScrollableResults.class);
+        when(scrollableResults.get(0)).thenReturn(o, o2);
+        when(scrollableResults.next()).thenReturn(true, true, false);
 
-    Function<ScrollParam<Order>, ScrollableResults> spiedScroll = LambdaTestUtils.spiedFunction(
-        s -> scrollableResults);
+        Function<ScrollParam<Order>, ScrollableResults> spiedScroll = LambdaTestUtils.spiedFunction(
+                s -> scrollableResults);
 
-    BooleanSupplier spiedUpdateNext = mock(BooleanSupplier.class);
-    when(spiedUpdateNext.getAsBoolean()).thenReturn(true, false);
+        BooleanSupplier spiedUpdateNext = mock(BooleanSupplier.class);
+        when(spiedUpdateNext.getAsBoolean()).thenReturn(true, false);
 
-    BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
-    });
+        BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
+        });
 
-    val updateWithScroll = UpdateWithScroll.<Order>builder()
-        .scrollParam(
-            ScrollParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
-                .build())
-        .scroll(spiedScroll)
-        .updateNext(spiedUpdateNext)
-        .mutator(order -> order.setCustomerId("C2"))
-        .updater(spiedUpdater).build();
+        val updateWithScroll = UpdateWithScroll.<Order>builder()
+                .scrollParam(
+                        ScrollParam.<Order>builder()
+                                .criteria(DetachedCriteria.forClass(Order.class))
+                                .build())
+                .scroll(spiedScroll)
+                .updateNext(spiedUpdateNext)
+                .mutator(order -> order.setCustomerId("C2"))
+                .updater(spiedUpdater).build();
 
-    Assertions.assertTrue(updateWithScroll.apply(session));
-    Mockito.verify(spiedUpdater, Mockito.times(2))
-        .accept(Mockito.any(),
-            ArgumentMatchers.argThat((Order x) -> x.getCustomerId().equals("C2")));
-  }
+        Assertions.assertTrue(updateWithScroll.apply(session));
+        Mockito.verify(spiedUpdater, Mockito.times(2))
+                .accept(Mockito.any(),
+                        ArgumentMatchers.argThat((Order x) -> x.getCustomerId().equals("C2")));
+    }
 
 
-  @Test
-  void testUpdateWithScroll_withNoValuesInScroll() {
+    @Test
+    void testUpdateWithScroll_withNoValuesInScroll() {
 
-    Order o = Order.builder().id(1).customerId("C1").build();
-    Order o2 = Order.builder().id(2).customerId("C2").build();
+        Order o = Order.builder().id(1).customerId("C1").build();
+        Order o2 = Order.builder().id(2).customerId("C2").build();
 
-    ScrollableResults scrollableResults = mock(ScrollableResults.class);
-    when(scrollableResults.get(0)).thenReturn(null);
-    when(scrollableResults.next()).thenReturn(true, true, false);
+        ScrollableResults scrollableResults = mock(ScrollableResults.class);
+        when(scrollableResults.get(0)).thenReturn(null);
+        when(scrollableResults.next()).thenReturn(true, true, false);
 
-    Function<ScrollParam<Order>, ScrollableResults> spiedScroll = LambdaTestUtils.spiedFunction(
-        s -> scrollableResults);
+        Function<ScrollParam<Order>, ScrollableResults> spiedScroll = LambdaTestUtils.spiedFunction(
+                s -> scrollableResults);
 
-    BooleanSupplier spiedUpdateNext = mock(BooleanSupplier.class);
-    when(spiedUpdateNext.getAsBoolean()).thenReturn(true, false);
+        BooleanSupplier spiedUpdateNext = mock(BooleanSupplier.class);
+        when(spiedUpdateNext.getAsBoolean()).thenReturn(true, false);
 
-    BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
-    });
+        BiConsumer<Order, Order> spiedUpdater = LambdaTestUtils.spiedBiConsumer((v1, v2) -> {
+        });
 
-    val updateWithScroll = UpdateWithScroll.<Order>builder()
-        .scrollParam(
-            ScrollParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
-                .build())
-        .scroll(spiedScroll)
-        .updateNext(spiedUpdateNext)
-        .mutator(order -> order.setCustomerId("C2"))
-        .updater(spiedUpdater).build();
+        val updateWithScroll = UpdateWithScroll.<Order>builder()
+                .scrollParam(
+                        ScrollParam.<Order>builder()
+                                .criteria(DetachedCriteria.forClass(Order.class))
+                                .build())
+                .scroll(spiedScroll)
+                .updateNext(spiedUpdateNext)
+                .mutator(order -> order.setCustomerId("C2"))
+                .updater(spiedUpdater).build();
 
-    Assertions.assertFalse(updateWithScroll.apply(session));
-    Mockito.verify(spiedUpdater, Mockito.times(0))
-        .accept(Mockito.any(),
-            Mockito.any());
-  }
+        Assertions.assertFalse(updateWithScroll.apply(session));
+        Mockito.verify(spiedUpdater, Mockito.times(0))
+                .accept(Mockito.any(),
+                        Mockito.any());
+    }
 }

@@ -42,7 +42,7 @@ public class BlacklistShardTask extends Task {
      * Example URL: http://localhost:8081/tasks/{tenantId}.blacklist?shard=1
      */
     public BlacklistShardTask(String tenantId, ShardManager shardManager) {
-        super(tenantId +".blacklist");
+        super(tenantId + ".blacklist");
         this.shardManager = shardManager;
     }
 

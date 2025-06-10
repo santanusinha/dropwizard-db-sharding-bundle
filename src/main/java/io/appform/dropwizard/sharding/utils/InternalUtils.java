@@ -28,16 +28,16 @@ public class InternalUtils {
             os.writeObject(input);
             os.flush();
 
-            try(val ois = new ObjectInputStream(new ByteArrayInputStream(bos.toByteArray()))) {
+            try (val ois = new ObjectInputStream(new ByteArrayInputStream(bos.toByteArray()))) {
                 return (T) ois.readObject();
             }
         }
     }
 
-    public  <T> Query<T> createQuery(
-        final Session session,
-        final Class<T> entityClass,
-        final QuerySpec<T, T> querySpec) {
+    public <T> Query<T> createQuery(
+            final Session session,
+            final Class<T> entityClass,
+            final QuerySpec<T, T> querySpec) {
         CriteriaBuilder builder = session.getCriteriaBuilder();
         CriteriaQuery<T> criteria = builder.createQuery(entityClass);
         Root<T> root = criteria.from(entityClass);

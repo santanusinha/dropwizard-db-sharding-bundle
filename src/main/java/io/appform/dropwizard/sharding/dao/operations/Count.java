@@ -15,24 +15,24 @@ import java.util.function.Function;
 @Builder
 public class Count extends OpContext<Long> {
 
-  @NonNull
-  private DetachedCriteria criteria;
+    @NonNull
+    private DetachedCriteria criteria;
 
-  @NonNull
-  private Function<DetachedCriteria, Long> counter;
+    @NonNull
+    private Function<DetachedCriteria, Long> counter;
 
-  @Override
-  public Long apply(Session session) {
-    return counter.apply(criteria);
-  }
+    @Override
+    public Long apply(Session session) {
+        return counter.apply(criteria);
+    }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.COUNT;
-  }
+    @Override
+    public OpType getOpType() {
+        return OpType.COUNT;
+    }
 
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

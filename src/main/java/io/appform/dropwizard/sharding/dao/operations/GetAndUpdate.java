@@ -19,35 +19,35 @@ import java.util.function.Function;
 @Builder
 public class GetAndUpdate<T> extends OpContext<Boolean> {
 
-  @NonNull
-  private DetachedCriteria criteria;
-  @NonNull
-  private Function<DetachedCriteria, T> getter;
-  @Builder.Default
-  private Function<T, T> mutator = t->t;
-  private BiConsumer<T, T> updater;
+    @NonNull
+    private DetachedCriteria criteria;
+    @NonNull
+    private Function<DetachedCriteria, T> getter;
+    @Builder.Default
+    private Function<T, T> mutator = t -> t;
+    private BiConsumer<T, T> updater;
 
-  @Override
-  public Boolean apply(Session session) {
-    T entity = getter.apply(criteria);
-    if (null == entity) {
-      return false;
+    @Override
+    public Boolean apply(Session session) {
+        T entity = getter.apply(criteria);
+        if (null == entity) {
+            return false;
+        }
+        T newEntity = mutator.apply(entity);
+        if (null == newEntity) {
+            return false;
+        }
+        updater.accept(entity, newEntity);
+        return true;
     }
-    T newEntity = mutator.apply(entity);
-    if (null == newEntity) {
-      return false;
+
+    @Override
+    public OpType getOpType() {
+        return OpType.GET_AND_UPDATE;
     }
-    updater.accept(entity, newEntity);
-    return true;
-  }
 
-  @Override
-  public OpType getOpType() {
-    return OpType.GET_AND_UPDATE;
-  }
-
-  @Override
-  public <R> R visit(OpContextVisitor<R> visitor) {
-    return visitor.visit(this);
-  }
+    @Override
+    public <R> R visit(OpContextVisitor<R> visitor) {
+        return visitor.visit(this);
+    }
 }

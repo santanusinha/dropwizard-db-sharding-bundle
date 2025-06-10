@@ -61,201 +61,201 @@ import java.util.stream.IntStream;
  */
 @Slf4j
 public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends
-    BundleCommonBase<T> {
+        BundleCommonBase<T> {
 
-  private Map<String, List<HibernateBundle<T>>> shardBundles = Maps.newHashMap();
+    private Map<String, List<HibernateBundle<T>>> shardBundles = Maps.newHashMap();
 
-  @Getter
-  private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
+    @Getter
+    private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
 
-  @Getter
-  private Map<String, ShardManager> shardManagers = Maps.newHashMap();
+    @Getter
+    private Map<String, ShardManager> shardManagers = Maps.newHashMap();
 
-  @Getter
-  private Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
+    @Getter
+    private Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
 
-  private Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
+    private Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
 
-  private Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
+    private Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
 
-  protected MultiTenantDBShardingBundleBase(
-      Class<?> entity,
-      Class<?>... entities) {
-    super(entity, entities);
-  }
+    protected MultiTenantDBShardingBundleBase(
+            Class<?> entity,
+            Class<?>... entities) {
+        super(entity, entities);
+    }
 
-  protected MultiTenantDBShardingBundleBase(List<String> classPathPrefixList) {
-    super(classPathPrefixList);
-  }
+    protected MultiTenantDBShardingBundleBase(List<String> classPathPrefixList) {
+        super(classPathPrefixList);
+    }
 
-  protected MultiTenantDBShardingBundleBase(String... classPathPrefixes) {
-    this(Arrays.asList(classPathPrefixes));
-  }
+    protected MultiTenantDBShardingBundleBase(String... classPathPrefixes) {
+        this(Arrays.asList(classPathPrefixes));
+    }
 
-  protected abstract ShardManager createShardManager(int numShards,
-      ShardBlacklistingStore blacklistingStore);
+    protected abstract ShardManager createShardManager(int numShards,
+                                                       ShardBlacklistingStore blacklistingStore);
 
-  @Override
-  public void run(T configuration, Environment environment) {
-    val tenantedConfig = getConfig(configuration);
-    tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
-      var blacklistingStore = getBlacklistingStore();
-      var shardManager = createShardManager(shardConfig.getShards().size(), blacklistingStore);
-      this.shardManagers.put(tenantId, shardManager);
-      val shardInfoProvider = new ShardInfoProvider(tenantId);
-      shardInfoProviders.put(tenantId, shardInfoProvider);
-      var healthCheckManager = new HealthCheckManager(tenantId, shardInfoProvider,
-          blacklistingStore,
-          shardManager);
-      healthCheckManagers.put(tenantId, healthCheckManager);
-      //Encryption Support through jasypt-hibernate5
-      var shardingOption = shardConfig.getShardingOptions();
-      shardingOption =
-          Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
-      List<HibernateBundle<T>> shardedBundle = IntStream.range(0, shardConfig.getShards().size())
-          .mapToObj(
-              shard ->
-                  new HibernateBundle<T>(initialisedEntities, new SessionFactoryFactory()) {
-                    @Override
-                    protected String name() {
-                      return shardInfoProvider.shardName(shard);
-                    }
+    @Override
+    public void run(T configuration, Environment environment) {
+        val tenantedConfig = getConfig(configuration);
+        tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
+            var blacklistingStore = getBlacklistingStore();
+            var shardManager = createShardManager(shardConfig.getShards().size(), blacklistingStore);
+            this.shardManagers.put(tenantId, shardManager);
+            val shardInfoProvider = new ShardInfoProvider(tenantId);
+            shardInfoProviders.put(tenantId, shardInfoProvider);
+            var healthCheckManager = new HealthCheckManager(tenantId, shardInfoProvider,
+                    blacklistingStore,
+                    shardManager);
+            healthCheckManagers.put(tenantId, healthCheckManager);
+            //Encryption Support through jasypt-hibernate5
+            var shardingOption = shardConfig.getShardingOptions();
+            shardingOption =
+                    Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
+            List<HibernateBundle<T>> shardedBundle = IntStream.range(0, shardConfig.getShards().size())
+                    .mapToObj(
+                            shard ->
+                                    new HibernateBundle<T>(initialisedEntities, new SessionFactoryFactory()) {
+                                        @Override
+                                        protected String name() {
+                                            return shardInfoProvider.shardName(shard);
+                                        }
 
-                    @Override
-                    public PooledDataSourceFactory getDataSourceFactory(T t) {
-                      return shardConfig.getShards().get(shard);
-                    }
-                  }).collect(Collectors.toList());
-      shardedBundle.forEach(hibernateBundle -> {
-        try {
-          hibernateBundle.run(configuration, environment);
-        } catch (Exception e) {
-          log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
-          throw new RuntimeException(e);
-        }
-      });
-      this.shardBundles.put(tenantId, shardedBundle);
-      val sessionFactory = shardedBundle.stream().map(HibernateBundle::getSessionFactory)
-          .collect(Collectors.toList());
-      sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
-      if (shardingOption.isEncryptionSupportEnabled()) {
-        Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
-            "Encryption IV Should be 16 bytes long");
-        registerStringEncryptor(tenantId, shardingOption);
-        registerBigIntegerEncryptor(tenantId, shardingOption);
-        registerBigDecimalEncryptor(tenantId, shardingOption);
-        registerByteEncryptor(tenantId, shardingOption);
-      }
-      this.sessionFactories.put(tenantId, sessionFactory);
-      this.shardingOptions.put(tenantId, shardingOption);
-      healthCheckManager.manageHealthChecks(shardConfig.getBlacklist(), environment);
-      setupObservers(shardConfig.getMetricConfig(), environment.metrics());
-      environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
-      environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
-    });
-  }
+                                        @Override
+                                        public PooledDataSourceFactory getDataSourceFactory(T t) {
+                                            return shardConfig.getShards().get(shard);
+                                        }
+                                    }).collect(Collectors.toList());
+            shardedBundle.forEach(hibernateBundle -> {
+                try {
+                    hibernateBundle.run(configuration, environment);
+                } catch (Exception e) {
+                    log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
+                    throw new RuntimeException(e);
+                }
+            });
+            this.shardBundles.put(tenantId, shardedBundle);
+            val sessionFactory = shardedBundle.stream().map(HibernateBundle::getSessionFactory)
+                    .collect(Collectors.toList());
+            sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
+            if (shardingOption.isEncryptionSupportEnabled()) {
+                Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
+                        "Encryption IV Should be 16 bytes long");
+                registerStringEncryptor(tenantId, shardingOption);
+                registerBigIntegerEncryptor(tenantId, shardingOption);
+                registerBigDecimalEncryptor(tenantId, shardingOption);
+                registerByteEncryptor(tenantId, shardingOption);
+            }
+            this.sessionFactories.put(tenantId, sessionFactory);
+            this.shardingOptions.put(tenantId, shardingOption);
+            healthCheckManager.manageHealthChecks(shardConfig.getBlacklist(), environment);
+            setupObservers(shardConfig.getMetricConfig(), environment.metrics());
+            environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
+            environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
+        });
+    }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public void initialize(Bootstrap<?> bootstrap) {
-    healthCheckManagers.values().forEach(healthCheckManager -> {
-      bootstrap.getHealthCheckRegistry().addListener(healthCheckManager);
-    });
-    shardBundles.values().forEach(
-        hibernateBundle -> bootstrap.addBundle((ConfiguredBundle) hibernateBundle));
-  }
+    @Override
+    @SuppressWarnings("unchecked")
+    public void initialize(Bootstrap<?> bootstrap) {
+        healthCheckManagers.values().forEach(healthCheckManager -> {
+            bootstrap.getHealthCheckRegistry().addListener(healthCheckManager);
+        });
+        shardBundles.values().forEach(
+                hibernateBundle -> bootstrap.addBundle((ConfiguredBundle) hibernateBundle));
+    }
 
-  @VisibleForTesting
-  public void runBundles(T configuration, Environment environment) {
-    shardBundles.forEach((tenantId, hibernateBundles) -> {
-      log.info("Running hibernate bundles for tenant: {}", tenantId);
-      hibernateBundles.forEach(hibernateBundle -> {
-        try {
-          hibernateBundle.run(configuration, environment);
-        } catch (Exception e) {
-          log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
-          throw new RuntimeException(e);
-        }
-      });
-    });
-  }
+    @VisibleForTesting
+    public void runBundles(T configuration, Environment environment) {
+        shardBundles.forEach((tenantId, hibernateBundles) -> {
+            log.info("Running hibernate bundles for tenant: {}", tenantId);
+            hibernateBundles.forEach(hibernateBundle -> {
+                try {
+                    hibernateBundle.run(configuration, environment);
+                } catch (Exception e) {
+                    log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
+                    throw new RuntimeException(e);
+                }
+            });
+        });
+    }
 
-  @VisibleForTesting
-  public void initBundles(Bootstrap bootstrap) {
-    initialize(bootstrap);
-  }
+    @VisibleForTesting
+    public void initBundles(Bootstrap bootstrap) {
+        initialize(bootstrap);
+    }
 
-  @VisibleForTesting
-  public Map<String, Map<Integer, Boolean>> healthStatus() {
-    return healthCheckManagers.entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().status()));
-  }
+    @VisibleForTesting
+    public Map<String, Map<Integer, Boolean>> healthStatus() {
+        return healthCheckManagers.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().status()));
+    }
 
-  protected abstract MultiTenantShardedHibernateFactory getConfig(T config);
+    protected abstract MultiTenantShardedHibernateFactory getConfig(T config);
 
-  protected Supplier<MetricConfig> getMetricConfig(String tenantId, T config) {
-    return () -> getConfig(config).getTenants().get(tenantId).getMetricConfig();
-  }
+    protected Supplier<MetricConfig> getMetricConfig(String tenantId, T config) {
+        return () -> getConfig(config).getTenants().get(tenantId).getMetricConfig();
+    }
 
-  public <EntityType, T extends Configuration>
-  MultiTenantLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
-    return new MultiTenantLookupDao<>(this.sessionFactories, clazz,
-        this.shardManagers,
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
+    public <EntityType, T extends Configuration>
+    MultiTenantLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
+        return new MultiTenantLookupDao<>(this.sessionFactories, clazz,
+                this.shardManagers,
+                this.shardingOptions,
+                shardInfoProviders,
+                rootObserver);
+    }
 
-  public <EntityType, T extends Configuration>
-  MultiTenantCacheableLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz,
-      Map<String, LookupCache<EntityType>> cacheManager) {
-    return new MultiTenantCacheableLookupDao<>(this.sessionFactories,
-        clazz, this.shardManagers,
-        cacheManager,
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
+    public <EntityType, T extends Configuration>
+    MultiTenantCacheableLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz,
+                                                                    Map<String, LookupCache<EntityType>> cacheManager) {
+        return new MultiTenantCacheableLookupDao<>(this.sessionFactories,
+                clazz, this.shardManagers,
+                cacheManager,
+                this.shardingOptions,
+                shardInfoProviders,
+                rootObserver);
+    }
 
-  public <EntityType, T extends Configuration>
-  MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
-    return new MultiTenantRelationalDao<>(this.sessionFactories, clazz,
-        this.shardManagers,
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
+    public <EntityType, T extends Configuration>
+    MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
+        return new MultiTenantRelationalDao<>(this.sessionFactories, clazz,
+                this.shardManagers,
+                this.shardingOptions,
+                shardInfoProviders,
+                rootObserver);
+    }
 
 
-  public <EntityType, T extends Configuration>
-  MultiTenantCacheableRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz,
-      Map<String, RelationalCache<EntityType>> cacheManager) {
-    return new MultiTenantCacheableRelationalDao<>(this.sessionFactories,
-        clazz,
-        this.shardManagers,
-        cacheManager,
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
+    public <EntityType, T extends Configuration>
+    MultiTenantCacheableRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz,
+                                                                         Map<String, RelationalCache<EntityType>> cacheManager) {
+        return new MultiTenantCacheableRelationalDao<>(this.sessionFactories,
+                clazz,
+                this.shardManagers,
+                cacheManager,
+                this.shardingOptions,
+                shardInfoProviders,
+                rootObserver);
+    }
 
-  public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
-  WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId, Class<DaoType> daoTypeClass) {
-    Preconditions.checkArgument(
-            this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
-            "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass, this.shardManagers.get(tenantId));
-  }
+    public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
+    WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId, Class<DaoType> daoTypeClass) {
+        Preconditions.checkArgument(
+                this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
+                "Unknown tenant: " + tenantId);
+        return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass, this.shardManagers.get(tenantId));
+    }
 
-  public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
-  WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId,
-      Class<DaoType> daoTypeClass,
-      Class[] extraConstructorParamClasses,
-      Class[] extraConstructorParamObjects) {
-    Preconditions.checkArgument(
-            this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
-            "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
-        extraConstructorParamClasses, extraConstructorParamObjects, this.shardManagers.get(tenantId));
-  }
+    public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
+    WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId,
+                                                     Class<DaoType> daoTypeClass,
+                                                     Class[] extraConstructorParamClasses,
+                                                     Class[] extraConstructorParamObjects) {
+        Preconditions.checkArgument(
+                this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
+                "Unknown tenant: " + tenantId);
+        return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
+                extraConstructorParamClasses, extraConstructorParamObjects, this.shardManagers.get(tenantId));
+    }
 }

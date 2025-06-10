@@ -94,7 +94,7 @@ public class LookupDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
+        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
@@ -186,21 +186,21 @@ public class LookupDaoTest {
     @Test
     public void testCreateOrUpdate() {
         val saved = lookupDaoForAI.createOrUpdate("testId",
-                                                  e -> e.setText("Some Other Text"),
-                                                  () -> TestEntityWithAIId.builder()
-                                                          .externalId("testId")
-                                                          .text("Some New Text")
-                                                          .build())
+                        e -> e.setText("Some Other Text"),
+                        () -> TestEntityWithAIId.builder()
+                                .externalId("testId")
+                                .text("Some New Text")
+                                .build())
                 .orElse(null);
         assertNotNull(saved);
         assertEquals("Some New Text", saved.getText());
 
         val updated = lookupDaoForAI.createOrUpdate("testId",
-                                                    e -> e.setText("Some Other Text"),
-                                                    () -> TestEntityWithAIId.builder()
-                                                            .externalId("testId")
-                                                            .text("Some New Text")
-                                                            .build())
+                        e -> e.setText("Some Other Text"),
+                        () -> TestEntityWithAIId.builder()
+                                .externalId("testId")
+                                .text("Some New Text")
+                                .build())
                 .orElse(null);
         assertNotNull(updated);
         assertEquals(saved.getId(), updated.getId());
@@ -288,7 +288,7 @@ public class LookupDaoTest {
         int rowsUpdated = lookupDao.updateUsingQuery(id, UpdateOperationMeta.builder()
                 .queryName("testTextUpdateQuery")
                 .params(ImmutableMap.of("externalId", id,
-                                        "text", newText))
+                        "text", newText))
                 .build());
         assertEquals(1, rowsUpdated);
 
@@ -310,7 +310,7 @@ public class LookupDaoTest {
         int rowsUpdated = lookupDao.updateUsingQuery(id, UpdateOperationMeta.builder()
                 .queryName("testTextUpdateQuery")
                 .params(ImmutableMap.of("externalId", UUID.randomUUID().toString(),
-                                        "text", newText))
+                        "text", newText))
                 .build());
         assertEquals(0, rowsUpdated);
 
@@ -426,7 +426,7 @@ public class LookupDaoTest {
                 .orElse(null));
         assertTrue(lookupDao.delete("testId"));
         assertNull(lookupDao.get("testId")
-                                  .orElse(null));
+                .orElse(null));
     }
 
     @Test

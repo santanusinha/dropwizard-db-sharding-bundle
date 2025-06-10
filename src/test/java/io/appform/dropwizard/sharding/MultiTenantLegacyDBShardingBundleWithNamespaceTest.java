@@ -23,15 +23,15 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 
 public class MultiTenantLegacyDBShardingBundleWithNamespaceTest extends
-    MultiTenantDBShardingBundleTestBase {
+        MultiTenantDBShardingBundleTestBase {
 
-  @Override
-  protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
-    return new MultiTenantDBShardingBundle<TestConfig>(Order.class, OrderItem.class) {
-      @Override
-      protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
-        return testConfig.getShards();
-      }
-    };
-  }
+    @Override
+    protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
+        return new MultiTenantDBShardingBundle<TestConfig>(Order.class, OrderItem.class) {
+            @Override
+            protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
+                return testConfig.getShards();
+            }
+        };
+    }
 }

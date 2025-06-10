@@ -7,13 +7,11 @@
  *
  * @param <T> The type of the entity for which the query specification is applied.
  * @param <U> The type of the result expected from the query.
- *
+ * @author Your Name
+ * @version 1.0
  * @see javax.persistence.criteria.CriteriaBuilder
  * @see javax.persistence.criteria.CriteriaQuery
  * @see javax.persistence.criteria.Root
- *
- * @author Your Name
- * @version 1.0
  * @since 2023-09-30
  */
 

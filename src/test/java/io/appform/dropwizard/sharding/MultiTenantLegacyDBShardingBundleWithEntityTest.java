@@ -27,7 +27,7 @@ public class MultiTenantLegacyDBShardingBundleWithEntityTest extends MultiTenant
     @Override
     protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
         return new MultiTenantDBShardingBundle<TestConfig>(Order.class, OrderItem.class,
-            TestEncryptedEntity.class) {
+                TestEncryptedEntity.class) {
             @Override
             protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
                 config.getShards().getTenants().forEach((tenant, factory) -> {

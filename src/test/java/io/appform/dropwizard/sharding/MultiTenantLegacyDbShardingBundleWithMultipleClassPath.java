@@ -28,59 +28,59 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class MultiTenantLegacyDbShardingBundleWithMultipleClassPath extends
-    MultiTenantDBShardingBundleTestBase {
+        MultiTenantDBShardingBundleTestBase {
 
 
-  @Override
-  protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
-    return new MultiTenantDBShardingBundle<TestConfig>(
-        "io.appform.dropwizard.sharding.dao.testdata.entities",
-        "io.appform.dropwizard.sharding.dao.testdata.multi") {
-      @Override
-      protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
-        return testConfig.getShards();
-      }
-    };
-  }
+    @Override
+    protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
+        return new MultiTenantDBShardingBundle<TestConfig>(
+                "io.appform.dropwizard.sharding.dao.testdata.entities",
+                "io.appform.dropwizard.sharding.dao.testdata.multi") {
+            @Override
+            protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
+                return testConfig.getShards();
+            }
+        };
+    }
 
 
-  @Test
-  public void testMultiPackage() throws Exception {
-    MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+    @Test
+    public void testMultiPackage() throws Exception {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
 
-    bundle.initialize(bootstrap);
-    bundle.initBundles(bootstrap);
-    bundle.runBundles(testConfig, environment);
-    bundle.run(testConfig, environment);
-    MultiTenantLookupDao<MultiPackageTestEntity> lookupDao = bundle.createParentObjectDao(
-        MultiPackageTestEntity.class);
+        bundle.initialize(bootstrap);
+        bundle.initBundles(bootstrap);
+        bundle.runBundles(testConfig, environment);
+        bundle.run(testConfig, environment);
+        MultiTenantLookupDao<MultiPackageTestEntity> lookupDao = bundle.createParentObjectDao(
+                MultiPackageTestEntity.class);
 
-    MultiPackageTestEntity multiPackageTestEntity = MultiPackageTestEntity.builder()
-        .text("Testing multi package scanning")
-        .lookup("123")
-        .build();
+        MultiPackageTestEntity multiPackageTestEntity = MultiPackageTestEntity.builder()
+                .text("Testing multi package scanning")
+                .lookup("123")
+                .build();
 
-    Optional<MultiPackageTestEntity> saveMultiPackageTestEntity = lookupDao.save("TENANT1",
-        multiPackageTestEntity);
-    assertEquals(multiPackageTestEntity.getText(), saveMultiPackageTestEntity.get().getText());
+        Optional<MultiPackageTestEntity> saveMultiPackageTestEntity = lookupDao.save("TENANT1",
+                multiPackageTestEntity);
+        assertEquals(multiPackageTestEntity.getText(), saveMultiPackageTestEntity.get().getText());
 
-    Optional<MultiPackageTestEntity> fetchedMultiPackageTestEntity = lookupDao.get("TENANT1",
-        multiPackageTestEntity.getLookup());
-    assertEquals(saveMultiPackageTestEntity.get().getText(),
-        fetchedMultiPackageTestEntity.get().getText());
+        Optional<MultiPackageTestEntity> fetchedMultiPackageTestEntity = lookupDao.get("TENANT1",
+                multiPackageTestEntity.getLookup());
+        assertEquals(saveMultiPackageTestEntity.get().getText(),
+                fetchedMultiPackageTestEntity.get().getText());
 
-    MultiTenantLookupDao<TestEntity> testEntityLookupDao = bundle.createParentObjectDao(
-        TestEntity.class);
+        MultiTenantLookupDao<TestEntity> testEntityLookupDao = bundle.createParentObjectDao(
+                TestEntity.class);
 
-    TestEntity testEntity = TestEntity.builder()
-        .externalId("E123")
-        .text("Test Second Package")
-        .build();
-    Optional<TestEntity> savedTestEntity = testEntityLookupDao.save("TENANT2", testEntity);
-    assertEquals(testEntity.getText(), savedTestEntity.get().getText());
+        TestEntity testEntity = TestEntity.builder()
+                .externalId("E123")
+                .text("Test Second Package")
+                .build();
+        Optional<TestEntity> savedTestEntity = testEntityLookupDao.save("TENANT2", testEntity);
+        assertEquals(testEntity.getText(), savedTestEntity.get().getText());
 
-    Optional<TestEntity> fetchedTestEntity = testEntityLookupDao.get("TENANT2",
-        testEntity.getExternalId());
-    assertEquals(savedTestEntity.get().getText(), fetchedTestEntity.get().getText());
-  }
+        Optional<TestEntity> fetchedTestEntity = testEntityLookupDao.get("TENANT2",
+                testEntity.getExternalId());
+        assertEquals(savedTestEntity.get().getText(), fetchedTestEntity.get().getText());
+    }
 }
