@@ -17,17 +17,9 @@
 
 package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
-import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.caching.RelationalCache;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
-import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -39,47 +31,19 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
 
     private final MultiTenantCacheableRelationalDao<T> delegate;
 
-    public CacheableRelationalDao(String dbNamespace,
-                                  MultiTenantCacheableRelationalDao<T> delegate) {
-        super(dbNamespace, delegate);
-        this.delegate = delegate;
-        this.dbNamespace = dbNamespace;
-    }
-
     /**
      * Constructs a CacheableRelationalDao instance for managing entities across multiple shards with caching support.
      * <p>
      * This constructor initializes a CacheableRelationalDao instance, which extends the functionality of a
      * RelationalDao, for working with entities of the specified class distributed across multiple shards.
-     * It requires a list of session factories, a shard calculator, a relational cache, a shard information provider,
-     * and a transaction observer. The entity class should designate one field as the primary key using the `@Id` annotation.
+     * The entity class should designate one field as the primary key using the `@Id` annotation.
      *
-     * @param sessionFactories  A list of SessionFactory instances for database access across shards.
-     * @param entityClass       The Class representing the type of entities managed by this CacheableRelationalDao.
-     * @param shardCalculator   A ShardCalculator instance used to determine the shard for each operation.
-     * @param cache             A RelationalCache instance for caching entity data.
-     * @param shardInfoProvider A ShardInfoProvider for retrieving shard information.
-     * @param observer          A TransactionObserver for monitoring transaction events.
-     * @throws IllegalArgumentException If the entity class does not have exactly one field designated as @Id,
-     *                                  if the designated key field is not accessible, or if it is not of type String.
      */
-    public CacheableRelationalDao(List<SessionFactory> sessionFactories, Class<T> entityClass,
-                                  ShardCalculator<String> shardCalculator,
-                                  RelationalCache<T> cache,
-                                  ShardingBundleOptions shardingOptions,
-                                  ShardInfoProvider shardInfoProvider,
-                                  TransactionObserver observer) {
-        super(sessionFactories, entityClass, shardCalculator, shardingOptions, shardInfoProvider, observer);
-        this.dbNamespace = DBShardingBundleBase.DEFAULT_NAMESPACE;
-        this.delegate = new MultiTenantCacheableRelationalDao<>(
-                Map.of(dbNamespace, sessionFactories),
-                entityClass,
-                shardCalculator,
-                Map.of(dbNamespace, cache),
-                Map.of(dbNamespace, shardingOptions),
-                Map.of(dbNamespace, shardInfoProvider),
-                observer
-        );
+    public CacheableRelationalDao(String dbNamespace,
+                                  MultiTenantCacheableRelationalDao<T> delegate) {
+        super(dbNamespace, delegate);
+        this.delegate = delegate;
+        this.dbNamespace = dbNamespace;
     }
 
     /**

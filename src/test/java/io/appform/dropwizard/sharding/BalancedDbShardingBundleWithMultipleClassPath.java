@@ -22,7 +22,6 @@ import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.multi.MultiPackageTestEntity;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -108,20 +107,5 @@ public class BalancedDbShardingBundleWithMultipleClassPath extends DBShardingBun
         Optional<TestEntity> fetchTestEntityCacheble = testEntityLookupDaoCacheble.get(testEntity.getExternalId());
         assertEquals(savedTestEntityCacheble.get().getText(), fetchTestEntityCacheble.get().getText());
 
-        // Bucketizer
-        LookupDao<TestEntity> testEntityLookupDaoBucketizer = bundle.createParentObjectDao(TestEntity.class, new ConsistentHashBucketIdExtractor<>(bundle.getShardManager()));
-        Optional<TestEntity> savedEntityLookupDaoBucketizer = testEntityLookupDaoBucketizer.save(testEntity);
-        assertEquals(testEntity.getText(), savedEntityLookupDaoBucketizer.get().getText());
-
-        Optional<TestEntity> fetchEntityLookupDaoBucketizer = testEntityLookupDaoBucketizer.get(testEntity.getExternalId());
-        assertEquals(savedEntityLookupDaoBucketizer.get().getText(), fetchEntityLookupDaoBucketizer.get().getText());
-
-        // Cacheble + Bucketizer
-        LookupDao<TestEntity> testEntityLookupDaoCachebleAndBucketizer = bundle.createParentObjectDao(TestEntity.class, new ConsistentHashBucketIdExtractor<>(bundle.getShardManager()), CACHE_MANAGER);
-        Optional<TestEntity> savedEntityLookupDaoCachebleAndBucketizer = testEntityLookupDaoCachebleAndBucketizer.save(testEntity);
-        assertEquals(testEntity.getText(), savedEntityLookupDaoCachebleAndBucketizer.get().getText());
-
-        Optional<TestEntity> fetchEntityLookupDaoCachebleAndBucketizer = testEntityLookupDaoCachebleAndBucketizer.get(testEntity.getExternalId());
-        assertEquals(savedEntityLookupDaoCachebleAndBucketizer.get().getText(), fetchEntityLookupDaoCachebleAndBucketizer.get().getText());
     }
 }

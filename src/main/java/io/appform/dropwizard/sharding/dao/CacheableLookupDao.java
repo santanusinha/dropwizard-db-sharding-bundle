@@ -17,19 +17,10 @@
 
 package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
-import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.caching.LookupCache;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.exceptions.DaoFwdException;
-import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.SessionFactory;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -47,45 +38,18 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
     private final String dbNamespace;
     private final MultiTenantCacheableLookupDao<T> delegate;
 
-    public CacheableLookupDao(final String tenantId,
-                              final MultiTenantCacheableLookupDao<T> delegate) {
-        super(tenantId, delegate);
-        this.dbNamespace = tenantId;
-        this.delegate = delegate;
-    }
-
     /**
      * Constructs a CacheableLookupDao instance with caching support.
      *
      * This constructor initializes a CacheableLookupDao instance with the provided parameters, enabling caching for
      * improved performance and data retrieval optimization.
      *
-     * @param sessionFactories A list of SessionFactory instances for database access.
-     * @param entityClass The Class representing the entity type handled by the DAO.
-     * @param shardCalculator A ShardCalculator for determining the database shard based on keys.
-     * @param cache The LookupCache implementation for caching entities.
-     * @param shardingOptions ShardingBundleOptions for configuring sharding behavior.
-     * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
-     * @param observer A TransactionObserver for observing transaction events.
      */
-    public CacheableLookupDao(List<SessionFactory> sessionFactories,
-                              Class<T> entityClass,
-                              ShardCalculator<String> shardCalculator,
-                              LookupCache<T> cache,
-                              ShardingBundleOptions shardingOptions,
-                              ShardInfoProvider shardInfoProvider,
-                              TransactionObserver observer) {
-        super(sessionFactories, entityClass, shardCalculator, shardingOptions, shardInfoProvider, observer);
-        this.dbNamespace = DBShardingBundleBase.DEFAULT_NAMESPACE;
-        this.delegate = new MultiTenantCacheableLookupDao<>(
-                Map.of(dbNamespace, sessionFactories),
-                entityClass,
-                shardCalculator,
-                Map.of(dbNamespace, cache),
-                Map.of(dbNamespace, shardingOptions),
-                Map.of(dbNamespace, shardInfoProvider),
-                observer
-        );
+    public CacheableLookupDao(final String tenantId,
+                              final MultiTenantCacheableLookupDao<T> delegate) {
+        super(tenantId, delegate);
+        this.dbNamespace = tenantId;
+        this.delegate = delegate;
     }
 
     /**

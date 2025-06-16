@@ -17,10 +17,6 @@
 
 package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
-import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
@@ -32,7 +28,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Criteria;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.lang.reflect.Field;
@@ -61,44 +56,17 @@ public class LookupDao<T> implements ShardedDao<T> {
 
     private final MultiTenantLookupDao<T> delegate;
 
-    public LookupDao(final String dbNamespace,
-                     final MultiTenantLookupDao<T> delegate) {
-        this.dbNamespace = dbNamespace;
-        this.delegate = delegate;
-    }
-
     /**
      * Constructs a LookupDao instance for querying and managing entities across multiple shards.
      * <p>
      * This constructor initializes a LookupDao instance for working with entities of the specified class
-     * distributed across multiple shards. It requires a list of session factories, a shard calculator,
-     * sharding options, a shard information provider, and a transaction observer.
+     * distributed across multiple shards.
      *
-     * @param sessionFactories  A list of SessionFactory instances for database access across shards.
-     * @param entityClass       The Class representing the type of entities managed by this LookupDao.
-     * @param shardCalculator   A ShardCalculator instance used to determine the shard for each operation.
-     * @param shardingOptions   ShardingBundleOptions specifying additional sharding configuration options.
-     * @param shardInfoProvider A ShardInfoProvider for retrieving shard information.
-     * @param observer          A TransactionObserver for monitoring transaction events.
-     * @throws IllegalArgumentException If the entity class does not have exactly one field marked as LookupKey,
-     *                                  if the key field is not accessible, or if it is not of type String.
      */
-    public LookupDao(
-            List<SessionFactory> sessionFactories,
-            Class<T> entityClass,
-            ShardCalculator<String> shardCalculator,
-            ShardingBundleOptions shardingOptions,
-            final ShardInfoProvider shardInfoProvider,
-            final TransactionObserver observer) {
-        this.dbNamespace = DBShardingBundleBase.DEFAULT_NAMESPACE;
-        this.delegate = new MultiTenantLookupDao<>(
-                Map.of(dbNamespace, sessionFactories),
-                entityClass,
-                shardCalculator,
-                Map.of(dbNamespace, shardingOptions),
-                Map.of(dbNamespace, shardInfoProvider),
-                observer
-        );
+    public LookupDao(final String dbNamespace,
+                     final MultiTenantLookupDao<T> delegate) {
+        this.dbNamespace = dbNamespace;
+        this.delegate = delegate;
     }
 
     /**

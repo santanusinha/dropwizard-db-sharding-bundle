@@ -23,7 +23,6 @@ import io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.multi.MultiPackageTestEntity;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -133,20 +132,5 @@ public class MultiTenantBalancedDbShardingBundleWithMultipleClassPath extends Mu
         Optional<TestEntity> fetchTestEntityCacheble = testEntityLookupDaoCacheble.get("TENANT1", testEntity.getExternalId());
         assertEquals(savedTestEntityCacheble.get().getText(), fetchTestEntityCacheble.get().getText());
 
-        // Bucketizer
-        MultiTenantLookupDao<TestEntity> testEntityLookupDaoBucketizer = bundle.createParentObjectDao(TestEntity.class, new ConsistentHashBucketIdExtractor<>(bundle.getShardManagers()));
-        Optional<TestEntity> savedEntityLookupDaoBucketizer = testEntityLookupDaoBucketizer.save("TENANT2", testEntity);
-        assertEquals(testEntity.getText(), savedEntityLookupDaoBucketizer.get().getText());
-
-        Optional<TestEntity> fetchEntityLookupDaoBucketizer = testEntityLookupDaoBucketizer.get("TENANT2", testEntity.getExternalId());
-        assertEquals(savedEntityLookupDaoBucketizer.get().getText(), fetchEntityLookupDaoBucketizer.get().getText());
-
-        // Cacheble + Bucketizer
-        MultiTenantLookupDao<TestEntity> testEntityLookupDaoCachebleAndBucketizer = bundle.createParentObjectDao(TestEntity.class, new ConsistentHashBucketIdExtractor<>(bundle.getShardManagers()), CACHE_MANAGER);
-        Optional<TestEntity> savedEntityLookupDaoCachebleAndBucketizer = testEntityLookupDaoCachebleAndBucketizer.save("TENANT1", testEntity);
-        assertEquals(testEntity.getText(), savedEntityLookupDaoCachebleAndBucketizer.get().getText());
-
-        Optional<TestEntity> fetchEntityLookupDaoCachebleAndBucketizer = testEntityLookupDaoCachebleAndBucketizer.get("TENANT1", testEntity.getExternalId());
-        assertEquals(savedEntityLookupDaoCachebleAndBucketizer.get().getText(), fetchEntityLookupDaoCachebleAndBucketizer.get().getText());
     }
 }

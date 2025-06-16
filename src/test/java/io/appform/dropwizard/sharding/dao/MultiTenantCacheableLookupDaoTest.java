@@ -29,8 +29,6 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -92,62 +90,58 @@ public class MultiTenantCacheableLookupDaoTest {
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
-    final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
-        new ConsistentHashBucketIdExtractor<>(
-            shardManager));
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
         new ShardInfoProvider("TENANT1"),
         "TENANT2", new ShardInfoProvider("TENANT2"));
-    lookupDao = new MultiTenantCacheableLookupDao<>(
-        sessionFactories,
-        TestEntity.class,
-        new ShardCalculator<>(shardManager, new ConsistentHashBucketIdExtractor<>(shardManager)),
-        Map.of("TENANT1", new LookupCache<TestEntity>() {
+      lookupDao = new MultiTenantCacheableLookupDao<>(
+              sessionFactories,
+              TestEntity.class,
+              shardManager,
+              Map.of("TENANT1", new LookupCache<TestEntity>() {
 
-              private Map<String, TestEntity> cache = new HashMap<>();
+                          private Map<String, TestEntity> cache = new HashMap<>();
 
-              @Override
-              public void put(String key, TestEntity entity) {
-                cache.put(key, entity);
-              }
+                          @Override
+                          public void put(String key, TestEntity entity) {
+                              cache.put(key, entity);
+                          }
 
-              @Override
-              public boolean exists(String key) {
-                return cache.containsKey(key);
-              }
+                          @Override
+                          public boolean exists(String key) {
+                              return cache.containsKey(key);
+                          }
 
-              @Override
-              public TestEntity get(String key) {
-                return cache.get(key);
-              }
-            }, "TENANT2",
-            new LookupCache<TestEntity>() {
+                          @Override
+                          public TestEntity get(String key) {
+                              return cache.get(key);
+                          }
+                      }, "TENANT2",
+                      new LookupCache<TestEntity>() {
 
-              private Map<String, TestEntity> cache = new HashMap<>();
+                          private Map<String, TestEntity> cache = new HashMap<>();
 
-              @Override
-              public void put(String key, TestEntity entity) {
-                cache.put(key, entity);
-              }
+                          @Override
+                          public void put(String key, TestEntity entity) {
+                              cache.put(key, entity);
+                          }
 
-              @Override
-              public boolean exists(String key) {
-                return cache.containsKey(key);
-              }
+                          @Override
+                          public boolean exists(String key) {
+                              return cache.containsKey(key);
+                          }
 
-              @Override
-              public TestEntity get(String key) {
-                return cache.get(key);
-              }
-            }),
-        shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
+                          @Override
+                          public TestEntity get(String key) {
+                              return cache.get(key);
+                          }
+                      }),
+              shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     phoneDao = new MultiTenantCacheableLookupDao<>(sessionFactories,
         Phone.class,
-        new ShardCalculator<>(shardManager,
-            new ConsistentHashBucketIdExtractor<>(shardManager)),
+        shardManager,
         Map.of("TENANT1",
             new LookupCache<Phone>() {
 
@@ -190,9 +184,7 @@ public class MultiTenantCacheableLookupDaoTest {
         shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     transactionDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Transaction.class,
-        new ShardCalculator<>(shardManager,
-            new ConsistentHashBucketIdExtractor<>(
-                shardManager)),
+        shardManager,
         Map.of("TENANT1",
             new RelationalCache<Transaction>() {
 
@@ -320,8 +312,7 @@ public class MultiTenantCacheableLookupDaoTest {
             }), shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     auditDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Audit.class,
-        new ShardCalculator<>(shardManager,
-            new ConsistentHashBucketIdExtractor<>(shardManager)),
+        shardManager,
         Map.of("TENANT1", new RelationalCache<Audit>() {
 
           private Map<String, Object> cache = new HashMap<>();

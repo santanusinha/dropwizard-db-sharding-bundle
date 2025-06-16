@@ -19,7 +19,7 @@ package io.appform.dropwizard.sharding;
 
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 
-public class LegacyMultiTenantDBShardingBundleWithAnnotationTest extends MultiTenantDBShardingBundleTestBase {
+public class MultiTenantLegacyDBShardingBundleWithAnnotationTest extends MultiTenantDBShardingBundleTestBase {
 
     @Override
     protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {

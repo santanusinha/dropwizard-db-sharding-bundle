@@ -31,7 +31,6 @@ import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -126,6 +125,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
         return delegate.getSessionFactories().get(dbNamespace);
     }
 
+    public List<Class<?>> getInitialisedEntities() {
+        return delegate.getInitialisedEntities();
+    }
+
     protected abstract ShardManager createShardManager(int numShards, ShardBlacklistingStore blacklistingStore);
 
     @Override
@@ -174,30 +177,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
     }
 
     public <EntityType, T extends Configuration>
-    LookupDao<EntityType> createParentObjectDao(
-            Class<EntityType> clazz,
-            BucketIdExtractor<String> bucketIdExtractor) {
-        return new LookupDao<>(dbNamespace,
-                delegate.createParentObjectDao(clazz, bucketIdExtractor));
-    }
-
-    public <EntityType, T extends Configuration>
-    CacheableLookupDao<EntityType> createParentObjectDao(
-            Class<EntityType> clazz,
-            BucketIdExtractor<String> bucketIdExtractor,
-            LookupCache<EntityType> cacheManager) {
-        return new CacheableLookupDao<>(dbNamespace,
-                delegate.createParentObjectDao(clazz, bucketIdExtractor,
-                        Map.of(dbNamespace, cacheManager)));
-    }
-
-
-    public <EntityType, T extends Configuration>
     RelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
         return new RelationalDao<>(dbNamespace,
                 delegate.createRelatedObjectDao(clazz));
     }
-
 
     public <EntityType, T extends Configuration>
     CacheableRelationalDao<EntityType> createRelatedObjectDao(
@@ -207,36 +190,9 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 delegate.createRelatedObjectDao(clazz, Map.of(dbNamespace, cacheManager)));
     }
 
-
-    public <EntityType, T extends Configuration>
-    RelationalDao<EntityType> createRelatedObjectDao(
-            Class<EntityType> clazz,
-            BucketIdExtractor<String> bucketIdExtractor) {
-        return new RelationalDao<>(dbNamespace,
-                delegate.createRelatedObjectDao(clazz, bucketIdExtractor));
-    }
-
-    public <EntityType, T extends Configuration>
-    CacheableRelationalDao<EntityType> createRelatedObjectDao(
-            Class<EntityType> clazz,
-            BucketIdExtractor<String> bucketIdExtractor,
-            RelationalCache<EntityType> cacheManager) {
-        return new CacheableRelationalDao<>(dbNamespace,
-                delegate.createRelatedObjectDao(clazz, bucketIdExtractor,
-                        Map.of(dbNamespace, cacheManager)));
-    }
-
-
     public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
     WrapperDao<EntityType, DaoType> createWrapperDao(Class<DaoType> daoTypeClass) {
         return delegate.createWrapperDao(dbNamespace, daoTypeClass);
-    }
-
-    public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
-    WrapperDao<EntityType, DaoType> createWrapperDao(
-            Class<DaoType> daoTypeClass,
-            BucketIdExtractor<String> bucketIdExtractor) {
-        return delegate.createWrapperDao(dbNamespace, daoTypeClass, bucketIdExtractor);
     }
 
     public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>

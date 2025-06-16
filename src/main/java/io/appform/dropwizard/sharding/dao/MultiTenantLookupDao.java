@@ -46,6 +46,8 @@ import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.scroll.ScrollResultItem;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
+import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.appform.dropwizard.sharding.utils.InternalUtils;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
@@ -119,8 +121,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *                           shards.
      * @param entityClass        The Class representing the type of entities managed by this
      *                           LookupDao.
-     * @param shardCalculator    A ShardCalculator instance used to determine the shard for each
-     *                           operation.
+     * @param shardManagers      A map of ShardManager to instantiate ShardCalculator.
      * @param shardingOptions    ShardingBundleOptions specifying additional sharding configuration
      *                           options.
      * @param shardInfoProviders A ShardInfoProvider for retrieving shard information.
@@ -132,7 +133,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     public MultiTenantLookupDao(
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
-            ShardCalculator<String> shardCalculator,
+            Map<String, ShardManager> shardManagers,
             Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
@@ -141,7 +142,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             daos.put(tenantId, factories.stream().map(LookupDaoPriv::new).collect(Collectors.toList()));
         });
         this.entityClass = entityClass;
-        this.shardCalculator = shardCalculator;
+        this.shardCalculator = new ShardCalculator<>(shardManagers, new ConsistentHashBucketIdExtractor<>(shardManagers));
         this.shardingOptions = shardingOptions;
         this.shardInfoProviders = shardInfoProviders;
         this.observer = observer;

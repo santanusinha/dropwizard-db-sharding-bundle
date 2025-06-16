@@ -20,18 +20,20 @@ package io.appform.dropwizard.sharding.dao.locktest;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.LockedContext;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
+import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
+import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.hibernate.SessionFactory;
@@ -46,6 +48,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -95,13 +98,20 @@ public class LockTest {
             sessionFactories.add(sessionFactory);
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager, Integer::parseInt);
         final ShardingBundleOptions shardingOptions = ShardingBundleOptions.builder().skipReadOnlyTransaction(true).build();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
-        lookupDao = new LookupDao<>(sessionFactories, SomeLookupObject.class, shardCalculator, shardingOptions,
-                shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));
-        relationDao = new RelationalDao<>(sessionFactories, SomeOtherObject.class, shardCalculator, shardingOptions,
-                shardInfoProvider, new DaoClassLocalObserver(new TerminalTransactionObserver()));
+        lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        SomeLookupObject.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
+                        new DaoClassLocalObserver(new TerminalTransactionObserver())));
+        relationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        SomeOtherObject.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
+                        new DaoClassLocalObserver(new TerminalTransactionObserver())));
     }
 
     @Test
