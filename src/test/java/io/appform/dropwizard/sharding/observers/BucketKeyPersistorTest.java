@@ -4,10 +4,16 @@ import io.appform.dropwizard.sharding.BalancedDBShardingBundle;
 import io.appform.dropwizard.sharding.BundleBasedTestBase;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
+import io.appform.dropwizard.sharding.observers.entity.BaseChild;
+import io.appform.dropwizard.sharding.observers.entity.ChildWithDuplicateBucketKey;
+import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
+import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
+import io.appform.dropwizard.sharding.observers.entity.ParentWithoutBucketKey;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Property;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -24,8 +30,16 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
 
     @Override
     protected DBShardingBundleBase<TestConfig> getBundle() {
-        return new BalancedDBShardingBundle<TestConfig>(SimpleParent.class, SimpleChild.class, SimpleParentWithoutBucketKey.class) {
+        return new BalancedDBShardingBundle<TestConfig>(SimpleChild.class, SimpleParent.class, ParentWithoutBucketKey.class) {
+            @Override
+            protected ShardedHibernateFactory getConfig(TestConfig config) {
+                return testConfig.getShards();
+            }
+        };
+    }
 
+    protected DBShardingBundleBase<TestConfig> getBundleWithMalformedEntity() {
+        return new BalancedDBShardingBundle<TestConfig>(ChildWithDuplicateBucketKey.class, BaseChild.class) {
             @Override
             protected ShardedHibernateFactory getConfig(TestConfig config) {
                 return testConfig.getShards();
@@ -263,7 +277,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
     @Test
     public void testWhenBucketKeyNotPresent() {
         val bundle = createBundle();
-        val parentWithoutBucketKeyDao = bundle.createParentObjectDao(SimpleParentWithoutBucketKey.class);
+        val parentWithoutBucketKeyDao = bundle.createParentObjectDao(ParentWithoutBucketKey.class);
 
         val obj = buildParentWithoutBucketKeyObj(shardingKey);
         parentWithoutBucketKeyDao.save(obj);
@@ -273,8 +287,26 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         assertEquals(shardingKey, persistedParent.get().getName());
     }
 
+    @SneakyThrows
+    @Test
+    public void testWithMalformedEntity() {
+        final var error = Assertions.assertThrows(RuntimeException.class, this::createBundleWithMalformedEntity);
+        final var errorMessage = String.format("Failed to validate/resolve entity meta for " +
+                ChildWithDuplicateBucketKey.class.getName());
+        Assertions.assertEquals(errorMessage, error.getMessage());
+    }
+
     private DBShardingBundleBase<TestConfig> createBundle() {
         val bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.initBundles(bootstrap);
+        bundle.runBundles(testConfig, environment);
+        bundle.run(testConfig, environment);
+        return bundle;
+    }
+
+    private DBShardingBundleBase<TestConfig> createBundleWithMalformedEntity() {
+        val bundle = getBundleWithMalformedEntity();
         bundle.initialize(bootstrap);
         bundle.initBundles(bootstrap);
         bundle.runBundles(testConfig, environment);
@@ -300,8 +332,8 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         return obj;
     }
 
-    private SimpleParentWithoutBucketKey buildParentWithoutBucketKeyObj (final String lookupKey) {
-        val obj = new SimpleParentWithoutBucketKey();
+    private ParentWithoutBucketKey buildParentWithoutBucketKeyObj (final String lookupKey) {
+        val obj = new ParentWithoutBucketKey();
         obj.setName(lookupKey);
         // setting incorrect bucketKey, should not be persisted or updated anywhere.
         return obj;

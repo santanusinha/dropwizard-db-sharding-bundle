@@ -27,14 +27,11 @@ import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlyconte
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -42,18 +39,16 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     private final String tenantId;
     private final BucketIdExtractor<String> bucketIdExtractor;
-    private final Map<String, EntityMeta> initialisedEntityMeta;
+    private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
     public BucketKeyPersistor(final String tenantId,
                               final BucketIdExtractor<String> bucketIdExtractor,
                               final Map<String, EntityMeta> initialisedEntitiesMeta) {
-        Preconditions.checkArgument(!Objects.isNull(bucketIdExtractor), "BucketIdExtractor must not be null");
+        Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
         Preconditions.checkArgument(!StringUtils.isEmpty(tenantId), "tenantId must not be empty");
-        Preconditions.checkArgument(!MapUtils.isEmpty(initialisedEntitiesMeta), "initialisedEntitiesMeta must not" +
-                " be null or empty");
         this.tenantId = tenantId;
         this.bucketIdExtractor = bucketIdExtractor;
-        this.initialisedEntityMeta = initialisedEntitiesMeta;
+        this.initialisedEntitiesMeta = initialisedEntitiesMeta;
     }
 
     @Override
@@ -73,7 +68,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(GetAndUpdate<T> opContext) {
-        val oldMutator = opContext.getMutator();
+        final var oldMutator = opContext.getMutator();
         opContext.setMutator((T entity) -> {
             T value = oldMutator.apply(entity);
             addBucketId(value);
@@ -89,7 +84,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(GetAndUpdateByLookupKey<T> getAndUpdateByLookupKey) {
-        val oldMutator = getAndUpdateByLookupKey.getMutator();
+        final var oldMutator = getAndUpdateByLookupKey.getMutator();
         getAndUpdateByLookupKey.setMutator((Optional<T> entity) -> {
             T value = oldMutator.apply(entity);
             addBucketId(value);
@@ -110,12 +105,12 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(LockAndExecute<T> opContext) {
-        val contextMode = opContext.getMode();
+        final var contextMode = opContext.getMode();
         switch (contextMode) {
             case READ:
                 return null;
             case INSERT:
-                val oldSaver = opContext.getSaver();
+                final var oldSaver = opContext.getSaver();
                 opContext.setSaver((T entity) -> {
                     addBucketId(entity);
                     return oldSaver.apply(entity);
@@ -134,7 +129,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(UpdateWithScroll<T> updateWithScroll) {
-        val oldMutator = updateWithScroll.getMutator();
+        final var oldMutator = updateWithScroll.getMutator();
         updateWithScroll.setMutator((T entity) -> {
             T value = oldMutator.apply(entity);
             addBucketId(value);
@@ -145,7 +140,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(UpdateAll<T> updateAll) {
-        val oldMutator = updateAll.getMutator();
+        final var oldMutator = updateAll.getMutator();
         updateAll.setMutator((T entity) -> {
             T value = oldMutator.apply(entity);
             addBucketId(value);
@@ -156,7 +151,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(SelectAndUpdate<T> selectAndUpdate) {
-        val oldMutator = selectAndUpdate.getMutator();
+        final var oldMutator = selectAndUpdate.getMutator();
         selectAndUpdate.setMutator((T entity) -> {
             T value = oldMutator.apply(entity);
             addBucketId(value);
@@ -182,7 +177,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T, R> Void visit(Save<T, R> opContext) {
-        val oldSaver = opContext.getSaver();
+        final var oldSaver = opContext.getSaver();
         opContext.setSaver((T entity) -> {
             addBucketId(entity);
             return oldSaver.apply(entity);
@@ -192,7 +187,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(SaveAll<T> opContext) {
-        val oldSaver = opContext.getSaver();
+        final var oldSaver = opContext.getSaver();
         opContext.setSaver((Collection<T> entities) -> {
             entities.forEach(this::addBucketId);
             return oldSaver.apply(entities);
@@ -202,7 +197,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(CreateOrUpdateByLookupKey<T> createOrUpdateByLookupKey) {
-        val oldMutator = createOrUpdateByLookupKey.getMutator();
+        final var oldMutator = createOrUpdateByLookupKey.getMutator();
         createOrUpdateByLookupKey.setMutator(result -> {
             if (result != null) {
                 T value = oldMutator.apply(result);
@@ -212,7 +207,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
             return null;
         });
 
-        val oldSaver = createOrUpdateByLookupKey.getSaver();
+        final var oldSaver = createOrUpdateByLookupKey.getSaver();
         createOrUpdateByLookupKey.setSaver((T entity) -> {
             addBucketId(entity);
             return oldSaver.apply(entity);
@@ -222,7 +217,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T> Void visit(CreateOrUpdate<T> createOrUpdate) {
-        val oldMutator = createOrUpdate.getMutator();
+        final var oldMutator = createOrUpdate.getMutator();
         createOrUpdate.setMutator(result -> {
             if (result != null) {
                 T value = oldMutator.apply(result);
@@ -232,7 +227,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
             return null;
         });
 
-        val oldSaver = createOrUpdate.getSaver();
+        final var oldSaver = createOrUpdate.getSaver();
         createOrUpdate.setSaver((T entity) -> {
             addBucketId(entity);
             return oldSaver.apply(entity);
@@ -242,7 +237,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T, U> Void visit(CreateOrUpdateInLockedContext<T, U> createOrUpdateInLockedContext) {
-        val oldMutator = createOrUpdateInLockedContext.getMutator();
+        final var oldMutator = createOrUpdateInLockedContext.getMutator();
         createOrUpdateInLockedContext.setMutator(entity -> {
             if (entity != null) {
                 T value = oldMutator.apply(entity);
@@ -252,7 +247,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
             return null;
         });
 
-        val oldSaver = createOrUpdateInLockedContext.getSaver();
+        final var oldSaver = createOrUpdateInLockedContext.getSaver();
         createOrUpdateInLockedContext.setSaver((T entity) -> {
             addBucketId(entity);
             return oldSaver.apply(entity);
@@ -266,39 +261,26 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     private <T> void addBucketId(T entity) {
-        if (Objects.isNull(entity)) {
+        if (entity == null || MapUtils.isEmpty(this.initialisedEntitiesMeta)) {
             return;
         }
 
-        val entitymeta = initialisedEntityMeta.get(entity.getClass().getName());
-        if (Objects.isNull(entitymeta)) {
+        final var entityMeta = initialisedEntitiesMeta.get(entity.getClass().getName());
+        if (entityMeta == null) {
             return;
         }
 
-        val bucketKeyField = entitymeta.getBucketKeyField();
-        val shardingKeyField = entitymeta.getShardingKeyField();
-        if (Objects.isNull(bucketKeyField) || Objects.isNull(shardingKeyField)) {
-            return;
-        }
-        val shardingKey = (String) resolveFieldData(entity, shardingKeyField).toString();
-        val bucketId = this.bucketIdExtractor.bucketId(this.tenantId, shardingKey);
+        final var shardingKeyGetter = entityMeta.getShardingKeyGetter();
+        final var bucketKeySetter = entityMeta.getBucketKeySetter();
 
         try {
-            bucketKeyField.setAccessible(true);
-            bucketKeyField.set(entity, bucketId);
-        } catch (IllegalAccessException e) {
-            log.error("Error setting field {}", bucketKeyField.getName(), e);
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    private <T> Object resolveFieldData(T entity, Field field) {
-        try {
-            field.setAccessible(true);
-            return field.get(entity);
-        } catch (IllegalAccessException e) {
-            log.error("Error resolving field {}", field.getName(), e);
-            throw new IllegalArgumentException(e);
+            final var shardingKey = (String) shardingKeyGetter.invoke(entity);
+            final var bucketId = this.bucketIdExtractor.bucketId(this.tenantId, shardingKey);
+            bucketKeySetter.invoke(entity, bucketId);
+        } catch (Throwable e) {
+            log.error("Error accessing/setting sharding/bucket key {}", entity.getClass().getName(), e);
+            throw new RuntimeException(String.format("Error accessing/setting sharding/bucket key %s",
+                    entity.getClass().getName()), e);
         }
     }
 }

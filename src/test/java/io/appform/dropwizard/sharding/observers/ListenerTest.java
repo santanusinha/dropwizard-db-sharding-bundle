@@ -6,6 +6,8 @@ import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
+import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
+import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.junit.jupiter.api.BeforeEach;

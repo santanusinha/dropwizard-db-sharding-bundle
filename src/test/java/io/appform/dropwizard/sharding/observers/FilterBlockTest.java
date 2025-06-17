@@ -8,6 +8,8 @@ import io.appform.dropwizard.sharding.exceptions.TransactionFilteredException;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.filters.TransactionFilterResult;
+import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
+import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.junit.jupiter.api.Test;

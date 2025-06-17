@@ -1,6 +1,5 @@
 package io.appform.dropwizard.sharding;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -17,9 +16,7 @@ import io.appform.dropwizard.sharding.sharding.ShardingKey;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
 import org.apache.commons.lang3.ClassUtils;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.jasypt.encryption.pbe.StandardPBEBigDecimalEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEBigIntegerEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEByteEncryptor;
@@ -30,11 +27,14 @@ import org.reflections.Reflections;
 
 import javax.persistence.Entity;
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -168,46 +168,91 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
 
   private void validateAndBuildEntitiesMeta(final List<Class<?>> initialisedEntities) {
     initialisedEntities.forEach(clazz -> {
-      val bucketKeyField = resolveFieldFromEntity(clazz, BucketKey.class,
-              entity -> validateAndResolveField(entity, BucketKey.class.getSimpleName(), Integer.class));
-      if (Objects.isNull(bucketKeyField)) {
-        return;
-      }
+      try {
+        final var bucketKeyFieldEntry = fetchAndValidateAnnotateField(clazz, BucketKey.class, Integer.class);
+        if (bucketKeyFieldEntry.isEmpty()) {
+          return;
+        }
+        final var lookupKeyFieldEntry = fetchAndValidateAnnotateField(clazz, LookupKey.class, String.class);
+        final var shardingKeyFieldEntry = fetchAndValidateAnnotateField(clazz, ShardingKey.class, String.class);
+        final var shardingKeyField = shardingKeyFieldEntry.map(Map.Entry::getKey);
+        final var lookupKeyField = lookupKeyFieldEntry.map(Map.Entry::getKey);
 
-      val lookupKeyField = resolveFieldFromEntity(clazz, LookupKey.class,
-              entity -> validateAndResolveField(entity, LookupKey.class.getSimpleName(), String.class));
-      val shardingKeyField = resolveFieldFromEntity(clazz, ShardingKey.class,
-              entity -> validateAndResolveField(entity, ShardingKey.class.getSimpleName(), String.class));
-      if (Objects.isNull(shardingKeyField) && Objects.isNull(lookupKeyField) ) {
-        throw new RuntimeException("ShardingKey or LookupKey must be present if bucketKey is present");
-      }
+        if (shardingKeyField.isEmpty() && lookupKeyField.isEmpty()) {
+          throw new RuntimeException(String.format("Entity %s: ShardingKey or LookupKey must be present if BucketKey " +
+                  "is present", clazz.getName()));
+        }
 
-      val entityMeta = EntityMeta.builder()
-              .bucketKeyField(bucketKeyField)
-              .shardingKeyField(Objects.isNull(shardingKeyField) ? lookupKeyField : shardingKeyField)
-              .build();
-      initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
+        if (shardingKeyField.isPresent() && lookupKeyField.isPresent()) {
+          throw new RuntimeException(String.format("Entity %s: Both ShardingKey and LookupKey cannot be present at the " +
+                  "same time", clazz.getName()));
+        }
+
+        final var bucketKeyFieldDeclaringClassLookup =
+                MethodHandles.privateLookupIn(bucketKeyFieldEntry.get().getValue(), MethodHandles.lookup());
+        final var bucketKeyField = bucketKeyFieldEntry.get().getKey();
+        final var bucketKeySetter = bucketKeyFieldDeclaringClassLookup.unreflectSetter(bucketKeyField);
+
+        MethodHandle shardingKeyGetter;
+        if (shardingKeyField.isPresent()) {
+          final var shardingKeyFieldDeclaringClassLookup =
+                  MethodHandles.privateLookupIn(shardingKeyFieldEntry.get().getValue(), MethodHandles.lookup());
+          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyField.get());
+        } else {
+          final var lookupKeyFieldDeclaringClassLookup =
+                  MethodHandles.privateLookupIn(lookupKeyFieldEntry.get().getValue(), MethodHandles.lookup());
+          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyField.get());
+        }
+
+        final var entityMeta = EntityMeta.builder()
+                .bucketKeySetter(bucketKeySetter)
+                .shardingKeyGetter(shardingKeyGetter)
+                .build();
+        initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
+
+      } catch (Exception e) {
+        log.error("Error validating/resolving entity meta for class: {}", clazz.getName(), e);
+        throw new RuntimeException("Failed to validate/resolve entity meta for " + clazz.getName(), e);
+      }
     });
   }
 
-  private Field validateAndResolveField(final Field[] fields,
-                                        final String fieldType,
-                                        final Class<?> acceptableClass) {
-    if(fields.length == 0) {
-      return null;
+  private <K> Optional<Map.Entry<Field, Class<?>>> fetchAndValidateAnnotateField(
+          final Class<K> clazz,
+          final Class<? extends Annotation> annotationClazz,
+          final Class<?> acceptableClass)
+          throws IllegalAccessException {
+
+    final List<Map.Entry<Field, Class<?>>> annotatedFieldEntries = new ArrayList<>();
+    Class<?> currentClass = clazz;
+    while (currentClass != null && currentClass != Object.class) {
+      final var currentClassLookup = MethodHandles.privateLookupIn(currentClass, MethodHandles.lookup());
+      for (Field field : currentClassLookup.lookupClass().getDeclaredFields()) {
+        if (field.isAnnotationPresent(annotationClazz)) {
+          annotatedFieldEntries.add(Map.entry(field, currentClass));
+        }
+      }
+      currentClass = currentClass.getSuperclass();
     }
-    Preconditions.checkArgument(fields.length == 1, String.format("Only one field can be designated " +
-            "as @%s", fieldType));
-    val keyField = fields[0];
-    Preconditions.checkArgument(ClassUtils.isAssignable(keyField.getType(), acceptableClass),
-            String.format("Key field must be of acceptable Type: %s", acceptableClass));
-    return keyField;
+    Preconditions.checkArgument(annotatedFieldEntries.size() <= 1,
+            String.format("Only one field can be designated with @%s in class %s or its superclasses",
+                    annotationClazz.getSimpleName(), clazz.getName()));
+    if (annotatedFieldEntries.isEmpty()) {
+      return Optional.empty();
+    }
+    return annotatedFieldEntries.stream()
+            .findFirst()
+            .map(entry -> {
+              validateField(entry.getKey(), annotationClazz.getSimpleName(), acceptableClass);
+              return entry;
+            });
   }
 
-  private Field resolveFieldFromEntity(Class<?> clazz, Class<? extends Annotation> annotationClazz,
-                                       Function<Field[], Field> validateAndResolve) {
-    val keyFields = FieldUtils.getFieldsWithAnnotation(clazz, annotationClazz);
-    return validateAndResolve.apply(keyFields);
+  private void validateField(final Field field,
+                             final String annotationName,
+                             final Class<?> acceptableClass) {
+    final var errorMessage = String.format("Field annotated with @%s (%s) must be of acceptable Type: %s, but found %s",
+            annotationName, field.getName(), acceptableClass.getSimpleName(), field.getType().getSimpleName());
+    Preconditions.checkArgument(ClassUtils.isAssignable(field.getType(), acceptableClass), errorMessage);
   }
-
 }
