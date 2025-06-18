@@ -1,6 +1,5 @@
 package io.appform.dropwizard.sharding.observers.entity;
 
-import io.appform.dropwizard.sharding.sharding.BucketKey;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -12,18 +11,14 @@ import javax.persistence.Entity;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "child")
+@Table(name = "heirarchial_child")
 @FieldNameConstants
 @Getter
 @Setter
 @ToString
 @RequiredArgsConstructor
-public class ChildWithDuplicateBucketKey extends BaseChild {
+public class HeirarchialBaseChildImpl extends HeirarchialBaseChild {
 
     @Column
     private String value;
-
-    @Column
-    @BucketKey
-    private int bucketKey;
 }

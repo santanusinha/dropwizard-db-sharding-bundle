@@ -13,7 +13,7 @@ import javax.persistence.Entity;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "simple_children")
+@Table(name = "child")
 @FieldNameConstants
 @Getter
 @Setter

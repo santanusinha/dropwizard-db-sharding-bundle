@@ -1,29 +1,26 @@
 package io.appform.dropwizard.sharding.observers.entity;
 
-import io.appform.dropwizard.sharding.sharding.BucketKey;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.FieldNameConstants;
 
-import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import javax.persistence.Transient;
+import java.util.ArrayList;
+import java.util.Collection;
 
 @Entity
-@Table(name = "child")
+@Table(name = "heirarchial_child")
 @FieldNameConstants
 @Getter
 @Setter
 @ToString
 @RequiredArgsConstructor
-public class ChildWithDuplicateBucketKey extends BaseChild {
+public class HeirarchialChildImpl extends HeirarchialBaseChildImpl {
 
-    @Column
-    private String value;
-
-    @Column
-    @BucketKey
-    private int bucketKey;
+    @Transient
+    private Collection<SimpleChild> children = new ArrayList<>();
 }
