@@ -25,7 +25,7 @@ import java.util.Objects;
 @FieldNameConstants
 @Getter
 @Setter
-@ToString(callSuper = true)
+@ToString
 @RequiredArgsConstructor
 public class SimpleChild {
     @Id
