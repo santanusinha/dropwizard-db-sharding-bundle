@@ -16,13 +16,13 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "heirarchial_child")
+@Table(name = "hierarchical_child")
 @FieldNameConstants
 @Getter
 @Setter
 @ToString
 @RequiredArgsConstructor
-public class HeirarchialBaseChild {
+public class HierarchicalBaseChild {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;

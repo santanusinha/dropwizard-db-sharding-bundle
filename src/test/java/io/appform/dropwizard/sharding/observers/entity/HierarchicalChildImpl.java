@@ -13,13 +13,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 @Entity
-@Table(name = "heirarchial_child")
+@Table(name = "hierarchical_child")
 @FieldNameConstants
 @Getter
 @Setter
 @ToString
 @RequiredArgsConstructor
-public class HeirarchialChildImpl extends HeirarchialBaseChildImpl {
+public class HierarchicalChildImpl extends HierarchicalBaseChildImpl {
 
     @Transient
     private Collection<SimpleChild> children = new ArrayList<>();

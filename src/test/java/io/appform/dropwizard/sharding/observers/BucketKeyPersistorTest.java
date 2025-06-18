@@ -6,9 +6,9 @@ import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.observers.entity.BaseChild;
 import io.appform.dropwizard.sharding.observers.entity.ChildWithDuplicateBucketKey;
-import io.appform.dropwizard.sharding.observers.entity.HeirarchialBaseChild;
-import io.appform.dropwizard.sharding.observers.entity.HeirarchialBaseChildImpl;
-import io.appform.dropwizard.sharding.observers.entity.HeirarchialChildImpl;
+import io.appform.dropwizard.sharding.observers.entity.HierarchicalBaseChild;
+import io.appform.dropwizard.sharding.observers.entity.HierarchicalBaseChildImpl;
+import io.appform.dropwizard.sharding.observers.entity.HierarchicalChildImpl;
 import io.appform.dropwizard.sharding.observers.entity.ParentWithoutBucketKey;
 import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
 import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
@@ -34,8 +34,8 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
     @Override
     protected DBShardingBundleBase<TestConfig> getBundle() {
         return new BalancedDBShardingBundle<TestConfig>(SimpleChild.class, SimpleParent.class,
-                ParentWithoutBucketKey.class, HeirarchialBaseChild.class, HeirarchialBaseChildImpl.class,
-                HeirarchialChildImpl.class) {
+                ParentWithoutBucketKey.class, HierarchicalBaseChild.class, HierarchicalBaseChildImpl.class,
+                HierarchicalChildImpl.class) {
             @Override
             protected ShardedHibernateFactory getConfig(TestConfig config) {
                 return testConfig.getShards();
@@ -304,11 +304,11 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
     @Test
     public void testObserverInvocationForSaveWithMultiHeirarchy() {
         val bundle = createBundle();
-        val childDao = bundle.createRelatedObjectDao(HeirarchialChildImpl.class);
+        val childDao = bundle.createRelatedObjectDao(HierarchicalChildImpl.class);
 
-        val childObj = buildChildImplObj(shardingKey, childValue);
+        val childObj = buildHierarchicalChildImplObj(shardingKey, childValue);
         childDao.save(shardingKey, childObj);
-        val persistedChild = childDao.select(shardingKey,  DetachedCriteria.forClass(HeirarchialChildImpl.class)
+        val persistedChild = childDao.select(shardingKey,  DetachedCriteria.forClass(HierarchicalChildImpl.class)
                         .add(Property.forName("parent")
                                 .eq(shardingKey)),
                 0,
@@ -353,9 +353,9 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         return obj;
     }
 
-    private HeirarchialChildImpl buildChildImplObj(final String shardingKey,
-                                                   final String value) {
-        val obj = new HeirarchialChildImpl();
+    private HierarchicalChildImpl buildHierarchicalChildImplObj(final String shardingKey,
+                                                                final String value) {
+        val obj = new HierarchicalChildImpl();
         obj.setParent(shardingKey);
         obj.setValue(value);
         // setting incorrect bucketKey, should not be persisted or updated anywhere.

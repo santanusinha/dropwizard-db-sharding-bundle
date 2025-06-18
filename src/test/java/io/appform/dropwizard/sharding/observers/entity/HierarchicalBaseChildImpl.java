@@ -11,13 +11,13 @@ import javax.persistence.Entity;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "heirarchial_child")
+@Table(name = "hierarchical_child")
 @FieldNameConstants
 @Getter
 @Setter
 @ToString
 @RequiredArgsConstructor
-public class HeirarchialBaseChildImpl extends HeirarchialBaseChild {
+public class HierarchicalBaseChildImpl extends HierarchicalBaseChild {
 
     @Column
     private String value;
