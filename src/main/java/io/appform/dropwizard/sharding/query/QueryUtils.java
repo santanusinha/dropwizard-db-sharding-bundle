@@ -68,7 +68,7 @@ public class QueryUtils {
      */
     public static <T> Predicate inFilter(final Root<T> queryRoot,
                                          final String column,
-                                         final Collection<?> values) {
+                                         final Collection<String> values) {
         return queryRoot.get(column).in(values);
     }
 }

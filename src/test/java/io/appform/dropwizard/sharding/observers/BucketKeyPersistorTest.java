@@ -63,7 +63,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         parentDao.save(obj);
 
         val persistedParent = parentDao.get(shardingKey);
-        assertNotNull(persistedParent.get());
+        assertTrue(persistedParent.isPresent());
         assertEquals(preComputedBucketKeyValue, persistedParent.get().getBucketKey());
 
         val childObj = buildSimpleChildObj(shardingKey, childValue);
@@ -87,6 +87,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         val obj = buildParentObj(shardingKey);
         parentDao.save(obj);
         val persistedParent = parentDao.get(shardingKey);
+        assertTrue(persistedParent.isPresent());
         val bucketKeyValue = persistedParent.get().getBucketKey();
         assertEquals(preComputedBucketKeyValue, bucketKeyValue);
 
@@ -163,7 +164,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         parentDao.createOrUpdate(shardingKey, (t) -> t, () -> parentObj);
 
         var persistedParent = parentDao.get(shardingKey);
-        assertNotNull(persistedParent.get());
+        assertTrue(persistedParent.isPresent());
         assertEquals(preComputedBucketKeyValue, persistedParent.get().getBucketKey());
 
         parentDao.createOrUpdate(shardingKey, (t) -> {
@@ -172,7 +173,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         }, () -> parentObj);
 
         persistedParent = parentDao.get(shardingKey);
-        assertNotNull(persistedParent.get());
+        assertTrue(persistedParent.isPresent());
         assertEquals(preComputedBucketKeyValue, persistedParent.get().getBucketKey());
     }
 
@@ -186,7 +187,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         parentDao.save(parentObj);
 
         var persistedParent = parentDao.get(shardingKey);
-        assertNotNull(persistedParent.get());
+        assertTrue(persistedParent.isPresent());
         assertEquals(preComputedBucketKeyValue, persistedParent.get().getBucketKey());
 
         parentDao.update(shardingKey, (t) -> {
@@ -198,7 +199,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         });
 
         persistedParent = parentDao.get(shardingKey);
-        assertNotNull(persistedParent.get());
+        assertTrue(persistedParent.isPresent());
         assertEquals(preComputedBucketKeyValue, persistedParent.get().getBucketKey());
     }
 
