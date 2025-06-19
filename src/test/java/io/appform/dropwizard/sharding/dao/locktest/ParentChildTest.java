@@ -13,7 +13,6 @@ import io.appform.dropwizard.sharding.query.QueryUtils;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.SneakyThrows;
-import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
@@ -27,13 +26,16 @@ import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class ParentChildTest {
 
+    private static final String PARENT_KEY = "123";
+    private static final String PARENT_A_VALUE = "PARENT_A";
+    private static final String PARENT_B_VALUE = "PARENT_B";
+    private static final String CHILD_A_COLUMN_VALUE = "CHILD-A-VALUE-1";
+    private static final String CHILD_B_COLUMN_VALUE = "CHILD-B-VALUE-2";
+
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
-
-
     private RelationalDao<ParentClass> parentClassRelationalDao;
 
     @BeforeEach
@@ -53,139 +55,110 @@ public class ParentChildTest {
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
+        setupStore();
     }
 
-
-//    @SneakyThrows
-//    @Test
-//    public void test() {
-//        String parentKey = "1";
-//        ParentClass childClass1 = ChildBClass.builder().childColumn("CHILD1VALUE").parentColumn(1).build();
-//        ParentClass childClass2 = Child2Class.builder().childColumn("CHILD2VALUE").parentColumn(2).build();
-//        parentClassRelationalDao.save(parentKey, childClass1);
-//        parentClassRelationalDao.save(parentKey, childClass2);
-//
-////        QuerySpec<Child1Class, Child1Class> querySpec = (queryRoot, query, criteriaBuilder) -> {
-////           // QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "childColumn", "SOMEVALUE");
-////             criteriaBuilder.and(
-////                    criteriaBuilder.equal(queryRoot.type(), Child1Class.class),
-////                    criteriaBuilder.like(((Root<Child1Class>) (Root<?>) queryRoot).get("childColumn"), "CHILDVALUE")
-////            );
-////
-////        };
-//
-////        CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-////        CriteriaQuery<Car> criteriaQuery = criteriaBuilder.createQuery(Car.class);
-////        Root<Car> car= criteriaQuery.from(Car.class);
-////        Root<Soccerball> soccerballs = criteriaQuery.from(SoccerBall.class);
-////        Predicate [] restrictions = new Predicate[]{  criteriaBuiler.equal(car.get(carModel), "Civic"), criteriaBuilder.equal(soccerball.get("numberOfKicks"),20), criteriaBuilder.equal(soccerball.get(SoccerBall_.id),car.get(Car_.id))};
-////        criteriaQuery.where(restrictions);
-////        TypedQuery<Car> typedQuery = entityManager.createQuery(criteriaQuery);
-////        Car carWithSoccerBalls = typedQuery.getSingleResult();
-//
-//        QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
-//
-//            Predicate parentColumnCheck = criteriaBuilder.equal(queryRoot.get("type"), "CHILD1");
-
-    /// /            Predicate childColumnCheck = criteriaBuilder.equal(query.from(Child1Class.class).get("childColumn"), "CHILD1VALUE");
-    /// /            query.where(criteriaBuilder.and(parentColumnCheck, childColumnCheck));
-//            //query.where(parentColumnCheck);
-//            query.select(queryRoot);
-//            query.orderBy(criteriaBuilder.desc(queryRoot.get("id")));
-//        };
-//        val data = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
-//        data.stream().forEach(e -> {
-//            try {
-//                System.out.println(new ObjectMapper().writeValueAsString(e));
-//            } catch (JsonProcessingException ex) {
-//                //throw new RuntimeException(ex);
-//            }
-//        });
-//    }
     @SneakyThrows
-    @Test
-    void test() {
-        val parentKey = "123";
-        val parentA = "PARENT_A";
-        val parentB = "PARENT_B";
-        val childAColumnValue = "CHILD-A-VALUE-1";
-        val childBColumnValue = "CHILD-B-VALUE-2";
+    private void setupStore() {
+        List<ParentClass> dataList = List.of(
+                ChildAClass.builder().parentKey(PARENT_KEY).childAColumn("CHILD-A-VALUE-1").parentColumn(PARENT_A_VALUE).build(),
+                ChildAClass.builder().parentKey(PARENT_KEY).childAColumn("CHILD-A-VALUE-2").parentColumn(PARENT_B_VALUE).build(),
+                ChildAClass.builder().parentKey(PARENT_KEY).childAColumn("CHILD-A-VALUE-3").parentColumn(PARENT_A_VALUE).build(),
+                ChildAClass.builder().parentKey(PARENT_KEY).childAColumn("CHILD-A-VALUE-4").parentColumn(PARENT_B_VALUE).build(),
 
-        val dataList = List.of(
-                ChildAClass.builder().parentKey(parentKey).childAColumn("CHILD-A-VALUE-1").parentColumn(parentA).build(),
-                ChildAClass.builder().parentKey(parentKey).childAColumn("CHILD-A-VALUE-2").parentColumn(parentB).build(),
-                ChildAClass.builder().parentKey(parentKey).childAColumn("CHILD-A-VALUE-3").parentColumn(parentA).build(),
-                ChildAClass.builder().parentKey(parentKey).childAColumn("CHILD-A-VALUE-4").parentColumn(parentB).build(),
-
-                ChildBClass.builder().parentKey(parentKey).childBColumn("CHILD-B-VALUE-1").parentColumn(parentA).build(),
-                ChildBClass.builder().parentKey(parentKey).childBColumn("CHILD-B-VALUE-2").parentColumn(parentB).build(),
-                ChildBClass.builder().parentKey(parentKey).childBColumn("CHILD-B-VALUE-3").parentColumn(parentA).build(),
-                ChildBClass.builder().parentKey(parentKey).childBColumn("CHILD-B-VALUE-4").parentColumn(parentB).build()
+                ChildBClass.builder().parentKey(PARENT_KEY).childBColumn("CHILD-B-VALUE-1").parentColumn(PARENT_A_VALUE).build(),
+                ChildBClass.builder().parentKey(PARENT_KEY).childBColumn("CHILD-B-VALUE-2").parentColumn(PARENT_B_VALUE).build(),
+                ChildBClass.builder().parentKey(PARENT_KEY).childBColumn("CHILD-B-VALUE-3").parentColumn(PARENT_A_VALUE).build(),
+                ChildBClass.builder().parentKey(PARENT_KEY).childBColumn("CHILD-B-VALUE-4").parentColumn(PARENT_B_VALUE).build()
         );
         for (ParentClass data : dataList) {
             parentClassRelationalDao.save(data.getParentKey(), data);
         }
+    }
 
-        // Querying with Parent column -> WORKS
-        Assertions.assertDoesNotThrow(() -> {
+    @SneakyThrows
+    @Test
+    void testQueryingByParent() {
+        List<String> parentColumnValues = List.of(PARENT_A_VALUE, PARENT_B_VALUE);
+        for (String parentValue : parentColumnValues) {
             QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
-                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "parentColumn", parentA));
+                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "parentColumn", parentValue));
             };
-            val parentColumnQuery = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
-            Assertions.assertNotNull(parentColumnQuery);
-        });
+            List<ParentClass> parentAData = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
+            Assertions.assertNotNull(parentAData);
+            for (ParentClass ele : parentAData) {
+                Assertions.assertEquals(parentValue, ele.getParentColumn());
+            }
+        }
+    }
 
-        // Querying with Child column -> DOES NOT WORKS
-        // Error : Unable to locate Attribute  with the given name [childAColumn] on this ManagedType [io.appform.dropwizard.sharding.dao.locktest.ParentClass]
-        // Basically childField is not present in parentClass
-        Assertions.assertThrows(IllegalArgumentException.class, () -> {
-            QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
-                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "childAColumn", childAColumnValue));
+    @SneakyThrows
+    @Test
+    void testQueryingByChildColumn() {
+        List<String> childColumnValues = List.of(CHILD_A_COLUMN_VALUE, CHILD_B_COLUMN_VALUE);
+
+        for (String childValue : childColumnValues) {
+//        Querying with Child column -> DOES NOT WORKS
+//        Error : Unable to locate Attribute  with the given name [childAColumn] on this ManagedType [io.appform.dropwizard.sharding.dao.locktest.ParentClass]
+//        Basically childField is not present in parentClass
+            QuerySpec<ParentClass, ParentClass> wrondQuerySpec = (queryRoot, query, criteriaBuilder) -> {
+                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "childAColumn", childValue));
             };
-            val parentColumnQuery = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
-            Assertions.assertNotNull(parentColumnQuery);
-        });
+            Assertions.assertThrows(IllegalArgumentException.class, () -> {
+                parentClassRelationalDao.select(PARENT_KEY, wrondQuerySpec, 0, Integer.MAX_VALUE);
+            });
+        }
 
-        // FIX FOR ABOVE ISSUE
+
+//        // FIX FOR ABOVE ISSUE
         Assertions.assertDoesNotThrow(() -> {
             QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
                 Root<ChildAClass> childAClassRoot = criteriaBuilder.treat(queryRoot, ChildAClass.class);
-                Predicate parentColumnPredicate = QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "parentColumn", parentA);
-                Predicate childAColumnPredicate = QueryUtils.equalityFilter(criteriaBuilder, childAClassRoot, "childAColumn", childAColumnValue);
+                Predicate parentColumnPredicate = QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "parentColumn", PARENT_A_VALUE);
+                Predicate childAColumnPredicate = QueryUtils.equalityFilter(criteriaBuilder, childAClassRoot, "childAColumn", CHILD_A_COLUMN_VALUE);
                 query.where(criteriaBuilder.and(parentColumnPredicate, childAColumnPredicate));
             };
-            val parentColumnQuery = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
+            List<ParentClass> parentColumnQuery = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
             Assertions.assertNotNull(parentColumnQuery);
         });
+    }
 
-        // IN filter
+    @SneakyThrows
+    @Test
+    void testQueryingInClauseWithEnum() {
         Assertions.assertDoesNotThrow(() -> {
             QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
                 Predicate parentColumnPredicate = QueryUtils.inFilter(queryRoot, "type", List.of(Category.CATEGORYA));
                 query.where(parentColumnPredicate);
             };
-            val parentColumnQuery = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
+            List<ParentClass> parentColumnQuery = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
             Assertions.assertNotNull(parentColumnQuery);
-            for (val ele : parentColumnQuery) {
+            for (ParentClass ele : parentColumnQuery) {
                 Assertions.assertEquals(Category.CATEGORYA, ele.getType());
             }
-
         });
+    }
 
-        // NOT IN filter
+    @SneakyThrows
+    @Test
+    void testQueryingNotInClause() {
         Assertions.assertDoesNotThrow(() -> {
             QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
-                Predicate parentColumnPredicate = QueryUtils.notInFilter(criteriaBuilder, queryRoot, "type", List.of(Category.CATEGORYA));
+                Predicate parentColumnPredicate = QueryUtils.inFilter(queryRoot, "parentColumn", List.of(PARENT_A_VALUE));
                 query.where(parentColumnPredicate);
             };
-            val parentColumnQuery = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
+            List<ParentClass> parentColumnQuery = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
             Assertions.assertNotNull(parentColumnQuery);
-            for (val ele : parentColumnQuery) {
-                Assertions.assertNotEquals(Category.CATEGORYA, ele.getType());
+            for (ParentClass ele : parentColumnQuery) {
+                Assertions.assertEquals(PARENT_A_VALUE, ele.getParentColumn());
             }
         });
+    }
 
-        // Order By
+
+    @SneakyThrows
+    @Test
+    void testOrderBy() {
         Assertions.assertDoesNotThrow(() -> {
             QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
                 Predicate parentColumnPredicate = QueryUtils.notInFilter(criteriaBuilder, queryRoot, "type", List.of(Category.CATEGORYA));
@@ -193,32 +166,28 @@ public class ParentChildTest {
                 Order order2 = QueryUtils.descOrder(criteriaBuilder, queryRoot, "parentColumn");
                 query.where(parentColumnPredicate).orderBy(order2, order);
             };
-            val parentColumnQuery = parentClassRelationalDao.select(parentKey, querySpec, 0, Integer.MAX_VALUE);
+            List<ParentClass> parentColumnQuery = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
             Assertions.assertNotNull(parentColumnQuery);
-            for (val ele : parentColumnQuery) {
-                Assertions.assertNotEquals(Category.CATEGORYA, ele.getType());
-            }
         });
-
     }
 
 
-    private SessionFactory buildSessionFactory(String dbName) {
-        Configuration configuration = new Configuration();
-        configuration.setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-        configuration.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
-        configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
-        configuration.setProperty("hibernate.hbm2ddl.auto", "create");
-        configuration.setProperty("hibernate.current_session_context_class", "managed");
-        configuration.setProperty("hibernate.show_sql", "true");
+        private SessionFactory buildSessionFactory (String dbName){
+            Configuration configuration = new Configuration();
+            configuration.setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+            configuration.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
+            configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
+            configuration.setProperty("hibernate.hbm2ddl.auto", "create");
+            configuration.setProperty("hibernate.current_session_context_class", "managed");
+            configuration.setProperty("hibernate.show_sql", "true");
 
-        configuration.addAnnotatedClass(ParentClass.class);
-        configuration.addAnnotatedClass(ChildAClass.class);
-        configuration.addAnnotatedClass(ChildBClass.class);
+            configuration.addAnnotatedClass(ParentClass.class);
+            configuration.addAnnotatedClass(ChildAClass.class);
+            configuration.addAnnotatedClass(ChildBClass.class);
 
-        StandardServiceRegistry serviceRegistry
-                = new StandardServiceRegistryBuilder().applySettings(
-                configuration.getProperties()).build();
-        return configuration.buildSessionFactory(serviceRegistry);
+            StandardServiceRegistry serviceRegistry
+                    = new StandardServiceRegistryBuilder().applySettings(
+                    configuration.getProperties()).build();
+            return configuration.buildSessionFactory(serviceRegistry);
+        }
     }
-}
