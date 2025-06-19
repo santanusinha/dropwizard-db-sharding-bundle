@@ -65,7 +65,7 @@ public class QueryUtils {
      * @param queryRoot The root entity for the query.
      * @param column    The name of the column or attribute to filter on.
      * @param values    A collection of values to check for inclusion in the "in" clause.
-     * @return A predicate for "in" clause filtering.
+     * @return          A predicate for "in" clause filtering.
      */
     public static <T> Predicate inFilter(final Root<T> queryRoot,
                                          final String column,
@@ -80,7 +80,7 @@ public class QueryUtils {
      * @param queryRoot The root entity for the query.
      * @param column    The name of the column or attribute to filter on.
      * @param values    A collection of values to check for inclusion in the "not-in" clause.
-     * @return A predicate for "in" clause filtering.
+     * @return          A predicate for "not-in" clause filtering.
      */
     public static <T> Predicate notInFilter(final CriteriaBuilder criteriaBuilder,
                                             final Root<T> queryRoot,
@@ -89,12 +89,28 @@ public class QueryUtils {
         return criteriaBuilder.not(queryRoot.get(column).in(values));
     }
 
+    /**
+     *
+     * @param <T>              The type of the entity being queried.
+     * @param criteriaBuilder  The CriteriaBuilder for constructing query criteria.
+     * @param queryRoot        The root entity for the query.
+     * @param column           The name of the column or attribute to filter on.
+     * @return                 An Order for sorting query result.
+     */
     public static <T> Order ascOrder(final CriteriaBuilder criteriaBuilder,
                                      final Root<T> queryRoot,
                                      final String column) {
         return criteriaBuilder.asc(queryRoot.get(column));
     }
 
+    /**
+     *
+     * @param <T>              The type of the entity being queried.
+     * @param criteriaBuilder  The CriteriaBuilder for constructing query criteria.
+     * @param queryRoot        The root entity for the query.
+     * @param column           The name of the column or attribute to filter on.
+     * @return                 An Order for sorting query result.
+     */
     public static <T> Order descOrder(final CriteriaBuilder criteriaBuilder,
                                       final Root<T> queryRoot,
                                       final String column) {
