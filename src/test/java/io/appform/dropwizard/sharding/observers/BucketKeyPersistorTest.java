@@ -320,8 +320,6 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
     private DBShardingBundleBase<TestConfig> createBundle() {
         val bundle = getBundle();
         bundle.initialize(bootstrap);
-        bundle.initialize(bootstrap);
-        bundle.run(testConfig, environment);
         bundle.run(testConfig, environment);
         return bundle;
     }
@@ -329,8 +327,6 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
     private DBShardingBundleBase<TestConfig> createBundleWithMalformedEntity() {
         val bundle = getBundleWithMalformedEntity();
         bundle.initialize(bootstrap);
-        bundle.initialize(bootstrap);
-        bundle.run(testConfig, environment);
         bundle.run(testConfig, environment);
         return bundle;
     }
