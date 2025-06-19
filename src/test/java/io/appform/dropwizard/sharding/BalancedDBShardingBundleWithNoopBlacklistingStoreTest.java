@@ -17,26 +17,33 @@
 
 package io.appform.dropwizard.sharding;
 
-import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
-import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
-import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 
-/**
- * Created by tushar.mandar on 4/25/17.
- */
-public class LegacyDBShardingBundleWithAnnotationTest extends DBShardingBundleTestBase {
+import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
+import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
+import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class BalancedDBShardingBundleWithNoopBlacklistingStoreTest extends BundleBasedTestBase {
 
     @Override
     protected DBShardingBundleBase<TestConfig> getBundle() {
-        return new DBShardingBundle<TestConfig>("io.appform.dropwizard.sharding.dao.testdata.entities") {
+        return new BalancedDBShardingBundle<TestConfig>("namespace", Order.class, OrderItem.class) {
             @Override
-            protected ShardedHibernateFactory getConfig(DBShardingBundleTestBase.TestConfig config) {
+            protected ShardedHibernateFactory getConfig(TestConfig config) {
                 return testConfig.getShards();
             }
-            @Override
-            protected ShardBlacklistingStore getBlacklistingStore() {
-                return new InMemoryLocalShardBlacklistingStore();
-            }
         };
+    }
+
+    @Test
+    public void testBundleWithShardBlacklisted() throws Exception {
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+        bundle.getShardManager().blacklistShard(1);
+        //one for each shard
+        assertEquals(2, bundle.healthStatus().size());
     }
 }

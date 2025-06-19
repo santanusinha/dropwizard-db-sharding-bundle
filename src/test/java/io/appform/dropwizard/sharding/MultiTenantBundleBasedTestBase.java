@@ -1,6 +1,7 @@
 package io.appform.dropwizard.sharding;
 
 import com.codahale.metrics.health.HealthCheckRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
@@ -71,5 +72,6 @@ public abstract class MultiTenantBundleBasedTestBase {
     when(environment.healthChecks()).thenReturn(healthChecks);
     when(environment.admin()).thenReturn(adminEnvironment);
     when(bootstrap.getHealthCheckRegistry()).thenReturn(mock(HealthCheckRegistry.class));
+    when(bootstrap.getObjectMapper()).thenReturn(mock(ObjectMapper.class));
   }
 }

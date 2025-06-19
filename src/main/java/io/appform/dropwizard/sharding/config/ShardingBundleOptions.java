@@ -12,6 +12,8 @@ import lombok.NoArgsConstructor;
 public class ShardingBundleOptions {
     private boolean skipReadOnlyTransaction = false;
 
+    private boolean skipNativeHealthcheck = false;
+
     @Builder.Default
     private boolean encryptionSupportEnabled = false;
 
@@ -20,5 +22,11 @@ public class ShardingBundleOptions {
     private String encryptionPassword;
 
     private String encryptionIv;
+
+    @Builder.Default
+    private long shardsInitializationTimeoutInSec = 60;
+
+    @Builder.Default
+    private int shardInitializationParallelism = 1;
 
 }

@@ -22,7 +22,6 @@ import io.appform.dropwizard.sharding.sharding.ShardedTransaction;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
-import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Enhancer;

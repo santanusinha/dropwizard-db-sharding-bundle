@@ -23,6 +23,8 @@ import io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.multi.MultiPackageTestEntity;
+import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -86,6 +88,11 @@ public class MultiTenantBalancedDbShardingBundleWithMultipleClassPath extends Mu
                 return testConfig.getShards();
             }
 
+            @Override
+            protected ShardBlacklistingStore getBlacklistingStore() {
+                return new InMemoryLocalShardBlacklistingStore();
+            }
+
         };
     }
 
@@ -96,8 +103,6 @@ public class MultiTenantBalancedDbShardingBundleWithMultipleClassPath extends Mu
         MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
 
         bundle.initialize(bootstrap);
-        bundle.initBundles(bootstrap);
-        bundle.runBundles(testConfig, environment);
         bundle.run(testConfig, environment);
         MultiTenantLookupDao<MultiPackageTestEntity> lookupDao = bundle.createParentObjectDao(MultiPackageTestEntity.class);
 

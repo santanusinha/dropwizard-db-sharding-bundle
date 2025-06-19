@@ -18,6 +18,8 @@
 package io.appform.dropwizard.sharding;
 
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
+import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 
 public class MultiTenantBalancedDBShardingBundleWithAnnotationTest extends
     MultiTenantDBShardingBundleTestBase {
@@ -29,6 +31,11 @@ public class MultiTenantBalancedDBShardingBundleWithAnnotationTest extends
       @Override
       protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
         return testConfig.getShards();
+      }
+
+      @Override
+      protected ShardBlacklistingStore getBlacklistingStore() {
+        return new InMemoryLocalShardBlacklistingStore();
       }
     };
   }

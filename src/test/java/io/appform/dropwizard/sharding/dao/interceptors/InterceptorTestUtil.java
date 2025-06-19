@@ -1,6 +1,5 @@
 package io.appform.dropwizard.sharding.dao.interceptors;
 
-import io.appform.dropwizard.sharding.execution.DaoType;
 import lombok.experimental.UtilityClass;
 import org.slf4j.MDC;
 

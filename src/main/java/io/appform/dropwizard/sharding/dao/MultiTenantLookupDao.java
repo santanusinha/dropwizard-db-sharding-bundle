@@ -51,7 +51,6 @@ import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtrac
 import io.appform.dropwizard.sharding.utils.InternalUtils;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
-import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;

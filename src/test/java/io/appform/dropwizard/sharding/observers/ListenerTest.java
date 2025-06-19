@@ -89,8 +89,6 @@ public class ListenerTest extends BundleBasedTestBase {
     private DBShardingBundleBase<TestConfig> createBundle() {
         val bundle = getBundle();
         bundle.initialize(bootstrap);
-        bundle.initBundles(bootstrap);
-        bundle.runBundles(testConfig, environment);
         bundle.run(testConfig, environment);
         return bundle;
     }
