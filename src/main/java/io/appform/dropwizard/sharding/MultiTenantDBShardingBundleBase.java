@@ -187,51 +187,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     });
   }
 
-  private void setupObservers(final String tenantId,
-                              final MetricConfig metricConfig,
-                              final MetricRegistry metricRegistry,
-                              final Map<String, ShardManager> shardManagers,
-                              final Map<String, EntityMeta> initialisedEntityMeta) {
-    //Observer chain starts with filters and ends with listener invocations
-    //Terminal observer calls the actual method
-    rootObserver = new TerminalTransactionObserver();
-    if (!MapUtils.isEmpty(initialisedEntityMeta)) {
-      // Only initialise if we have initialisedEntityMeta.
-      // This won't be present in case bucketKey field itself is not present, so no need to apply this observer
-      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers),
-              initialisedEntityMeta)).setNext(rootObserver);
-    }
-    rootObserver = new ListenerTriggeringObserver(rootObserver).addListeners(
-            listeners);
-
-    for (var observer : observers) {
-      if (null == observer) {
-        return;
-      }
-      this.rootObserver = observer.setNext(rootObserver);
-    }
-    rootObserver = new TransactionMetricObserver(
-            new TransactionMetricManager(() -> metricConfig,
-                    metricRegistry)).setNext(rootObserver);
-
-    rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
-    //Print the observer chain
-    log.debug("Observer chain");
-    rootObserver.visit(observer -> {
-      log.debug(" Observer: {}", observer.getClass().getSimpleName());
-      if (observer instanceof FilteringObserver) {
-        log.debug("  Filters:");
-        ((FilteringObserver) observer).getFilters()
-                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
-      }
-      if (observer instanceof ListenerTriggeringObserver) {
-        log.debug("  Listeners:");
-        ((ListenerTriggeringObserver) observer).getListeners()
-                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
-      }
-    });
-  }
-
   @Override
   @SuppressWarnings("unchecked")
   public void initialize(Bootstrap<?> bootstrap) {
@@ -359,5 +314,50 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       throw new RuntimeException("Timed out waiting " + timeoutInSeconds + "s for tenant " + tenantId, e);
     }
     return sessionFactorySources;
+  }
+
+  private void setupObservers(final String tenantId,
+                              final MetricConfig metricConfig,
+                              final MetricRegistry metricRegistry,
+                              final Map<String, ShardManager> shardManagers,
+                              final Map<String, EntityMeta> initialisedEntityMeta) {
+    //Observer chain starts with filters and ends with listener invocations
+    //Terminal observer calls the actual method
+    rootObserver = new TerminalTransactionObserver();
+    if (!MapUtils.isEmpty(initialisedEntityMeta)) {
+      // Only initialise if we have initialisedEntityMeta.
+      // This won't be present in case bucketKey field itself is not present, so no need to apply this observer
+      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers),
+              initialisedEntityMeta)).setNext(rootObserver);
+    }
+    rootObserver = new ListenerTriggeringObserver(rootObserver).addListeners(
+            listeners);
+
+    for (var observer : observers) {
+      if (null == observer) {
+        return;
+      }
+      this.rootObserver = observer.setNext(rootObserver);
+    }
+    rootObserver = new TransactionMetricObserver(
+            new TransactionMetricManager(() -> metricConfig,
+                    metricRegistry)).setNext(rootObserver);
+
+    rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
+    //Print the observer chain
+    log.debug("Observer chain");
+    rootObserver.visit(observer -> {
+      log.debug(" Observer: {}", observer.getClass().getSimpleName());
+      if (observer instanceof FilteringObserver) {
+        log.debug("  Filters:");
+        ((FilteringObserver) observer).getFilters()
+                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
+      }
+      if (observer instanceof ListenerTriggeringObserver) {
+        log.debug("  Listeners:");
+        ((ListenerTriggeringObserver) observer).getListeners()
+                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
+      }
+    });
   }
 }
