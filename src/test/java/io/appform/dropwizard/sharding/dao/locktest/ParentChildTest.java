@@ -33,7 +33,6 @@ public class ParentChildTest {
     private static final String PARENT_A_VALUE = "PARENT_A";
     private static final String PARENT_B_VALUE = "PARENT_B";
     private static final String CHILD_A_COLUMN_VALUE = "CHILD-A-VALUE-1";
-    private static final String CHILD_B_COLUMN_VALUE = "CHILD-B-VALUE-2";
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
     private RelationalDao<ParentClass> parentClassRelationalDao;
@@ -95,7 +94,7 @@ public class ParentChildTest {
     @SneakyThrows
     @Test
     void testQueryingByChildColumn() {
-        List<String> childColumnValues = List.of(CHILD_A_COLUMN_VALUE, CHILD_B_COLUMN_VALUE);
+        List<String> childColumnValues = List.of(CHILD_A_COLUMN_VALUE);
 
         for (String childValue : childColumnValues) {
 //        Querying with Child column -> DOES NOT WORKS
@@ -104,9 +103,12 @@ public class ParentChildTest {
             QuerySpec<ParentClass, ParentClass> wrondQuerySpec = (queryRoot, query, criteriaBuilder) -> {
                 query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "childAColumn", childValue));
             };
-            Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            Throwable exception = Assertions.assertThrows(IllegalArgumentException.class, () -> {
                 parentClassRelationalDao.select(PARENT_KEY, wrondQuerySpec, 0, Integer.MAX_VALUE);
             });
+            String exceptionStr = exception.getMessage();
+            Assertions.assertTrue(exceptionStr.contains("Unable to locate Attribute"));
+            Assertions.assertTrue(exceptionStr.contains("childAColumn"));
         }
 
 
