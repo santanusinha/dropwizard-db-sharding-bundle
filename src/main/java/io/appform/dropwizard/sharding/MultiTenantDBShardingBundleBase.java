@@ -108,7 +108,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       var shardingOption = shardConfig.getShardingOptions();
       shardingOption = Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
       final int shardCount = shardConfig.getShards().size();
-      final int shardInitializationParallelism = fetchParallelism(shardingOption, shardCount);
+      final int shardInitializationParallelism = fetchParallelism(shardingOption);
       final var executorService = Executors.newFixedThreadPool(shardInitializationParallelism);
       try {
         final var blacklistingStore = getBlacklistingStore();
@@ -139,8 +139,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
                   }
                 }, executorService))
                 .collect(Collectors.toList());
-        final var sessionFactorySources = getSessionFactorySources(tenantId, futures,
-                shardingOption.getShardsInitializationTimeoutInSec());
+        final var sessionFactorySources = getSessionFactorySources(tenantId, futures);
         final var sessionFactoryManager = new SessionFactoryManager(sessionFactorySources);
         environment.lifecycle().manage(sessionFactoryManager);
         val sessionFactory = sessionFactorySources
@@ -258,30 +257,23 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         extraConstructorParamClasses, extraConstructorParamObjects, this.shardManagers.get(tenantId));
   }
 
-  private int fetchParallelism(final ShardingBundleOptions bundleOptions,
-                               final int shardCount) {
+  private int fetchParallelism(final ShardingBundleOptions bundleOptions) {
     final var availableCpus = Runtime.getRuntime().availableProcessors();
+    final var defaultParallelism = Math.max(1, availableCpus - 2);
     final var shardInitializationParallelism = bundleOptions.getShardInitializationParallelism();
-    if (shardInitializationParallelism == 1) {
-      if (shardCount >= availableCpus) {
-        log.warn("Shard initialization parallelism is set to 1. Detected {} available CPUs. Consider increasing " +
-                "`shardInitializationParallelism`", availableCpus);
-      } else {
-        log.warn("Shard initialization parallelism is set to 1. Detected {} maximum number of shards. Consider increasing" +
-                "`shardInitializationParallelism`", shardCount);
-      }
+    if (shardInitializationParallelism <= 0) {
+      return defaultParallelism;
     }
-    if (shardInitializationParallelism > availableCpus) {
-      log.warn("Shard initialization parallelism is set to {}. Detected {} available CPUs. " +
-              "Parallelism beyond available CPUs is not supported", shardInitializationParallelism, availableCpus);
+    if (shardInitializationParallelism > defaultParallelism) {
+      log.warn("A maximum of {} parallelism is allowed for initialization", defaultParallelism);
     }
-    return Math.min(shardInitializationParallelism, availableCpus);
+    return Math.min(shardInitializationParallelism, defaultParallelism);
   }
 
 
   private List<SessionFactorySource> getSessionFactorySources(final String tenantId,
-                                                              final List<CompletableFuture<SessionFactorySource>> futures,
-                                                              final long timeoutInSeconds) {
+                                                              final List<CompletableFuture<SessionFactorySource>> futures) {
+    final int TIMEOUT_SECONDS = 180;
     List<SessionFactorySource> sessionFactorySources;
     try {
       sessionFactorySources = CompletableFuture
@@ -291,7 +283,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
                               .map(CompletableFuture::join)
                               .collect(Collectors.toList())
               )
-              .get(timeoutInSeconds, TimeUnit.SECONDS);
+              .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException("Initialization interrupted for tenant " + tenantId, e);
@@ -299,7 +291,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       throw new RuntimeException("One or more session factories failed for tenant " + tenantId, e.getCause());
     } catch (TimeoutException e) {
       futures.forEach(f -> f.cancel(true));
-      throw new RuntimeException("Timed out waiting " + timeoutInSeconds + "s for tenant " + tenantId, e);
+      throw new RuntimeException("Timed out waiting " + TIMEOUT_SECONDS + "s for tenant " + tenantId, e);
     }
     return sessionFactorySources;
   }
