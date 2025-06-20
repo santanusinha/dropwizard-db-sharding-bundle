@@ -278,7 +278,6 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
             final var bucketId = this.bucketIdExtractor.bucketId(this.tenantId, shardingKey);
             bucketKeySetter.invoke(entity, bucketId);
         } catch (Throwable e) {
-            log.error("Error accessing/setting sharding/bucket key {}", entity.getClass().getName(), e);
             throw new RuntimeException(String.format("Error accessing/setting sharding/bucket key %s",
                     entity.getClass().getName()), e);
         }
