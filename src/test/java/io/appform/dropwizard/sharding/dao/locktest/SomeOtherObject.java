@@ -49,7 +49,7 @@ public class SomeOtherObject {
     @Column(name = "my_id")
     private String myId;
 
-    @Column(name = "value")
+    @Column(name = "`value`")
     private String value;
 
     @Builder

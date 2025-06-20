@@ -51,7 +51,7 @@ public class ScrollTestEntity {
     @Column(name = "ext_id", unique = true)
     private String externalId;
 
-    @Column(name = "value", nullable = false)
+    @Column(name = "`value`", nullable = false)
     private int value;
 
     @Override
