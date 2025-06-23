@@ -583,7 +583,8 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return A list of entities obtained by executing the query on all available shards.
      * @throws RuntimeException If an error occurs while querying the database.
      */
-    public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec) {
+    public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec, int start,
+                                 int numRows) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         return IntStream.range(0, daos.get(tenantId).size())
                 .mapToObj(shardId -> {
@@ -593,6 +594,8 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                 .getter(dao::select)
                                 .selectParam(SelectParam.<T>builder()
                                         .querySpec(querySpec)
+                                        .start(start)
+                                        .numRows(numRows)
                                         .build())
                                 .build();
                         return transactionExecutor.get(tenantId).execute(dao.sessionFactory,

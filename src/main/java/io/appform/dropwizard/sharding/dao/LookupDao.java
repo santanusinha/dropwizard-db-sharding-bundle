@@ -310,8 +310,8 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @return A list of entities obtained by executing the query on all available shards.
      * @throws java.lang.RuntimeException If an error occurs while querying the database.
      */
-    public List<T> scatterGather(final QuerySpec<T, T> querySpec) {
-        return delegate.scatterGather(dbNamespace, querySpec);
+    public List<T> scatterGather(final QuerySpec<T, T> querySpec, int start, int numRows) {
+        return delegate.scatterGather(dbNamespace, querySpec, start, numRows);
     }
 
     /**

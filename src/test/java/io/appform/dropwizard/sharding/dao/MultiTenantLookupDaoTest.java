@@ -231,7 +231,7 @@ public class MultiTenantLookupDaoTest {
   public void testScatterGatherWithQuerySpec() throws Exception {
     List<TestEntity> results = lookupDao
         .scatterGather("TENANT1", (queryRoot, query, criteriaBuilder)
-            -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")));
+            -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")), 0, Integer.MAX_VALUE);
     assertTrue(results.isEmpty());
     TestEntity testEntity = TestEntity.builder()
         .externalId("testId")
