@@ -230,7 +230,7 @@ public class LookupDaoTest {
     public void testScatterGatherWithQuerySpec() throws Exception {
         List<TestEntity> results = lookupDao
                 .scatterGather((queryRoot, query, criteriaBuilder)
-                        -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")), 0, Integer.MAX_VALUE);
+                        -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")));
         assertTrue(results.isEmpty());
         TestEntity testEntity = TestEntity.builder()
                 .externalId("testId")
@@ -242,6 +242,33 @@ public class LookupDaoTest {
         assertFalse(results.isEmpty());
         assertEquals("Some Text",
                 results.get(0)
+                        .getText());
+    }
+
+    @Test
+    public void testScatterGatherWithQuerySpecWithPagination() throws Exception {
+        List<TestEntity> results = lookupDao
+                .scatterGather((queryRoot, query, criteriaBuilder)
+                        -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")), 0, 1);
+        assertTrue(results.isEmpty());
+        TestEntity testEntity1 = TestEntity.builder()
+                .externalId("testId1")
+                .text("Some Text")
+                .build();
+        lookupDao.save(testEntity1);
+        TestEntity testEntity2 = TestEntity.builder()
+                .externalId("testId2")
+                .text("Some Text")
+                .build();
+        lookupDao.save(testEntity2);
+        results = lookupDao
+                .scatterGather((queryRoot, query, criteriaBuilder)
+                        -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")), 0, 2);
+        results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
+                .add(Restrictions.eq("text", "Some Text")));
+        assertFalse(results.isEmpty());
+        assertEquals(2, results.size());
+        assertEquals("Some Text", results.get(0)
                         .getText());
     }
 
