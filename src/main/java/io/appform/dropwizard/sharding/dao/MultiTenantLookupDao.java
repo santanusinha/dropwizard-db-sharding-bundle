@@ -584,26 +584,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If an error occurs while querying the database.
      */
     public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
-                .mapToObj(shardId -> {
-                    try {
-                        val dao = daos.get(tenantId).get(shardId);
-                        OpContext<List<T>> opContext = Select.<T, List<T>>builder()
-                                .getter(dao::select)
-                                .selectParam(SelectParam.<T>builder()
-                                        .querySpec(querySpec)
-                                        .build())
-                                .build();
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                                true,
-                                "scatterGather",
-                                opContext,
-                                shardId);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).flatMap(Collection::stream).collect(Collectors.toList());
+        return scatterGather(tenantId, querySpec, 0, Integer.MAX_VALUE);
     }
 
     /**
