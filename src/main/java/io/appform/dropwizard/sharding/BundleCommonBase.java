@@ -2,7 +2,6 @@ package io.appform.dropwizard.sharding;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
@@ -15,6 +14,21 @@ import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardingKey;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
+import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import javax.persistence.Entity;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ClassUtils;
 import org.jasypt.encryption.pbe.StandardPBEBigDecimalEncryptor;
@@ -25,45 +39,60 @@ import org.jasypt.hibernate5.encryptor.HibernatePBEEncryptorRegistry;
 import org.jasypt.iv.StringFixedIvGenerator;
 import org.reflections.Reflections;
 
-import javax.persistence.Entity;
-import java.lang.annotation.Annotation;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-
 @Slf4j
 public abstract class BundleCommonBase<T extends Configuration> implements ConfiguredBundle<T> {
 
   protected final List<TransactionListener> listeners = new ArrayList<>();
   protected final List<TransactionFilter> filters = new ArrayList<>();
-
   protected final List<TransactionObserver> observers = new ArrayList<>();
 
-  protected final List<Class<?>> initialisedEntities;
+  protected final List<Class<?>> initialisedEntities = new ArrayList<>();
+  protected final Map<String, EntityMeta> initialisedEntitiesMeta = new HashMap<>();
 
-  protected final Map<String, EntityMeta> initialisedEntitiesMeta = Maps.newHashMap();
+  private volatile boolean entityInitialisationBlocked = false;
 
   protected TransactionObserver rootObserver;
 
-  protected BundleCommonBase(Class<?> entity, Class<?>... entities) {
-    this.initialisedEntities = ImmutableList.<Class<?>>builder().add(entity).add(entities).build();
-    validateAndBuildEntitiesMeta(initialisedEntities);
+  protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
+    initialiseEntitiesAndMeta(ImmutableList.<Class<?>>builder()
+            .add(entity).add(entities).build());
   }
 
-  protected BundleCommonBase(List<String> classPathPrefixList) {
-    Set<Class<?>> entities = new Reflections(classPathPrefixList).getTypesAnnotatedWith(
-        Entity.class);
+  protected BundleCommonBase(final List<String> classPathPrefixList) {
+    final var entities = new Reflections(classPathPrefixList).getTypesAnnotatedWith(Entity.class);
     Preconditions.checkArgument(!entities.isEmpty(),
-        String.format("No entity class found at %s",
-            String.join(",", classPathPrefixList)));
-    this.initialisedEntities = ImmutableList.<Class<?>>builder().addAll(entities).build();
-    validateAndBuildEntitiesMeta(initialisedEntities);
+            String.format("No entity class found at %s", String.join(",", classPathPrefixList)));
+    initialiseEntitiesAndMeta(entities);
+  }
+
+  public final void registerEntities(@NonNull final Class<?>... entities) {
+      initialisePendingInitialisationEntitiesAndMeta(Arrays.asList(entities));
+  }
+
+  public final void registerEntities(@NonNull final List<String> classPathPrefixList) {
+      final var entities = new Reflections(classPathPrefixList).getTypesAnnotatedWith(Entity.class);
+      Preconditions.checkArgument(!entities.isEmpty(),
+              String.format("No entity class found at %s", String.join(",", classPathPrefixList)));
+      initialisePendingInitialisationEntitiesAndMeta(entities);
+  }
+
+  private synchronized void initialisePendingInitialisationEntitiesAndMeta(final Collection<Class<?>> entities) {
+    if (entityInitialisationBlocked) {
+      throw new UnsupportedOperationException("Entity registration is not supported after run method execution.");
+    }
+    final var pendingInitialisationEntities = entities.stream()
+            .filter(entity -> !this.initialisedEntities.contains(entity))
+            .collect(Collectors.toList());
+    initialiseEntitiesAndMeta(pendingInitialisationEntities);
+  }
+
+  private void initialiseEntitiesAndMeta(final Collection<Class<?>> entities) {
+    this.initialisedEntities.addAll(entities);
+    validateAndBuildEntitiesMeta(entities);
+  }
+
+  protected final synchronized void blockEntityInitialisation() {
+    this.entityInitialisationBlocked = true;
   }
 
   protected ShardBlacklistingStore getBlacklistingStore() {
@@ -71,10 +100,10 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   }
 
   public List<Class<?>> getInitialisedEntities() {
-    if (this.initialisedEntities == null) {
+    if (this.initialisedEntities.isEmpty()) {
       throw new IllegalStateException("DB sharding bundle is not initialised !");
     }
-    return this.initialisedEntities;
+    return List.copyOf(this.initialisedEntities);
   }
 
   public final void registerObserver(final TransactionObserver observer) {
@@ -166,7 +195,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     }
   }
 
-  private void validateAndBuildEntitiesMeta(final List<Class<?>> initialisedEntities) {
+  private void validateAndBuildEntitiesMeta(final Collection<Class<?>> initialisedEntities) {
     initialisedEntities.forEach(clazz -> {
       try {
         final var bucketKeyFieldEntry = fetchAndValidateAnnotateField(clazz, BucketKey.class, Integer.class);
