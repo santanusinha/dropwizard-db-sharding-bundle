@@ -55,12 +55,6 @@ import io.dropwizard.Configuration;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import lombok.val;
-import org.apache.commons.collections.MapUtils;
-import org.hibernate.SessionFactory;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +67,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+import org.apache.commons.collections.MapUtils;
+import org.hibernate.SessionFactory;
 
 /**
  * Base for Multi-Tenant sharding bundles. Clients cannot use this. Use one of the derived classes.
@@ -113,6 +112,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   @Override
   public void run(T configuration, Environment environment) {
+    this.blockEntityInitialisation();
     final var tenantedConfig = getConfig(configuration);
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
       //Encryption Support through jasypt-hibernate5
