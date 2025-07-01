@@ -23,9 +23,9 @@ import java.util.function.Supplier;
 @Builder
 public class ReadOnlyForRelationalDao<T> extends OpContext<List<T>> {
     @NonNull
-    private final Supplier<List<T>> getter;
+    private Supplier<List<T>> getter;
     @Builder.Default
-    private final List<Consumer<List<T>>> operations = Lists.newArrayList();
+    private List<Consumer<List<T>>> operations = Lists.newArrayList();
 
     @Override
     public OpType getOpType() {
