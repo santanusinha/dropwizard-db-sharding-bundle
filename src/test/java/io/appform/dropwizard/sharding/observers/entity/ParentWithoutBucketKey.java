@@ -1,4 +1,4 @@
-package io.appform.dropwizard.sharding.observers;
+package io.appform.dropwizard.sharding.observers.entity;
 
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import lombok.AllArgsConstructor;
@@ -20,18 +20,15 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Objects;
 
-/**
- *
- */
 @Entity
-@Table(name = "simple_parents")
+@Table(name = "simple_parents_without_bucketKey")
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldNameConstants
-public class SimpleParent {
+public class ParentWithoutBucketKey {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -7,6 +7,8 @@ import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.filters.TransactionFilterResult;
+import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
+import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.junit.jupiter.api.Test;
@@ -51,8 +53,6 @@ public class FilterErrorTest extends BundleBasedTestBase {
     private DBShardingBundleBase<TestConfig> createBundle() {
         val bundle = getBundle();
         bundle.initialize(bootstrap);
-        bundle.initBundles(bootstrap);
-        bundle.runBundles(testConfig, environment);
         bundle.run(testConfig, environment);
         return bundle;
     }

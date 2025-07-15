@@ -13,6 +13,9 @@ public class ShardingBundleOptions {
     private boolean skipReadOnlyTransaction = false;
 
     @Builder.Default
+    private boolean skipNativeHealthcheck = true;
+
+    @Builder.Default
     private boolean encryptionSupportEnabled = false;
 
     private String encryptionAlgorithm;
@@ -20,5 +23,7 @@ public class ShardingBundleOptions {
     private String encryptionPassword;
 
     private String encryptionIv;
+
+    private int shardInitializationParallelism;
 
 }

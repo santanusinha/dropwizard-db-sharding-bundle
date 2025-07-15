@@ -1,6 +1,7 @@
 package io.appform.dropwizard.sharding;
 
 import com.codahale.metrics.health.HealthCheckRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
@@ -45,7 +46,7 @@ public abstract class MultiTenantBundleBasedTestBase {
 
   protected abstract MultiTenantDBShardingBundleBase<TestConfig> getBundle();
 
-  private DataSourceFactory createConfig(String dbName) {
+  protected DataSourceFactory createConfig(String dbName) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
     properties.put("hibernate.hbm2ddl.auto", "create");
@@ -71,5 +72,6 @@ public abstract class MultiTenantBundleBasedTestBase {
     when(environment.healthChecks()).thenReturn(healthChecks);
     when(environment.admin()).thenReturn(adminEnvironment);
     when(bootstrap.getHealthCheckRegistry()).thenReturn(mock(HealthCheckRegistry.class));
+    when(bootstrap.getObjectMapper()).thenReturn(mock(ObjectMapper.class));
   }
 }

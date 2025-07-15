@@ -310,6 +310,23 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @return A list of entities obtained by executing the query on all available shards.
      * @throws java.lang.RuntimeException If an error occurs while querying the database.
      */
+    public List<T> scatterGather(final QuerySpec<T, T> querySpec, int start, int numRows) {
+        return delegate.scatterGather(dbNamespace, querySpec, start, numRows);
+    }
+
+    /**
+     * Performs a scatter-gather operation by executing a query on all database shards
+     * and collecting the results into a list of entities.
+     *
+     * <p>This method executes the provided QuerySpec on all available database shards serially,
+     * retrieving entities that match the query criteria from each shard. The results are then collected
+     * into a single list of entities, effectively performing a scatter-gather operation.
+     *
+     * @param querySpec The QuerySpec object representing the query criteria to be executed
+     *                  on all database shards.
+     * @return A list of entities obtained by executing the query on all available shards.
+     * @throws java.lang.RuntimeException If an error occurs while querying the database.
+     */
     public List<T> scatterGather(final QuerySpec<T, T> querySpec) {
         return delegate.scatterGather(dbNamespace, querySpec);
     }

@@ -21,6 +21,8 @@ import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEncryptedEntity;
+import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 
 public class MultiTenantLegacyDBShardingBundleWithEntityTest extends MultiTenantDBShardingBundleTestBase {
 
@@ -37,6 +39,11 @@ public class MultiTenantLegacyDBShardingBundleWithEntityTest extends MultiTenant
                     factory.getShardingOptions().setEncryptionIv("8SCaDgvH5xMD3KFE");
                 });
                 return testConfig.getShards();
+            }
+
+            @Override
+            protected ShardBlacklistingStore getBlacklistingStore() {
+                return new InMemoryLocalShardBlacklistingStore();
             }
         };
     }
