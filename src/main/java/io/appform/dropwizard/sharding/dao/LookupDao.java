@@ -310,8 +310,8 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @return A list of entities obtained by executing the query on all available shards.
      * @throws java.lang.RuntimeException If an error occurs while querying the database.
      */
-    public List<T> scatterGather(final QuerySpec<T, T> querySpec, int start, int numRows) {
-        return delegate.scatterGather(dbNamespace, querySpec, start, numRows);
+    public List<T> scatterGather(final QuerySpec<T, T> querySpec) {
+        return delegate.scatterGather(dbNamespace, querySpec);
     }
 
     /**
@@ -327,8 +327,8 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @return A list of entities obtained by executing the query on all available shards.
      * @throws java.lang.RuntimeException If an error occurs while querying the database.
      */
-    public List<T> scatterGather(final QuerySpec<T, T> querySpec) {
-        return delegate.scatterGather(dbNamespace, querySpec);
+    public List<T> scatterGather(final QuerySpec<T, T> querySpec, int start, int numRows) {
+        return delegate.scatterGather(dbNamespace, querySpec, start, numRows);
     }
 
     /**
@@ -404,6 +404,23 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     /**
+     * Counts the number of entities that match the specified criteria on each database shard.
+     *
+     * <p>This method executes a count operation on all available database shards serially,
+     * counting the entities that satisfy the provided criteria on each shard. The results are then
+     * collected into a list, where each element corresponds to the count of matching entities on
+     * a specific shard.
+     *
+     * @param criteria The DetachedCriteria object representing the criteria for counting entities.
+     * @return A list of counts, where each count corresponds to the number of entities matching
+     * the criteria on a specific shard.
+     * @throws java.lang.RuntimeException If an error occurs while querying the database.
+     */
+    public List<Long> count(QuerySpec<T, T> criteria) {
+        return delegate.count(dbNamespace, criteria);
+    }
+
+    /**
      * Run arbitrary read-only queries on all shards and return results.
      *
      * @param criteria The detached criteria. Typically, a grouping or counting query
@@ -411,6 +428,17 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     @SuppressWarnings("rawtypes")
     public Map<Integer, List<T>> run(DetachedCriteria criteria) {
+        return delegate.run(dbNamespace, criteria);
+    }
+
+    /**
+     * Run arbitrary read-only queries on all shards and return results.
+     *
+     * @param criteria The detached criteria. Typically, a grouping or counting query
+     * @return A map of shard vs result-list
+     */
+    @SuppressWarnings("rawtypes")
+    public Map<Integer, List<T>> run(QuerySpec<T, T> criteria) {
         return delegate.run(dbNamespace, criteria);
     }
 
@@ -424,6 +452,19 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     @SuppressWarnings("rawtypes")
     public <U> U run(DetachedCriteria criteria, Function<Map<Integer, List<T>>, U> translator) {
+        return delegate.run(dbNamespace, criteria, translator);
+    }
+
+    /**
+     * Run read-only queries on all shards and transform them into required types
+     *
+     * @param criteria   The detached criteria. Typically, a grouping or counting query
+     * @param translator A method to transform results to required type
+     * @param <U>        Return type
+     * @return Translated result
+     */
+    @SuppressWarnings("rawtypes")
+    public <U> U run(QuerySpec<T, T> criteria, Function<Map<Integer, List<T>>, U> translator) {
         return delegate.run(dbNamespace, criteria, translator);
     }
 

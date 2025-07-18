@@ -5,8 +5,10 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByL
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
+import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import lombok.Data;
@@ -21,6 +23,7 @@ import java.util.function.Function;
  */
 @Data
 public abstract class OpContext<T> implements Function<Session, T> {
+
   public abstract OpType getOpType();
 
   public abstract <P> P visit(OpContextVisitor<P> visitor);
@@ -71,6 +74,13 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T, R> P visit(Select<T, R> opContext);
 
+    <T, R> P visit(GetByQuerySpec<T, R> opContext);
+
+    <U, T> P visit(RunWithQuerySpec<U, T> opContext);
+
+    <T, R> P visit(GetByLookupKeyByQuerySpec<T, R> opContext);
+
+    <U, T> P visit(CreateOrUpdateByQuerySpec<U, T> opContext);
   }
 
 }
