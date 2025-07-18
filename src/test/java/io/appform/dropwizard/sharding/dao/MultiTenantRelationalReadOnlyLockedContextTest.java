@@ -9,8 +9,6 @@ import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -79,9 +77,6 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Map<String, ShardManager> shardManager = new HashMap<>();
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
-    final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
-        new ConsistentHashBucketIdExtractor<>(
-            shardManager));
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -92,12 +87,12 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
 
     companyRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class,
-        shardCalculator, shardingOptions,
+        shardManager, shardingOptions,
         shardInfoProvider, observer);
     departmentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class,
-        shardCalculator, shardingOptions,
+        shardManager, shardingOptions,
         shardInfoProvider, observer);
-    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardCalculator,
+    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardManager,
         shardingOptions,
         shardInfoProvider, observer);
   }

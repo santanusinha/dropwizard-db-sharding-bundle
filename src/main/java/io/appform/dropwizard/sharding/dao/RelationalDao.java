@@ -17,10 +17,6 @@
 
 package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
-import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
@@ -32,7 +28,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Criteria;
 import org.hibernate.Session;
-import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.lang.reflect.Field;
@@ -64,8 +59,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
     /**
      * Constructs a RelationalDao instance for managing entities across multiple shards.
      * This constructor initializes a RelationalDao instance for working with entities of the specified class
-     * distributed across multiple shards. It requires a list of session factories, a shard calculator,
-     * a shard information provider, and a transaction observer. The entity class must designate one field as
+     * distributed across multiple shards. The entity class must designate one field as
      * the primary key using the `@Id` annotation.
      *
      * @throws IllegalArgumentException If the entity class does not have exactly one field designated as @Id,
@@ -75,39 +69,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
                          final MultiTenantRelationalDao<T> delegate) {
         this.tenantId = tenantId;
         this.delegate = delegate;
-    }
-
-    /**
-     * Constructs a RelationalDao instance for managing entities across multiple shards.
-     * This constructor initializes a RelationalDao instance for working with entities of the specified class
-     * distributed across multiple shards. It requires a list of session factories, a shard calculator,
-     * a shard information provider, and a transaction observer. The entity class must designate one field as
-     * the primary key using the `@Id` annotation.
-     *
-     * @param sessionFactories  A list of SessionFactory instances for database access across shards.
-     * @param entityClass       The Class representing the type of entities managed by this RelationalDao.
-     * @param shardCalculator   A ShardCalculator instance used to determine the shard for each operation.
-     * @param shardInfoProvider A ShardInfoProvider for retrieving shard information.
-     * @param observer          A TransactionObserver for monitoring transaction events.
-     * @throws IllegalArgumentException If the entity class does not have exactly one field designated as @Id,
-     *                                  if the designated key field is not accessible, or if it is not of type String.
-     */
-    public RelationalDao(
-            List<SessionFactory> sessionFactories,
-            Class<T> entityClass,
-            ShardCalculator<String> shardCalculator,
-            ShardingBundleOptions shardingOptions,
-            final ShardInfoProvider shardInfoProvider,
-            final TransactionObserver observer) {
-        this.tenantId = DBShardingBundleBase.DEFAULT_NAMESPACE;
-        this.delegate = new MultiTenantRelationalDao<>(
-                Map.of(tenantId, sessionFactories),
-                entityClass,
-                shardCalculator,
-                Map.of(tenantId, shardingOptions),
-                Map.of(tenantId, shardInfoProvider),
-                observer
-        );
     }
 
     /**

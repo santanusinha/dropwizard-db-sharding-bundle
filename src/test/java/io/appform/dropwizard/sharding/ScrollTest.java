@@ -4,13 +4,12 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.LookupDao;
+import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.ScrollTestEntity;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.hibernate.SessionFactory;
@@ -26,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,14 +50,14 @@ public class ScrollTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         val shardManager = new BalancedShardManager(sessionFactories.size());
-        val shardCalculator = new ShardCalculator<String>(shardManager,
-                                                          new ConsistentHashBucketIdExtractor<>(
-                                                                  shardManager));
         val shardingOptions = new ShardingBundleOptions();
         val shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TerminalTransactionObserver();
-        lookupDao = new LookupDao<>(sessionFactories, ScrollTestEntity.class, shardCalculator, shardingOptions,
-                                    shardInfoProvider, observer);
+        lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        ScrollTestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), observer));
     }
 
     @Test

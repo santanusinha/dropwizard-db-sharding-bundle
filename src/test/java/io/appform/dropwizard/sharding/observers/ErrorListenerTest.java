@@ -6,6 +6,8 @@ import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
+import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
+import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -136,8 +138,6 @@ public class ErrorListenerTest extends BundleBasedTestBase {
     private DBShardingBundleBase<TestConfig> createBundle() {
         val bundle = getBundle();
         bundle.initialize(bootstrap);
-        bundle.initBundles(bootstrap);
-        bundle.runBundles(testConfig, environment);
         bundle.run(testConfig, environment);
         return bundle;
     }

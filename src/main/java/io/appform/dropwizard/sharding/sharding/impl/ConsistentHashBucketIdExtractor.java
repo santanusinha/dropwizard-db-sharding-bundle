@@ -18,7 +18,6 @@
 package io.appform.dropwizard.sharding.sharding.impl;
 
 import com.google.common.hash.Hashing;
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 
@@ -32,20 +31,8 @@ public class ConsistentHashBucketIdExtractor<T> implements BucketIdExtractor<T> 
 
     private final Map<String, ShardManager> shardManagers;
 
-    public ConsistentHashBucketIdExtractor(ShardManager shardManager) {
-        this(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
-    }
-
     public ConsistentHashBucketIdExtractor(Map<String, ShardManager> shardManagers) {
         this.shardManagers = shardManagers;
-    }
-
-
-    @Override
-    public int bucketId(T id) {
-        int hashKey = Hashing.murmur3_128().hashString(id.toString(), StandardCharsets.UTF_8).asInt();
-        hashKey *= hashKey < 0 ? -1 : 1;
-        return hashKey % shardManagers.get(DBShardingBundleBase.DEFAULT_NAMESPACE).numBuckets();
     }
 
     @Override

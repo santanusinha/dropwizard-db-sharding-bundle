@@ -51,10 +51,11 @@ import io.appform.dropwizard.sharding.scroll.FieldComparator;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.scroll.ScrollResultItem;
+import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.appform.dropwizard.sharding.utils.InternalUtils;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
-import io.dropwizard.hibernate.AbstractDAO;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
@@ -288,8 +289,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      *                           shards.
      * @param entityClass        The Class representing the type of entities managed by this
      *                           RelationalDao.
-     * @param shardCalculator    A ShardCalculator instance used to determine the shard for each
-     *                           operation.
+     * @param shardManagers      A map of ShardManager to instantiate ShardCalculator.
      * @param shardInfoProviders A ShardInfoProvider for retrieving shard information.
      * @param observer           A TransactionObserver for monitoring transaction events.
      * @throws IllegalArgumentException If the entity class does not have exactly one field designated
@@ -299,11 +299,11 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     public MultiTenantRelationalDao(
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
-            ShardCalculator<String> shardCalculator,
+            Map<String, ShardManager> shardManagers,
             Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
-        this.shardCalculator = shardCalculator;
+        this.shardCalculator = new ShardCalculator<>(shardManagers, new ConsistentHashBucketIdExtractor<>(shardManagers));
         this.shardingOptions = shardingOptions;
         sessionFactories.forEach((tenantId, factories) -> daos.put(tenantId,
                 factories.stream().map(RelationalDaoPriv::new).collect(Collectors.toList())));

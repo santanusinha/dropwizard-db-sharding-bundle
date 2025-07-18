@@ -1,5 +1,7 @@
-package io.appform.dropwizard.sharding.observers;
+package io.appform.dropwizard.sharding.observers.entity;
 
+import io.appform.dropwizard.sharding.sharding.BucketKey;
+import io.appform.dropwizard.sharding.sharding.ShardingKey;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -26,16 +28,20 @@ import java.util.Objects;
 @ToString
 @RequiredArgsConstructor
 public class SimpleChild {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @Column
+    @ShardingKey
     private String parent;
 
     @Column (name = "`value`")
     private String value;
+
+    @Column
+    @BucketKey
+    private int bucketKey;
 
     @Override
     public final boolean equals(Object o) {

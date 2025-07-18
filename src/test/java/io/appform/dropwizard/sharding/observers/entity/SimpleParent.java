@@ -1,5 +1,6 @@
-package io.appform.dropwizard.sharding.observers;
+package io.appform.dropwizard.sharding.observers.entity;
 
+import io.appform.dropwizard.sharding.sharding.BucketKey;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -40,6 +41,10 @@ public class SimpleParent {
     @Column
     @LookupKey
     private String name;
+
+    @Column
+    @BucketKey
+    private int bucketKey;
 
     @Transient
     private Collection<SimpleChild> children = new ArrayList<>();

@@ -18,16 +18,31 @@
 package io.appform.dropwizard.sharding;
 
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
+import org.junit.jupiter.api.Test;
 
-public class LegacyMultiTenantDBShardingBundleWithAnnotationTest extends MultiTenantDBShardingBundleTestBase {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+public class MultiTenantBalancedDbShardingBundleWithNoopBlacklistingStoreTest extends MultiTenantBundleBasedTestBase {
 
     @Override
     protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
-        return new MultiTenantDBShardingBundle<TestConfig>("io.appform.dropwizard.sharding.dao.testdata.entities") {
+        return new MultiTenantBalancedDBShardingBundle<TestConfig>("io.appform.dropwizard.sharding.dao.testdata.entities", "io.appform.dropwizard.sharding.dao.testdata.multi") {
             @Override
             protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
                 return testConfig.getShards();
             }
         };
+    }
+
+    @Test
+    public void testHealthCheck() throws Exception {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+        //one for each tenant
+        assertEquals(2, bundle.healthStatus().size());
+        //2 shards for each tenant
+        assertEquals(2, bundle.healthStatus().get("TENANT1").size());
+        assertEquals(2, bundle.healthStatus().get("TENANT2").size());
     }
 }

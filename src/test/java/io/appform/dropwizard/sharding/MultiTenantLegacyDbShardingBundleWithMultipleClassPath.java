@@ -21,6 +21,8 @@ import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.multi.MultiPackageTestEntity;
+import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -40,6 +42,11 @@ public class MultiTenantLegacyDbShardingBundleWithMultipleClassPath extends
       protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
         return testConfig.getShards();
       }
+
+      @Override
+      protected ShardBlacklistingStore getBlacklistingStore() {
+        return new InMemoryLocalShardBlacklistingStore();
+      }
     };
   }
 
@@ -49,8 +56,6 @@ public class MultiTenantLegacyDbShardingBundleWithMultipleClassPath extends
     MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
 
     bundle.initialize(bootstrap);
-    bundle.initBundles(bootstrap);
-    bundle.runBundles(testConfig, environment);
     bundle.run(testConfig, environment);
     MultiTenantLookupDao<MultiPackageTestEntity> lookupDao = bundle.createParentObjectDao(
         MultiPackageTestEntity.class);

@@ -17,6 +17,9 @@
 
 package io.appform.dropwizard.sharding;
 
+import com.codahale.metrics.MetricRegistry;
+import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module;
+import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module.Feature;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -27,35 +30,46 @@ import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.MetricConfig;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
+import io.appform.dropwizard.sharding.dao.AbstractDAO;
 import io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantCacheableRelationalDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
-import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
+import io.appform.dropwizard.sharding.hibernate.SessionFactoryFactory;
+import io.appform.dropwizard.sharding.hibernate.SessionFactoryManager;
+import io.appform.dropwizard.sharding.hibernate.SessionFactorySource;
+import io.appform.dropwizard.sharding.metrics.TransactionMetricManager;
+import io.appform.dropwizard.sharding.metrics.TransactionMetricObserver;
+import io.appform.dropwizard.sharding.observers.bucket.BucketKeyObserver;
+import io.appform.dropwizard.sharding.observers.bucket.BucketKeyPersistor;
+import io.appform.dropwizard.sharding.observers.internal.FilteringObserver;
+import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import io.appform.dropwizard.sharding.sharding.impl.MultiTenantConsistentHashBucketIdExtractor;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
-import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.db.PooledDataSourceFactory;
-import io.dropwizard.hibernate.AbstractDAO;
-import io.dropwizard.hibernate.HibernateBundle;
-import io.dropwizard.hibernate.SessionFactoryFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import org.apache.commons.collections.MapUtils;
 import org.hibernate.SessionFactory;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -66,8 +80,6 @@ import java.util.stream.IntStream;
 @Slf4j
 public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends
     BundleCommonBase<T> {
-
-  private Map<String, List<HibernateBundle<T>>> shardBundles = Maps.newHashMap();
 
   @Getter
   private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
@@ -101,96 +113,90 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   @Override
   public void run(T configuration, Environment environment) {
-    val tenantedConfig = getConfig(configuration);
+    final var tenantedConfig = getConfig(configuration);
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
-      var blacklistingStore = getBlacklistingStore();
-      var shardManager = createShardManager(shardConfig.getShards().size(), blacklistingStore);
-      this.shardManagers.put(tenantId, shardManager);
-      val shardInfoProvider = new ShardInfoProvider(tenantId);
-      shardInfoProviders.put(tenantId, shardInfoProvider);
-      var healthCheckManager = new HealthCheckManager(tenantId, shardInfoProvider,
-          blacklistingStore,
-          shardManager);
-      healthCheckManagers.put(tenantId, healthCheckManager);
       //Encryption Support through jasypt-hibernate5
       var shardingOption = shardConfig.getShardingOptions();
-      shardingOption =
-          Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
-      List<HibernateBundle<T>> shardedBundle = IntStream.range(0, shardConfig.getShards().size())
-          .mapToObj(
-              shard ->
-                  new HibernateBundle<T>(initialisedEntities, new SessionFactoryFactory()) {
-                    @Override
-                    protected String name() {
-                      return shardInfoProvider.shardName(shard);
-                    }
+      shardingOption = Objects.nonNull(shardingOption) ? shardingOption : new ShardingBundleOptions();
+      final int shardCount = shardConfig.getShards().size();
+      final int shardInitializationParallelism = fetchParallelism(shardingOption);
+      final var executorService = Executors.newFixedThreadPool(shardInitializationParallelism);
+      try {
+        final var blacklistingStore = getBlacklistingStore();
+        final var shardManager = createShardManager(shardCount, blacklistingStore);
+        this.shardManagers.put(tenantId, shardManager);
+        final var shardInfoProvider = new ShardInfoProvider(tenantId);
+        this.shardInfoProviders.put(tenantId, shardInfoProvider);
+        final var healthCheckManager = new HealthCheckManager(tenantId, environment, shardInfoProvider,
+                blacklistingStore, shardingOption);
+        healthCheckManagers.put(tenantId, healthCheckManager);
+        final List<CompletableFuture<SessionFactorySource>> futures = IntStream.range(0, shardCount)
+                .mapToObj(shard -> CompletableFuture.supplyAsync(() -> {
+                  try {
+                    return new SessionFactoryFactory<T>(initialisedEntities, healthCheckManager) {
+                      @Override
+                      protected String name() {
+                        return shardInfoProvider.shardName(shard);
+                      }
 
-                    @Override
-                    public PooledDataSourceFactory getDataSourceFactory(T t) {
-                      return shardConfig.getShards().get(shard);
-                    }
-                  }).collect(Collectors.toList());
-      shardedBundle.forEach(hibernateBundle -> {
-        try {
-          hibernateBundle.run(configuration, environment);
-        } catch (Exception e) {
-          log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
-          throw new RuntimeException(e);
+                      @Override
+                      public PooledDataSourceFactory getDataSourceFactory(T t) {
+                        return shardConfig.getShards().get(shard);
+                      }
+                    }.build(configuration, environment);
+                  } catch (Exception e) {
+                    log.error("Failed to build session factory for shard {}", shard, e);
+                    throw new RuntimeException("Shard " + shard + " build failed", e);
+                  }
+                }, executorService))
+                .collect(Collectors.toList());
+        final var sessionFactorySources = getSessionFactorySources(tenantId, futures);
+        final var sessionFactoryManager = new SessionFactoryManager(sessionFactorySources);
+        environment.lifecycle().manage(sessionFactoryManager);
+        val sessionFactory = sessionFactorySources
+                .stream()
+                .map(SessionFactorySource::getFactory)
+                .collect(Collectors.toList());
+        sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
+        if (shardingOption.isEncryptionSupportEnabled()) {
+          Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
+                  "Encryption IV Should be 16 bytes long");
+          registerStringEncryptor(tenantId, shardingOption);
+          registerBigIntegerEncryptor(tenantId, shardingOption);
+          registerBigDecimalEncryptor(tenantId, shardingOption);
+          registerByteEncryptor(tenantId, shardingOption);
         }
-      });
-      this.shardBundles.put(tenantId, shardedBundle);
-      val sessionFactory = shardedBundle.stream().map(HibernateBundle::getSessionFactory)
-          .collect(Collectors.toList());
-      sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
-      if (shardingOption.isEncryptionSupportEnabled()) {
-        Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
-            "Encryption IV Should be 16 bytes long");
-        registerStringEncryptor(tenantId, shardingOption);
-        registerBigIntegerEncryptor(tenantId, shardingOption);
-        registerBigDecimalEncryptor(tenantId, shardingOption);
-        registerByteEncryptor(tenantId, shardingOption);
+        this.sessionFactories.put(tenantId, sessionFactory);
+        this.shardingOptions.put(tenantId, shardingOption);
+        setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), this.shardManagers,
+              this.initialisedEntitiesMeta);
+        environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
+        environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
+      } finally {
+        executorService.shutdown();
+        try {
+          if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+            executorService.shutdownNow();
+          }
+        } catch (InterruptedException e) {
+          executorService.shutdownNow();
+          Thread.currentThread().interrupt();
+        }
       }
-      this.sessionFactories.put(tenantId, sessionFactory);
-      this.shardingOptions.put(tenantId, shardingOption);
-      healthCheckManager.manageHealthChecks(shardConfig.getBlacklist(), environment);
-      setupObservers(shardConfig.getMetricConfig(), environment.metrics());
-      environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
-      environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
     });
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public void initialize(Bootstrap<?> bootstrap) {
-    healthCheckManagers.values().forEach(healthCheckManager -> {
-      bootstrap.getHealthCheckRegistry().addListener(healthCheckManager);
-    });
-    shardBundles.values().forEach(
-        hibernateBundle -> bootstrap.addBundle((ConfiguredBundle) hibernateBundle));
+    // Registers the Hibernate5Module with Jackson's ObjectMapper to support serialization of Hibernate entities.
+    // Enables FORCE_LAZY_LOADING to automatically fetch and serialize lazy-loaded associations (e.g., @OneToMany(fetch = LAZY))
+    // during JSON serialization, as long as the Hibernate session is still open.
+    bootstrap.getObjectMapper().registerModule(new Hibernate5Module().enable(Feature.FORCE_LAZY_LOADING));
   }
 
   @VisibleForTesting
-  public void runBundles(T configuration, Environment environment) {
-    shardBundles.forEach((tenantId, hibernateBundles) -> {
-      log.info("Running hibernate bundles for tenant: {}", tenantId);
-      hibernateBundles.forEach(hibernateBundle -> {
-        try {
-          hibernateBundle.run(configuration, environment);
-        } catch (Exception e) {
-          log.error("Error initializing db sharding bundle for tenant {}", tenantId, e);
-          throw new RuntimeException(e);
-        }
-      });
-    });
-  }
-
-  @VisibleForTesting
-  public void initBundles(Bootstrap bootstrap) {
-    initialize(bootstrap);
-  }
-
-  @VisibleForTesting
-  public Map<String, Map<Integer, Boolean>> healthStatus() {
+  protected Map<String, Map<Integer, Boolean>> healthStatus() {
     return healthCheckManagers.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().status()));
   }
@@ -204,8 +210,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public <EntityType, T extends Configuration>
   MultiTenantLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
     return new MultiTenantLookupDao<>(this.sessionFactories, clazz,
-        new ShardCalculator<>(this.shardManagers,
-            new MultiTenantConsistentHashBucketIdExtractor<>(this.shardManagers)),
+        this.shardManagers,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
@@ -215,47 +220,17 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   MultiTenantCacheableLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz,
       Map<String, LookupCache<EntityType>> cacheManager) {
     return new MultiTenantCacheableLookupDao<>(this.sessionFactories,
-        clazz,
-        new ShardCalculator<>(this.shardManagers,
-            new MultiTenantConsistentHashBucketIdExtractor<>(this.shardManagers)),
+        clazz, this.shardManagers,
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
   }
-
-  public <EntityType, T extends Configuration>
-  MultiTenantLookupDao<EntityType> createParentObjectDao(
-      Class<EntityType> clazz,
-      BucketIdExtractor<String> bucketIdExtractor) {
-    return new MultiTenantLookupDao<>(this.sessionFactories,
-        clazz,
-        new ShardCalculator<>(this.shardManagers, bucketIdExtractor),
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
-
-  public <EntityType, T extends Configuration>
-  MultiTenantCacheableLookupDao<EntityType> createParentObjectDao(
-      Class<EntityType> clazz,
-      BucketIdExtractor<String> bucketIdExtractor,
-      Map<String, LookupCache<EntityType>> cacheManager) {
-    return new MultiTenantCacheableLookupDao<>(this.sessionFactories,
-        clazz,
-        new ShardCalculator<>(this.shardManagers, bucketIdExtractor),
-        cacheManager,
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
-
 
   public <EntityType, T extends Configuration>
   MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
     return new MultiTenantRelationalDao<>(this.sessionFactories, clazz,
-        new ShardCalculator<>(this.shardManagers,
-            new ConsistentHashBucketIdExtractor<>(this.shardManagers)),
+        this.shardManagers,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
@@ -267,58 +242,19 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       Map<String, RelationalCache<EntityType>> cacheManager) {
     return new MultiTenantCacheableRelationalDao<>(this.sessionFactories,
         clazz,
-        new ShardCalculator<>(this.shardManagers,
-            new ConsistentHashBucketIdExtractor<>(this.shardManagers)),
+        this.shardManagers,
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
   }
-
-  public <EntityType, T extends Configuration>
-  MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz,
-      BucketIdExtractor<String> bucketIdExtractor) {
-    return new MultiTenantRelationalDao<>(this.sessionFactories,
-        clazz,
-        new ShardCalculator<>(this.shardManagers, bucketIdExtractor),
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
-
-  public <EntityType, T extends Configuration>
-  MultiTenantCacheableRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz,
-      BucketIdExtractor<String> bucketIdExtractor,
-      Map<String, RelationalCache<EntityType>> cacheManager) {
-    return new MultiTenantCacheableRelationalDao<>(this.sessionFactories,
-        clazz,
-        new ShardCalculator<>(this.shardManagers, bucketIdExtractor),
-        cacheManager,
-        this.shardingOptions,
-        shardInfoProviders,
-        rootObserver);
-  }
-
 
   public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
   WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId, Class<DaoType> daoTypeClass) {
-    Preconditions.checkArgument(this.sessionFactories.containsKey(tenantId),
-        "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId),
-        daoTypeClass,
-        new ShardCalculator<>(this.shardManagers,
-            new ConsistentHashBucketIdExtractor<>(this.shardManagers)));
-  }
-
-  public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
-  WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId,
-      Class<DaoType> daoTypeClass,
-      BucketIdExtractor<String> bucketIdExtractor) {
-    Preconditions.checkArgument(this.sessionFactories.containsKey(tenantId),
-        "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId),
-        daoTypeClass,
-        new ShardCalculator<>(this.shardManagers, bucketIdExtractor));
+    Preconditions.checkArgument(
+            this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
+            "Unknown tenant: " + tenantId);
+    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass, this.shardManagers.get(tenantId));
   }
 
   public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
@@ -326,11 +262,94 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       Class<DaoType> daoTypeClass,
       Class[] extraConstructorParamClasses,
       Class[] extraConstructorParamObjects) {
-    Preconditions.checkArgument(this.sessionFactories.containsKey(tenantId),
-        "Unknown tenant: " + tenantId);
+    Preconditions.checkArgument(
+            this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
+            "Unknown tenant: " + tenantId);
     return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
-        extraConstructorParamClasses, extraConstructorParamObjects,
-        new ShardCalculator<>(this.shardManagers,
-            new ConsistentHashBucketIdExtractor<>(this.shardManagers)));
+        extraConstructorParamClasses, extraConstructorParamObjects, this.shardManagers.get(tenantId));
+  }
+
+  private int fetchParallelism(final ShardingBundleOptions bundleOptions) {
+    final var availableCpus = Runtime.getRuntime().availableProcessors();
+    final var defaultParallelism = Math.max(1, availableCpus - 2);
+    final var shardInitializationParallelism = bundleOptions.getShardInitializationParallelism();
+    if (shardInitializationParallelism <= 0) {
+      return defaultParallelism;
+    }
+    if (shardInitializationParallelism > defaultParallelism) {
+      log.warn("A maximum of {} parallelism is allowed for initialization", defaultParallelism);
+    }
+    return Math.min(shardInitializationParallelism, defaultParallelism);
+  }
+
+
+  private List<SessionFactorySource> getSessionFactorySources(final String tenantId,
+                                                              final List<CompletableFuture<SessionFactorySource>> futures) {
+    final int TIMEOUT_SECONDS = 180;
+    List<SessionFactorySource> sessionFactorySources;
+    try {
+      sessionFactorySources = CompletableFuture
+              .allOf(futures.toArray(new CompletableFuture[0]))
+              .thenApply(ignored ->
+                      futures.stream()
+                              .map(CompletableFuture::join)
+                              .collect(Collectors.toList())
+              )
+              .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Initialization interrupted for tenant " + tenantId, e);
+    } catch (ExecutionException e) {
+      throw new RuntimeException("One or more session factories failed for tenant " + tenantId, e.getCause());
+    } catch (TimeoutException e) {
+      futures.forEach(f -> f.cancel(true));
+      throw new RuntimeException("Timed out waiting " + TIMEOUT_SECONDS + "s for tenant " + tenantId, e);
+    }
+    return sessionFactorySources;
+  }
+
+  private void setupObservers(final String tenantId,
+                              final MetricConfig metricConfig,
+                              final MetricRegistry metricRegistry,
+                              final Map<String, ShardManager> shardManagers,
+                              final Map<String, EntityMeta> initialisedEntityMeta) {
+    //Observer chain starts with filters and ends with listener invocations
+    //Terminal observer calls the actual method
+    rootObserver = new TerminalTransactionObserver();
+    if (!MapUtils.isEmpty(initialisedEntityMeta)) {
+      // Only initialise if we have initialisedEntityMeta.
+      // This won't be present in case bucketKey field itself is not present, so no need to apply this observer
+      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers),
+              initialisedEntityMeta)).setNext(rootObserver);
+    }
+    rootObserver = new ListenerTriggeringObserver(rootObserver).addListeners(
+            listeners);
+
+    for (var observer : observers) {
+      if (null == observer) {
+        return;
+      }
+      this.rootObserver = observer.setNext(rootObserver);
+    }
+    rootObserver = new TransactionMetricObserver(
+            new TransactionMetricManager(() -> metricConfig,
+                    metricRegistry)).setNext(rootObserver);
+
+    rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
+    //Print the observer chain
+    log.debug("Observer chain");
+    rootObserver.visit(observer -> {
+      log.debug(" Observer: {}", observer.getClass().getSimpleName());
+      if (observer instanceof FilteringObserver) {
+        log.debug("  Filters:");
+        ((FilteringObserver) observer).getFilters()
+                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
+      }
+      if (observer instanceof ListenerTriggeringObserver) {
+        log.debug("  Listeners:");
+        ((ListenerTriggeringObserver) observer).getListeners()
+                .forEach(filter -> log.debug("    - {}", filter.getClass().getSimpleName()));
+      }
+    });
   }
 }

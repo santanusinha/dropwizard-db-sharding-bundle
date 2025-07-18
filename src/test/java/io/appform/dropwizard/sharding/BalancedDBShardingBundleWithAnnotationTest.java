@@ -18,6 +18,8 @@
 package io.appform.dropwizard.sharding;
 
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
+import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 
 /**
  * Created by tushar.mandar on 4/25/17.
@@ -30,6 +32,11 @@ public class BalancedDBShardingBundleWithAnnotationTest extends DBShardingBundle
             @Override
             protected ShardedHibernateFactory getConfig(TestConfig config) {
                 return testConfig.getShards();
+            }
+
+            @Override
+            protected ShardBlacklistingStore getBlacklistingStore() {
+                return new InMemoryLocalShardBlacklistingStore();
             }
         };
     }

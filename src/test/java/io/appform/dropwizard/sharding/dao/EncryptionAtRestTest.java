@@ -1,6 +1,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.Lists;
+import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
@@ -9,8 +10,6 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEncryptedEntity;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -24,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,15 +66,16 @@ public class EncryptionAtRestTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        final ShardCalculator<String> shardCalculator = new ShardCalculator<>(shardManager,
-                new ConsistentHashBucketIdExtractor<>(
-                        shardManager));
-
         final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
-        lookupDao = new LookupDao<>(sessionFactories, TestEncryptedEntity.class, shardCalculator, shardingOptions,
-                shardInfoProvider, observer);
+        lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        TestEncryptedEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
+                        observer));
+
     }
 
     @AfterEach

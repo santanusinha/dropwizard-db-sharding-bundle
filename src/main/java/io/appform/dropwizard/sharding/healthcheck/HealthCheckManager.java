@@ -1,103 +1,70 @@
 package io.appform.dropwizard.sharding.healthcheck;
 
 import com.codahale.metrics.health.HealthCheck;
-import com.codahale.metrics.health.HealthCheckRegistryListener;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.BlacklistConfig;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
+import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.dropwizard.hibernate.SessionFactoryHealthCheck;
 import io.dropwizard.setup.Environment;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
 
 import java.util.AbstractMap;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
-public class HealthCheckManager implements HealthCheckRegistryListener {
+public class HealthCheckManager {
 
     private final String namespace;
-    private final Map<String, ShardHealthCheckMeta> dbHealthChecks = new HashMap<>();
-    private final Map<String, ShardHealthCheckMeta> wrappedHealthChecks = new HashMap<>();
+    private final Environment environment;
     private final ShardInfoProvider shardInfoProvider;
     private final ShardBlacklistingStore blacklistingStore;
-    private final ShardManager shardManager;
+    private final ShardingBundleOptions shardingBundleOptions;
+
+    private final Map<String, ShardHealthCheckMeta> dbHealthChecks = new ConcurrentHashMap<>();
 
     public HealthCheckManager(final String namespace,
+                              final Environment environment,
                               final ShardInfoProvider shardInfoProvider,
                               final ShardBlacklistingStore blacklistingStore,
-                              final ShardManager shardManager) {
+                              final ShardingBundleOptions shardingBundleOptions) {
         this.namespace = namespace;
+        this.environment = environment;
         this.shardInfoProvider = shardInfoProvider;
         this.blacklistingStore = blacklistingStore;
-        this.shardManager = shardManager;
+        this.shardingBundleOptions = shardingBundleOptions;
     }
 
-
-    @Override
-    public void onHealthCheckAdded(final String name,
-                                   final HealthCheck healthCheck) {
-        if (!(healthCheck instanceof SessionFactoryHealthCheck)) {
+    public void register(final String name,
+                         final HealthCheck healthCheck) {
+        /*
+         * If skipNativeHealthcheck is set, or blacklisting store is not NoopShardBlacklistingStore
+         * we don't register any health checks
+         */
+        if (shardingBundleOptions.isSkipNativeHealthcheck() ||
+                !(blacklistingStore instanceof NoopShardBlacklistingStore)) {
             return;
         }
-
-        String dbNamespace = shardInfoProvider.namespace(name);
+        final var dbNamespace = shardInfoProvider.namespace(name);
         if (!Objects.equals(dbNamespace, this.namespace)) {
             return;
         }
-
-        int shardId = shardInfoProvider.shardId(name);
+        final var shardId = shardInfoProvider.shardId(name);
         if (shardId == -1) {
             return;
         }
-
-        log.info("db health check added {}", shardId);
         dbHealthChecks.put(name, ShardHealthCheckMeta.builder()
                 .healthCheck(healthCheck)
                 .shardId(shardId)
                 .build());
+        environment.healthChecks().register(name, healthCheck);
+
     }
-
-    @Override
-    public void onHealthCheckRemoved(final String name,
-                                     final HealthCheck healthCheck) {
-        /*
-        nothing needs to be done here
-        */
-    }
-
-    public void manageHealthChecks(final BlacklistConfig blacklistConfig,
-                                   final Environment environment) {
-        if (blacklistingStore == null) {
-            wrappedHealthChecks.putAll(dbHealthChecks);
-            return;
-        }
-
-        val blacklistingConfig = blacklistConfig != null
-                ? blacklistConfig
-                : BlacklistConfig.builder().skipNativeHealthcheck(false).build();
-
-        dbHealthChecks.forEach((name, healthCheck) -> {
-            environment.healthChecks().unregister(name);
-            val hc = new BlacklistingAwareHealthCheck(healthCheck.getShardId(),
-                    healthCheck.getHealthCheck(),
-                    shardManager,
-                    blacklistingConfig);
-            environment.healthChecks().register(name, hc);
-            wrappedHealthChecks.put(name, ShardHealthCheckMeta.builder()
-                    .healthCheck(hc)
-                    .shardId(healthCheck.getShardId())
-                    .build());
-        });
-    }
-
 
     public Map<Integer, Boolean> status() {
-        return wrappedHealthChecks.values()
+        return dbHealthChecks.values()
                 .stream()
                 .map(shardHealthCheckMeta -> new AbstractMap.SimpleEntry<>(shardHealthCheckMeta.getShardId(),
                         shardHealthCheckMeta.getHealthCheck().execute().isHealthy()))

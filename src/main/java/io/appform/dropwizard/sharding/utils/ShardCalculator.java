@@ -33,10 +33,6 @@ public class ShardCalculator<T> {
     private final Map<String, ShardManager> shardManagers;
     private final BucketIdExtractor<T> extractor;
 
-    public ShardCalculator(ShardManager shardManager, BucketIdExtractor<T> extractor) {
-        this(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager), extractor);
-    }
-
     public ShardCalculator(Map<String, ShardManager> shardManagers, BucketIdExtractor<T> extractor) {
         this.shardManagers = shardManagers;
         this.extractor = extractor;
@@ -52,7 +48,12 @@ public class ShardCalculator<T> {
     }
 
     public boolean isOnValidShard(T key) {
-        int bucketId = extractor.bucketId(key);
+        int bucketId = extractor.bucketId(DBShardingBundleBase.DEFAULT_NAMESPACE, key);
         return shardManagers.get(DBShardingBundleBase.DEFAULT_NAMESPACE).isMappedToValidShard(bucketId);
+    }
+
+    public boolean isOnValidShard(String tenantId, T key) {
+        int bucketId = extractor.bucketId(tenantId, key);
+        return shardManagers.get(tenantId).isMappedToValidShard(bucketId);
     }
 }
