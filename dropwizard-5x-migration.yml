@@ -8,6 +8,9 @@ tags:
   - java
 
 recipeList:
+  - org.openrewrite.maven.ChangePropertyValue:
+      key: dropwizard.version
+      newValue: 5.0.0-rc.3
   - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
       oldGroupId: org.hibernate
       oldArtifactId: hibernate-core
