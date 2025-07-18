@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - Replaced `dropwizard-hibernate` with direct use of `hibernate-core`.
+
+  **Reason**: `dropwizard-hibernate` is a Dropwizard bundle.
+  - With `-Db.shards` deprecated in favor of multi-tenancy, shard configuration is only available during `run()`. This meant Hibernate bundles couldn't be initialized in `initialize()`, violating Dropwizard lifecycle expectations. 
+  - Parallel initialization of SessionFactory instances was previously not feasible, as Dropwizard requires all bundles to be registered sequentially, and the Environment's managedObjects is not thread-safe.
+  
 - Added support for parallel `SessionFactory` initialization per tenant.
 - Introduced `BucketObserver` support:
   - Bucket IDs are now automatically populated in the column annotated with `@BucketKey`.

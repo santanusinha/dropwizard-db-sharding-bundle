@@ -230,20 +230,38 @@ public class MultiTenantLookupDaoTest {
   @Test
   public void testScatterGatherWithQuerySpec() throws Exception {
     List<TestEntity> results = lookupDao
-        .scatterGather("TENANT1", (queryRoot, query, criteriaBuilder)
-            -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")));
+            .scatterGather("TENANT1", (queryRoot, query, criteriaBuilder)
+                    -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")));
     assertTrue(results.isEmpty());
     TestEntity testEntity = TestEntity.builder()
-        .externalId("testId")
-        .text("Some Text")
-        .build();
+            .externalId("testId")
+            .text("Some Text")
+            .build();
     lookupDao.save("TENANT1", testEntity);
     results = lookupDao.scatterGather("TENANT1", DetachedCriteria.forClass(TestEntity.class)
-        .add(Restrictions.eq("externalId", "testId")));
+            .add(Restrictions.eq("externalId", "testId")));
     assertFalse(results.isEmpty());
     assertEquals("Some Text",
-        results.get(0)
-            .getText());
+            results.get(0)
+                    .getText());
+  }
+  @Test
+  public void testScatterGatherWithQuerySpecWithPagination() throws Exception {
+    List<TestEntity> results = lookupDao
+            .scatterGather("TENANT1", (queryRoot, query, criteriaBuilder)
+                    -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")), 0, Integer.MAX_VALUE);
+    assertTrue(results.isEmpty());
+    TestEntity testEntity = TestEntity.builder()
+            .externalId("testId")
+            .text("Some Text")
+            .build();
+    lookupDao.save("TENANT1", testEntity);
+    results = lookupDao.scatterGather("TENANT1", DetachedCriteria.forClass(TestEntity.class)
+            .add(Restrictions.eq("externalId", "testId")));
+    assertFalse(results.isEmpty());
+    assertEquals("Some Text",
+            results.get(0)
+                    .getText());
   }
 
   @Test

@@ -38,6 +38,8 @@ public class MultiTenantBalancedDbShardingBundleWithNoopBlacklistingStoreTest ex
     public void testHealthCheck() throws Exception {
         MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
+        testConfig.getShards().getTenants().forEach((tenant, factory)
+                -> factory.getShardingOptions().setSkipNativeHealthcheck(false));
         bundle.run(testConfig, environment);
         //one for each tenant
         assertEquals(2, bundle.healthStatus().size());

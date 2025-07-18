@@ -41,6 +41,7 @@ public class BalancedDBShardingBundleWithNoopBlacklistingStoreTest extends Bundl
     public void testBundleWithShardBlacklisted() throws Exception {
         DBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
+        testConfig.getShards().getShardingOptions().setSkipNativeHealthcheck(false);
         bundle.run(testConfig, environment);
         bundle.getShardManager().blacklistShard(1);
         //one for each shard

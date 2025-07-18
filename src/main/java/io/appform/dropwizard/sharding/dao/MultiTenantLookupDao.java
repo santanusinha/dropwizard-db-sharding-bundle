@@ -584,6 +584,27 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If an error occurs while querying the database.
      */
     public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec) {
+        return scatterGather(tenantId, querySpec, 0, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Performs a scatter-gather operation by executing a query on all database shards and collecting
+     * the results into a list of entities with pagination support.
+     *
+     * <p>This method executes the provided QuerySpec on all available database shards serially,
+     * retrieving entities that match the query criteria from each shard. The results are then
+     * collected into a single list of entities, effectively performing a scatter-gather operation.
+     *
+     * @param tenantId  Tenant id
+     * @param querySpec The QuerySpec object representing the query criteria to be executed on all
+     *                  database shards.
+     * @param start  starting index of pagination
+     * @param numRows  number of records expected in resultset
+     * @return A list of entities obtained by executing the query on all available shards.
+     * @throws RuntimeException If an error occurs while querying the database.
+     */
+    public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec, int start,
+                                 int numRows) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         return IntStream.range(0, daos.get(tenantId).size())
                 .mapToObj(shardId -> {
@@ -593,6 +614,8 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                 .getter(dao::select)
                                 .selectParam(SelectParam.<T>builder()
                                         .querySpec(querySpec)
+                                        .start(start)
+                                        .numRows(numRows)
                                         .build())
                                 .build();
                         return transactionExecutor.get(tenantId).execute(dao.sessionFactory,

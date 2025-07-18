@@ -46,7 +46,7 @@ public abstract class MultiTenantBundleBasedTestBase {
 
   protected abstract MultiTenantDBShardingBundleBase<TestConfig> getBundle();
 
-  private DataSourceFactory createConfig(String dbName) {
+  protected DataSourceFactory createConfig(String dbName) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
     properties.put("hibernate.hbm2ddl.auto", "create");
