@@ -19,6 +19,6 @@ import javax.persistence.Table;
 @RequiredArgsConstructor
 public class HierarchicalBaseChildImpl extends HierarchicalBaseChild {
 
-    @Column
+    @Column(name = "`value`")
     private String value;
 }
