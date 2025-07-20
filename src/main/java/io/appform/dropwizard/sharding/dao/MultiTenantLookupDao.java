@@ -22,12 +22,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.operations.Count;
 import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
-import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
 import io.appform.dropwizard.sharding.dao.operations.RunWithQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.Select;
@@ -36,7 +33,6 @@ import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
-import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
@@ -60,20 +56,15 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.hibernate.Criteria;
 import org.hibernate.LockMode;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Projections;
-import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 
-import javax.persistence.LockModeType;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Root;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Comparator;
@@ -542,38 +533,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     }
 
     /**
-     * Queries using the specified criteria across all shards and returns the result.
-     * <b>Note:</b> This method runs the query serially, and it's usage is not recommended.
-     * Performs a scatter-gather operation by executing a query on all database shards and collecting
-     * the results into a list of entities.
-     *
-     * @param tenantId Tenant id
-     * @param criteria The DetachedCriteria object representing the query criteria to be executed on
-     *                 all database shards.
-     * @return A list of entities obtained by executing the query criteria on all available shards.
-     */
-    public List<T> scatterGather(String tenantId, DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
-                .mapToObj(shardId -> {
-                    try {
-                        val dao = daos.get(tenantId).get(shardId);
-                        val opContext = Select.<T, List<T>>builder()
-                                .getter(dao::select)
-                                .selectParam(SelectParam.<T>builder()
-                                        .criteria(criteria)
-                                        .build())
-                                .build();
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                                true, "scatterGather", opContext,
-                                shardId);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).flatMap(Collection::stream).collect(Collectors.toList());
-    }
-
-    /**
      * Performs a scatter-gather operation by executing a query on all database shards and collecting
      * the results into a list of entities.
      *
@@ -725,41 +684,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * criteria on a specific shard.
      * @throws RuntimeException If an error occurs while querying the database.
      */
-    public List<Long> count(String tenantId, DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
-                .mapToObj(shardId -> {
-                    val dao = daos.get(tenantId).get(shardId);
-                    val opContext = Count.builder()
-                            .counter(dao::count)
-                            .criteria(criteria)
-                            .build();
-                    try {
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                                true,
-                                "count",
-                                opContext,
-                                shardId);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).collect(Collectors.toList());
-    }
-
-    /**
-     * Counts the number of entities that match the specified criteria on each database shard.
-     *
-     * <p>This method executes a count operation on all available database shards serially,
-     * counting the entities that satisfy the provided criteria on each shard. The results are then
-     * collected into a list, where each element corresponds to the count of matching entities on a
-     * specific shard.
-     *
-     * @param tenantId Tenant id
-     * @param criteria The DetachedCriteria object representing the criteria for counting entities.
-     * @return A list of counts, where each count corresponds to the number of entities matching the
-     * criteria on a specific shard.
-     * @throws RuntimeException If an error occurs while querying the database.
-     */
     public List<Long> count(String tenantId, QuerySpec<T, T> criteria) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         return IntStream.range(0, daos.get(tenantId).size())
@@ -789,51 +713,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return A map of shard vs result-list
      */
     @SuppressWarnings("rawtypes")
-    public Map<Integer, List<T>> run(String tenantId, DetachedCriteria criteria) {
-        return run(tenantId, criteria, Function.identity());
-    }
-
-    /**
-     * Run arbitrary read-only queries on all shards and return results.
-     *
-     * @param tenantId Tenant id
-     * @param criteria The detached criteria. Typically, a grouping or counting query
-     * @return A map of shard vs result-list
-     */
-    @SuppressWarnings("rawtypes")
     public Map<Integer, List<T>> run(String tenantId, QuerySpec<T, T> criteria) {
         return run(tenantId, criteria, Function.identity());
     }
-
-    /**
-     * Run read-only queries on all shards and transform them into required types
-     *
-     * @param tenantId   Tenant id
-     * @param criteria   The detached criteria. Typically, a grouping or counting query
-     * @param translator A method to transform results to required type
-     * @param <U>        Return type
-     * @return Translated result
-     */
-    @SuppressWarnings("rawtypes")
-    public <U> U run(String tenantId, DetachedCriteria criteria,
-                     Function<Map<Integer, List<T>>, U> translator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val output = IntStream.range(0, daos.get(tenantId).size())
-                .boxed()
-                .collect(Collectors.toMap(Function.identity(), shardId -> {
-                    final LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List<T>> opContext = RunWithCriteria.<List<T>>builder()
-                            .handler(dao::run)
-                            .detachedCriteria(criteria)
-                            .build();
-                    return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                            true, "run",
-                            opContext,
-                            shardId);
-                }));
-        return translator.apply(output);
-    }
-
 
     /**
      * Run read-only queries on all shards and transform them into required types
@@ -863,8 +745,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 }));
         return translator.apply(output);
     }
-
-
 
     /**
      * Retrieves a list of entities associated with the specified keys from the database.
@@ -1100,31 +980,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entities based on a DetachedCriteria, retrieving a single related
-         * entity
-         *
-         * <p>This method reads and augments parent entities based on the specified {@code criteria},
-         * retrieving only a single child entity, and then applies the provided {@code consumer}
-         * function to augment it with related child entity. The consumer function is applied to parent
-         * entity.</p>
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting and composing parent entities.
-         * @param consumer      A function that applies the child entity augmentation to the parent
-         *                      entity.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the
-         *                          consumer function.
-         */
-        public <U> ReadOnlyContext<T> readOneAugmentParent(
-                MultiTenantRelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                BiConsumer<T, List<U>> consumer) {
-            return readAugmentParent(relationalDao, criteria, 0, 1, consumer, p -> true);
-        }
-
-        /**
          * Read and augment parent entities based on a QuerySpec, retrieving a single related entity and
          * applying operation.
          *
@@ -1146,34 +1001,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 QuerySpec<U, U> querySpec,
                 BiConsumer<T, List<U>> consumer) {
             return readAugmentParent(relationalDao, querySpec, 0, 1, consumer, p -> true);
-        }
-
-        /**
-         * Read and augment parent entities based on a DetachedCriteria and apply operations
-         * selectively.
-         *
-         * <p>This method augments parent entities based on the child entities selected through
-         * specified {@code criteria} The provided {@code consumer} function is then applied to augment
-         * the selected parent entity with related child entities.</p>
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting and composing parent entities.
-         * @param first         The index of the first parent entity to retrieve.
-         * @param numResults    The maximum number of parent entities to retrieve.
-         * @param consumer      A function that applies the child entity augmentation to the parent
-         *                      entities.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the
-         *                          consumer function.
-         */
-        public <U> ReadOnlyContext<T> readAugmentParent(
-                MultiTenantRelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                int first,
-                int numResults,
-                BiConsumer<T, List<U>> consumer) {
-            return readAugmentParent(relationalDao, criteria, first, numResults, consumer, p -> true);
         }
 
         /**
@@ -1206,35 +1033,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity based on a {@link DetachedCriteria} and apply operations
-         * selectively.
-         *
-         * <p>This method augments parent entity based on the single child entity selected through
-         * specified {@link DetachedCriteria} The provided {@code consumer} function is then applied to
-         * augment the selected parent entity with related child entities.</p> The filter function
-         * selectively applies the consumer function to the chosen parent entity.
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting parent entities.
-         * @param consumer      A function that applies the child entity augmentation to the parent
-         *                      entity.
-         * @param filter        A predicate function to filter the parent entity on which the consumer
-         *                      function is applied.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the
-         *                          consumer function. {@code readOneAugmentParent} method that accepts
-         *                          a {@code QuerySpec} for better query composition and type-safety.
-         */
-        public <U> ReadOnlyContext<T> readOneAugmentParent(
-                MultiTenantRelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                BiConsumer<T, List<U>> consumer,
-                Predicate<T> filter) {
-            return readAugmentParent(relationalDao, criteria, 0, 1, consumer, filter);
-        }
-
-        /**
          * Read and augment parent entity based on a {@link QuerySpec} and apply operations
          * selectively.
          *
@@ -1261,26 +1059,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 Predicate<T> filter) {
             return readAugmentParent(relationalDao, querySpec, 0, 1, consumer, filter);
         }
-
-        public <U> ReadOnlyContext<T> readAugmentParent(
-                MultiTenantRelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                int first,
-                int numResults,
-                BiConsumer<T, List<U>> consumer,
-                Predicate<T> filter) {
-            return apply(parent -> {
-                if (filter.test(parent)) {
-                    try {
-                        consumer.accept(parent,
-                                relationalDao.select(this, criteria, first, numResults));
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-        }
-
 
         /**
          * Reads and augments a parent entity using a relational DAO, applying a filter and consumer
@@ -1491,29 +1269,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Runs a query inside the shard based on the provided {@code DetachedCriteria} and returns a
-         * list of matching entities.
-         *
-         * @param criteria The selection criteria to be applied to the query.
-         * @return A list of matching entities or an empty list if none are found.
-         */
-        List<T> select(DetachedCriteria criteria) {
-            return list(criteria.getExecutableCriteria(currentSession()));
-        }
-
-        /**
-         * Run a query inside this shard and return the matching list.
-         *
-         * @param criteria selection criteria to be applied.
-         * @return List of elements or empty list if none found
-         */
-        @SuppressWarnings("rawtypes")
-        List run(DetachedCriteria criteria) {
-            return criteria.getExecutableCriteria(currentSession())
-                    .list();
-        }
-
-        /**
          * Run a query inside this shard and return the matching list.
          *
          * @param criteria selection criteria to be applied.
@@ -1526,16 +1281,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         List<T> select(SelectParam selectParam) {
-            if (selectParam.criteria != null) {
-                val criteria = selectParam.criteria.getExecutableCriteria(currentSession());
-                if (null != selectParam.getStart()) {
-                    criteria.setFirstResult(selectParam.start);
-                }
-                if (null != selectParam.getNumRows()) {
-                    criteria.setMaxResults(selectParam.numRows);
-                }
-                return list(criteria);
-            }
             val query = InternalUtils.createQuery(currentSession(), entityClass, selectParam.querySpec);
             if (null != selectParam.getStart()) {
                 query.setFirstResult(selectParam.start);
@@ -1561,20 +1306,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             querySpec.apply(root, criteria, builder);
             return list(session.createQuery(criteria));
         }
-
-        /**
-         * Counts the number of entities that match the provided {@code DetachedCriteria}. The count is
-         * based on the selection criteria specified in the query.
-         *
-         * @param criteria The selection criteria to be applied for counting.
-         * @return The number of matching entities.
-         */
-        long count(DetachedCriteria criteria) {
-            return (long) criteria.getExecutableCriteria(currentSession())
-                    .setProjection(Projections.rowCount())
-                    .uniqueResult();
-        }
-
 
         /**
          * Counts the number of entities that match the provided {@code DetachedCriteria}. The count is
@@ -1611,7 +1342,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                     .orElse(false);
 
         }
-
 
         /**
          * Executes an update operation within the shard based on the provided

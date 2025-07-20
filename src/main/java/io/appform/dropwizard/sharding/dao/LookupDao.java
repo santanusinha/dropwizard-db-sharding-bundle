@@ -26,9 +26,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Criteria;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -284,20 +282,6 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     /**
-     * Queries using the specified criteria across all shards and returns the result.
-     * <b>Note:</b> This method runs the query serially, and it's usage is not recommended.
-     * Performs a scatter-gather operation by executing a query on all database shards
-     * and collecting the results into a list of entities.
-     *
-     * @param criteria The DetachedCriteria object representing the query criteria to be executed
-     *                 on all database shards.
-     * @return A list of entities obtained by executing the query criteria on all available shards.
-     */
-    public List<T> scatterGather(DetachedCriteria criteria) {
-        return delegate.scatterGather(dbNamespace, criteria);
-    }
-
-    /**
      * Performs a scatter-gather operation by executing a query on all database shards
      * and collecting the results into a list of entities.
      *
@@ -399,23 +383,6 @@ public class LookupDao<T> implements ShardedDao<T> {
      * the criteria on a specific shard.
      * @throws java.lang.RuntimeException If an error occurs while querying the database.
      */
-    public List<Long> count(DetachedCriteria criteria) {
-        return delegate.count(dbNamespace, criteria);
-    }
-
-    /**
-     * Counts the number of entities that match the specified criteria on each database shard.
-     *
-     * <p>This method executes a count operation on all available database shards serially,
-     * counting the entities that satisfy the provided criteria on each shard. The results are then
-     * collected into a list, where each element corresponds to the count of matching entities on
-     * a specific shard.
-     *
-     * @param criteria The DetachedCriteria object representing the criteria for counting entities.
-     * @return A list of counts, where each count corresponds to the number of entities matching
-     * the criteria on a specific shard.
-     * @throws java.lang.RuntimeException If an error occurs while querying the database.
-     */
     public List<Long> count(QuerySpec<T, T> criteria) {
         return delegate.count(dbNamespace, criteria);
     }
@@ -427,32 +394,8 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @return A map of shard vs result-list
      */
     @SuppressWarnings("rawtypes")
-    public Map<Integer, List<T>> run(DetachedCriteria criteria) {
-        return delegate.run(dbNamespace, criteria);
-    }
-
-    /**
-     * Run arbitrary read-only queries on all shards and return results.
-     *
-     * @param criteria The detached criteria. Typically, a grouping or counting query
-     * @return A map of shard vs result-list
-     */
-    @SuppressWarnings("rawtypes")
     public Map<Integer, List<T>> run(QuerySpec<T, T> criteria) {
         return delegate.run(dbNamespace, criteria);
-    }
-
-    /**
-     * Run read-only queries on all shards and transform them into required types
-     *
-     * @param criteria   The detached criteria. Typically, a grouping or counting query
-     * @param translator A method to transform results to required type
-     * @param <U>        Return type
-     * @return Translated result
-     */
-    @SuppressWarnings("rawtypes")
-    public <U> U run(DetachedCriteria criteria, Function<Map<Integer, List<T>>, U> translator) {
-        return delegate.run(dbNamespace, criteria, translator);
     }
 
     /**
@@ -575,28 +518,6 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entities based on a DetachedCriteria, retrieving a single related entity
-         *
-         * <p>This method reads and augments parent entities based on the specified {@code criteria}, retrieving only a
-         * single child entity, and then applies the provided {@code consumer} function to augment it with related child
-         * entity. The consumer function is applied to parent entity.</p>
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting and composing parent entities.
-         * @param consumer      A function that applies the child entity augmentation to the parent entity.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the consumer function.
-         */
-        public <U> ReadOnlyContext<T> readOneAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                BiConsumer<T, List<U>> consumer) {
-            delegate.readOneAugmentParent(relationalDao.getDelegate(), criteria, consumer);
-            return this;
-        }
-
-        /**
          * Read and augment parent entities based on a QuerySpec, retrieving a single related entity and applying
          * operation.
          *
@@ -617,33 +538,6 @@ public class LookupDao<T> implements ShardedDao<T> {
                 QuerySpec<U, U> querySpec,
                 BiConsumer<T, List<U>> consumer) {
             delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpec, consumer);
-            return this;
-        }
-
-        /**
-         * Read and augment parent entities based on a DetachedCriteria and apply operations selectively.
-         *
-         * <p>This method augments parent entities based on the child entities selected through specified {@code
-         * criteria}
-         * The provided {@code consumer} function is then applied to augment the selected parent
-         * entity with related child entities.</p>
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting and composing parent entities.
-         * @param first         The index of the first parent entity to retrieve.
-         * @param numResults    The maximum number of parent entities to retrieve.
-         * @param consumer      A function that applies the child entity augmentation to the parent entities.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the consumer function.
-         */
-        public <U> ReadOnlyContext<T> readAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                int first,
-                int numResults,
-                BiConsumer<T, List<U>> consumer) {
-            delegate.readAugmentParent(relationalDao.getDelegate(), criteria, first, numResults, consumer);
             return this;
         }
 
@@ -676,37 +570,6 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity based on a {@link org.hibernate.criterion.DetachedCriteria} and apply
-         * operations selectively.
-         *
-         * <p>This method augments parent entity based on the single child entity selected through specified
-         * {@link org.hibernate.criterion.DetachedCriteria}
-         * The provided {@code consumer} function is then applied to augment the selected parent entity with related
-         * child entities.</p>
-         * The filter function selectively applies the consumer function to the chosen parent entity.
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting parent entities.
-         * @param consumer      A function that applies the child entity augmentation to the parent entity.
-         * @param filter        A predicate function to filter the parent entity on which the consumer function is
-         *                      applied.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the consumer function.
-         *                          {@code readOneAugmentParent} method that accepts a {@code QuerySpec} for better
-         *                          query composition and
-         *                          type-safety.
-         */
-        public <U> ReadOnlyContext<T> readOneAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                BiConsumer<T, List<U>> consumer,
-                Predicate<T> filter) {
-            delegate.readOneAugmentParent(relationalDao.getDelegate(), criteria, consumer, filter);
-            return this;
-        }
-
-        /**
          * Read and augment parent entity based on a {@link io.appform.dropwizard.sharding.query.QuerySpec} and apply
          * operations selectively.
          *
@@ -733,18 +596,6 @@ public class LookupDao<T> implements ShardedDao<T> {
             delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpec, consumer, filter);
             return this;
         }
-
-        public <U> ReadOnlyContext<T> readAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                int first,
-                int numResults,
-                BiConsumer<T, List<U>> consumer,
-                Predicate<T> filter) {
-            delegate.readAugmentParent(relationalDao.getDelegate(), criteria, first, numResults, consumer, filter);
-            return this;
-        }
-
 
         /**
          * Reads and augments a parent entity using a relational DAO, applying a filter and consumer function.

@@ -1,15 +1,13 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.dropwizard.util.Generics;
-import org.hibernate.Criteria;
 import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.query.Query;
-import org.hibernate.query.internal.AbstractProducedQuery;
 
-import javax.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.CriteriaQuery;
 import java.io.Serializable;
 import java.util.List;
 
@@ -41,18 +39,6 @@ public class AbstractDAO<E> {
      */
     protected Session currentSession() {
         return sessionFactory.getCurrentSession();
-    }
-
-    /**
-     * Creates a new {@link Criteria} query for {@code <E>}.
-     *
-     * @return a new {@link Criteria} query
-     * @see Session#createCriteria(Class)
-     * @deprecated Use {@link AbstractDAO#criteriaQuery()} instead.
-     */
-    @Deprecated
-    protected Criteria criteria() {
-        return currentSession().createCriteria(entityClass);
     }
 
     /**
@@ -124,20 +110,6 @@ public class AbstractDAO<E> {
     }
 
     /**
-     * Convenience method to return a single instance that matches the criteria, or null if the
-     * criteria returns no results.
-     *
-     * @param criteria the {@link Criteria} query to run
-     * @return the single result or {@code null}
-     * @throws HibernateException if there is more than one matching result
-     * @see Criteria#uniqueResult()
-     */
-    @SuppressWarnings("unchecked")
-    protected E uniqueResult(Criteria criteria) throws HibernateException {
-        return (E) requireNonNull(criteria).uniqueResult();
-    }
-
-    /**
      * Convenience method to return a single instance that matches the query, or null if the query
      * returns no results.
      *
@@ -148,18 +120,6 @@ public class AbstractDAO<E> {
      */
     protected E uniqueResult(Query<E> query) throws HibernateException {
         return requireNonNull(query).uniqueResult();
-    }
-
-    /**
-     * Get the results of a {@link Criteria} query.
-     *
-     * @param criteria the {@link Criteria} query to run
-     * @return the list of matched query results
-     * @see Criteria#list()
-     */
-    @SuppressWarnings("unchecked")
-    protected List<E> list(Criteria criteria) throws HibernateException {
-        return requireNonNull(criteria).list();
     }
 
     /**

@@ -20,7 +20,7 @@ package io.appform.dropwizard.sharding;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.dropwizard.Configuration;
+import io.dropwizard.core.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
