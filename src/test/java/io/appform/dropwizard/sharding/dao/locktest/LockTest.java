@@ -736,7 +736,7 @@ public class LockTest {
 
         contextUpdate.update(relationDao,
                 (queryRoot, query, criteriaBuilder) ->
-                        query.where(criteriaBuilder.equal(queryRoot.get("myId"), p1.getMyId())),
+                        query.where(criteriaBuilder.equal(queryRoot.get("id"), c1.getId())),
                 child -> {
                     child.setValue("CHILD_ONE");
                     return child;
@@ -783,7 +783,7 @@ public class LockTest {
 
         contextUpdate.update(relationDao,
                 (queryRoot, query, criteriaBuilder) ->
-                        query.where(criteriaBuilder.equal(queryRoot.get("myId"), p1.getMyId())),
+                        query.where(criteriaBuilder.equal(queryRoot.get("id"), c1.getId())),
                 child -> {
                     child.setValue("CHILD_ONE");
                     return child;
