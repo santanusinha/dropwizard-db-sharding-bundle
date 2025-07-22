@@ -26,8 +26,7 @@ import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.dao.testdata.OrderDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
+import jakarta.persistence.criteria.Join;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -123,14 +122,16 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
         assertEquals(2, blah.get("count"));
 
         List<OrderItem> orderItems = orderItemDao.select("customer1",
-                DetachedCriteria.forClass(OrderItem.class)
-                        .createAlias("order", "o")
-                        .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
+                (root, query, cb) -> {
+                    Join<Object, Object> orderJoin = root.join("order");
+                    query.where(cb.equal(orderJoin.get("orderId"), "OD00001"));
+                }, 0, 10);
         assertEquals(2, orderItems.size());
         orderItemDao.update("customer1",
-                DetachedCriteria.forClass(OrderItem.class)
-                        .createAlias("order", "o")
-                        .add(Restrictions.eq("o.orderId", "OD00001")),
+                (root, query, cb) -> {
+                    Join<Object, Object> orderJoin = root.join("order");
+                    query.where(cb.equal(orderJoin.get("orderId"), "OD00001"));
+                },
                 item -> OrderItem.builder()
                         .id(item.getId())
                         .order(item.getOrder())
@@ -138,9 +139,10 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
                         .build());
 
         orderItems = orderItemDao.select("customer1",
-                DetachedCriteria.forClass(OrderItem.class)
-                        .createAlias("order", "o")
-                        .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
+                (root, query, cb) -> {
+                    Join<Object, Object> orderJoin = root.join("order");
+                    query.where(cb.equal(orderJoin.get("orderId"), "OD00001"));
+                }, 0, 10);
         assertEquals(2, orderItems.size());
         assertEquals("Item AA", orderItems.get(0).getName());
     }

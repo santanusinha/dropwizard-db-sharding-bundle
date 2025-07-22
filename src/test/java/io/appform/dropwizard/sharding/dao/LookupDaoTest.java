@@ -31,15 +31,17 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntityWithAIId;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -209,8 +211,9 @@ public class LookupDaoTest {
 
     @Test
     public void testScatterGather() throws Exception {
-        List<TestEntity> results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("externalId", "testId")));
+        List<TestEntity> results = lookupDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId"));
+        });
         assertTrue(results.isEmpty());
 
         TestEntity testEntity = TestEntity.builder()
@@ -218,8 +221,9 @@ public class LookupDaoTest {
                 .text("Some Text")
                 .build();
         lookupDao.save(testEntity);
-        results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("externalId", "testId")));
+        results = lookupDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId"));
+        });
         assertFalse(results.isEmpty());
         assertEquals("Some Text",
                 results.get(0)
@@ -237,8 +241,9 @@ public class LookupDaoTest {
                 .text("Some Text")
                 .build();
         lookupDao.save(testEntity);
-        results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("externalId", "testId")));
+        results = lookupDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId"));
+        });
         assertFalse(results.isEmpty());
         assertEquals("Some Text",
                 results.get(0)
@@ -264,8 +269,9 @@ public class LookupDaoTest {
         results = lookupDao
                 .scatterGather((queryRoot, query, criteriaBuilder)
                         -> query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId")), 0, 2);
-        results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("text", "Some Text")));
+        results = lookupDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("text"), "Some Text"));
+        });
         assertFalse(results.isEmpty());
         assertEquals(2, results.size());
         assertEquals("Some Text", results.get(0)
@@ -383,11 +389,13 @@ public class LookupDaoTest {
         saveAudit(phoneNumber, "testTxn", "Underway");
         saveAudit(phoneNumber, "testTxn", "Completed");
 
-        assertEquals(3, auditDao.count(phoneNumber, DetachedCriteria.forClass(Audit.class)
-                .add(Restrictions.eq("transaction.transactionId", "testTxn"))));
+        assertEquals(3, auditDao.count(phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "testTxn"));
+        }));
 
-        List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
-                .add(Restrictions.eq("transaction.transactionId", "testTxn")), 0, 10);
+        List<Audit> audits = auditDao.select(phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "testTxn"));
+        }, 0, 10);
         assertEquals("Started",
                 audits.get(0)
                         .getText());
@@ -409,12 +417,15 @@ public class LookupDaoTest {
         saveHierarchy(phoneNumber);
         saveHierarchy("9986402019");
 
-        List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
-                .add(Restrictions.eq("transaction.transactionId", "newTxn-" + phoneNumber)), 0, 10);
+        List<Audit> audits = auditDao.select(phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "newTxn-" + phoneNumber));
+        }, 0, 10);
 
         assertEquals(2, audits.size());
 
-        List<Audit> allAudits = auditDao.scatterGather(DetachedCriteria.forClass(Audit.class), 0, 10);
+        List<Audit> allAudits = auditDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            // No restrictions, select all
+        }, 0, 10);
         assertEquals(4, allAudits.size());
     }
 
@@ -458,13 +469,14 @@ public class LookupDaoTest {
 
     @Test
     public void testCount() throws Exception {
-        DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("text", "TEST_TYPE"));
+        var criteria = new QuerySpec<TestEntity, TestEntity>() {
+            @Override
+            public void apply(Root<TestEntity> queryRoot, CriteriaQuery<TestEntity> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get("text"), "TEST_TYPE"));
+            }
+        };
 
-        assertEquals(
-                0L,
-                (long) lookupDao.count(criteria).stream().reduce(0L, Long::sum)
-        );
+        assertEquals(0L, (long) lookupDao.count(criteria).stream().reduce(0L, Long::sum));
 
         TestEntity testEntity = TestEntity.builder()
                 .externalId("testId2")
@@ -477,9 +489,10 @@ public class LookupDaoTest {
 
         assertEquals(
                 2L,
-                (long) lookupDao.count(criteria).stream().reduce(0L, Long::sum)
+                (long) lookupDao.count((queryRoot, query, criteriaBuilder) -> {
+                    query.where(criteriaBuilder.equal(queryRoot.get("text"), "TEST_TYPE"));
+                }).stream().reduce(0L, Long::sum)
         );
-
 
         lookupDao.delete("testId2");
         assertEquals(

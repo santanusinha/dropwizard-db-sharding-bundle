@@ -31,3 +31,6 @@ recipeList:
   - org.openrewrite.java.ChangeType:
       oldFullyQualifiedTypeName: io.dropwizard.setup.Bootstrap
       newFullyQualifiedTypeName: io.dropwizard.core.setup.Bootstrap
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.setup.AdminEnvironment
+      newFullyQualifiedTypeName: io.dropwizard.core.setup.AdminEnvironment

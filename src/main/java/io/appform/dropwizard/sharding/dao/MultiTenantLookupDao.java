@@ -1196,11 +1196,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          * @return The retrieved entity, or null if the entity is not found.
          */
         T get(String lookupKey) {
-            return getLocked(lookupKey, x -> x, LockModeType.READ);
+            return getLocked(lookupKey, x -> x, LockModeType.NONE);
         }
 
         T get(String lookupKey, UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
-            return getLocked(lookupKey, criteriaUpdater, LockModeType.READ);
+            return getLocked(lookupKey, criteriaUpdater, LockModeType.NONE);
         }
 
         /**

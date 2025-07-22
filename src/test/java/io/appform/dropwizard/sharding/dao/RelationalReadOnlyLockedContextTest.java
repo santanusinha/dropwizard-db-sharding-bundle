@@ -1,13 +1,13 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.AllArgsConstructor;
@@ -21,8 +21,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,8 +109,9 @@ public class RelationalReadOnlyLockedContextTest {
         val companyId1 = "CMPID1";
         val companyId2 = "CMPID2";
 
-        val parentCriteria = DetachedCriteria.forClass(Company.class)
-                .add(Restrictions.in("companyUsageId", Sets.newHashSet(companyId1, companyId2)));
+        // Use QuerySpec as a lambda instead of DetachedCriteria
+        QuerySpec<Company, Company> parentCriteria = (root, query, cb) ->
+                query.where(root.get("companyUsageId").in(companyId1, companyId2));
 
         val associationMappingSpecs = Lists.newArrayList(
                 RelationalDao.AssociationMappingSpec.builder().childMappingKey("companyExtId").parentMappingKey("companyUsageId").build()
@@ -140,7 +139,7 @@ public class RelationalReadOnlyLockedContextTest {
         Assertions.assertTrue(respCompanyOptionalCase1A.isPresent());
         val respCompanyA = respCompanyOptionalCase1A.get();
         Assertions.assertNotNull(respCompanyA.getCeo());
-        Assertions.assertEquals(respCompanyA.getCeo().getCompanyExtId(), companyId1);
+        Assertions.assertEquals(companyId1, respCompanyA.getCeo().getCompanyExtId());
         Assertions.assertTrue(respCompanyA.getDepartments().stream().allMatch(e -> e.getCompanyExtId().equals(companyId1)));
 
         val respCompanyOptionalCase1B = dataList.stream()
@@ -149,7 +148,7 @@ public class RelationalReadOnlyLockedContextTest {
         Assertions.assertTrue(respCompanyOptionalCase1B.isPresent());
         val respCompanyB = respCompanyOptionalCase1B.get();
         Assertions.assertNotNull(respCompanyB.getCeo());
-        Assertions.assertEquals(respCompanyB.getCeo().getCompanyExtId(), companyId2);
+        Assertions.assertEquals(companyId2, respCompanyB.getCeo().getCompanyExtId());
         Assertions.assertTrue(respCompanyB.getDepartments().stream().allMatch(e -> e.getCompanyExtId().equals(companyId2)));
     }
 
@@ -161,17 +160,16 @@ public class RelationalReadOnlyLockedContextTest {
 
         val companyToRetrieve = "CMPID1";
 
-        val parentCriteria = DetachedCriteria.forClass(Company.class)
-                .add(Restrictions.eq("companyUsageId", companyToRetrieve));
+        // Use QuerySpec as a lambda instead of DetachedCriteria
+        QuerySpec<Company, Company> parentCriteria = (root, query, cb) ->
+                query.where(cb.equal(root.get("companyUsageId"), companyToRetrieve));
 
         val departmentQueryFilterSpec = RelationalDao.QueryFilterSpec.<Department>builder()
-                .criteria(DetachedCriteria.forClass(Department.class)
-                        .add(Restrictions.eq("companyExtId", companyToRetrieve)))
+                .querySpec((root, query, cb) -> query.where(cb.equal(root.get("companyExtId"), companyToRetrieve)))
                 .build();
 
         val ceoQueryFilterSpec = RelationalDao.QueryFilterSpec.<Ceo>builder()
-                .criteria(DetachedCriteria.forClass(Ceo.class)
-                        .add(Restrictions.eq("companyExtId", companyToRetrieve)))
+                .querySpec((root, query, cb) -> query.where(cb.equal(root.get("companyExtId"), companyToRetrieve)))
                 .build();
 
         val dataList = companyRelationalDao.readOnlyExecutor(parentKey, parentCriteria, 0, 4)

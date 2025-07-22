@@ -13,7 +13,7 @@ import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jersey.DropwizardResourceConfig;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
-import io.dropwizard.setup.AdminEnvironment;
+import io.dropwizard.core.setup.AdminEnvironment;
 import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 
