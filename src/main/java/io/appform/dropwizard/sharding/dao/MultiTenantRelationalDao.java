@@ -228,6 +228,11 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return query.executeUpdate();
         }
 
+        public QuerySpec<T, T> getQuerySpec(final Object key) {
+            return (queryRoot, query, criteriaBuilder) ->
+                    query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), key));
+        }
+
         private Query<T> createQuery(
                 final Session session,
                 final Class<T> entityClass,
@@ -330,7 +335,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = GetByQuerySpec.<T, T, U>builder()
                 .getter(dao::get)
-                .criteria(dao.getDetachedCriteria(key))
+                .criteria(dao.getQuerySpec(key))
                 .afterGet(function).build();
         return transactionExecutor.get(tenantId)
                 .execute(dao.sessionFactory, true, "get", opContext, shardId);
@@ -750,7 +755,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                            boolean completeTransaction) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val opContext = GetAndUpdateByQuerySpec.<T>builder()
-                .criteria(dao.getDetachedCriteria(id))
+                .criteria(dao.getQuerySpec(id))
                 .getter(dao::get)
                 .mutator(updater)
                 .updater(dao::update).build();
