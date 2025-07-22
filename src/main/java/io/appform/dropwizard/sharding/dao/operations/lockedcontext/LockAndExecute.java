@@ -1,15 +1,15 @@
 package io.appform.dropwizard.sharding.dao.operations.lockedcontext;
 
-import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.dao.LockedContext.Mode;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.OpType;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
 import org.hibernate.Session;
 
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 @Data
 public class LockAndExecute<T> extends OpContext<T> {
 
-    private final List<Consumer<T>> operations = Lists.newArrayList();
+    private final Queue<Consumer<T>> operations = new ConcurrentLinkedQueue<>();
     @NonNull
     private final Mode mode;
     private Supplier<T> getter;
@@ -49,8 +49,11 @@ public class LockAndExecute<T> extends OpContext<T> {
     @Override
     public T apply(Session session) {
         T result = generateEntity();
-        operations
-            .forEach(operation -> operation.accept(result));
+        while (!operations.isEmpty()) {
+            Consumer<T> operation = operations.poll();
+            operation.accept(result);
+        }
+
         return result;
     }
 
