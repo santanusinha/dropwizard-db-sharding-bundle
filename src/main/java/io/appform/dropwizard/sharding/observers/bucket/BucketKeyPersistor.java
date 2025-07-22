@@ -2,7 +2,7 @@ package io.appform.dropwizard.sharding.observers.bucket;
 
 import com.google.common.base.Preconditions;
 import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.GetAndUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.GetByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
@@ -56,7 +56,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(GetAndUpdate<T> opContext) {
+    public <T> Void visit(GetAndUpdateByQuerySpec<T> opContext) {
         final var oldMutator = opContext.getMutator();
         opContext.setMutator((T entity) -> {
             T value = oldMutator.apply(entity);
@@ -220,7 +220,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T, R> Void visit(GetByQuerySpec<T, R> opContext) {
+    public <T, G, R> Void visit(GetByQuerySpec<T, G, R> opContext) {
         return null;
     }
 

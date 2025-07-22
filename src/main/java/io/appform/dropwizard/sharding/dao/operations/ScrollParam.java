@@ -12,7 +12,7 @@ public class ScrollParam<T> {
 
   @Builder
   public ScrollParam(QuerySpec<T, T> querySpec) {
-    Preconditions.checkArgument(criteria != null || querySpec != null);
+    Preconditions.checkArgument(querySpec != null);
     this.querySpec = querySpec;
   }
 

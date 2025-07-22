@@ -86,7 +86,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(parentKey, key, t -> t));
     }
 
-
     public <U> U get(String parentKey, Object key, Function<T, U> function) {
         return delegate.get(tenantId, parentKey, key, function);
     }
@@ -113,7 +112,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.save(tenantId, parentKey, entity, handler);
     }
 
-
     /**
      * Saves a collection of entities associated to the database and returns a boolean indicating the success of the
      * operation.
@@ -132,12 +130,31 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.saveAll(tenantId, parentKey, entities);
     }
 
-    public Optional<T> createOrUpdate(
-            final String parentKey,
-            final DetachedCriteria selectionCriteria,
-            final UnaryOperator<T> updater,
-            final Supplier<T> entityGenerator) {
-        return delegate.createOrUpdate(tenantId, parentKey, selectionCriteria, updater, entityGenerator);
+    /**
+     * Creates or updates a single entity within a specific shard based on a query and update logic.
+     * <p>
+     * This method performs a create or update operation on a single entity within a specific shard,
+     * as determined by the provided LockedContext and shard ID. It uses the provided query to check
+     * for the existence of an entity, and based on the result:
+     * - If no entity is found, it generates a new entity using the entity generator and saves it.
+     * - If an entity is found, it applies the provided updater function to update the entity.
+     *
+     * @param context         A LockedContext object containing information about the shard and session factory.
+     * @param querySpec       A QuerySpec object specifying the criteria for selecting an entity.
+     * @param updater         A function that takes an old entity, applies updates, and returns a new entity.
+     * @param entityGenerator A supplier function for generating a new entity if none exists.
+     * @param <U>             The type of result associated with the LockedContext.
+     * @return true if the entity was successfully created or updated, false otherwise.
+     * @throws RuntimeException If any exception occurs during the create/update operation or if criteria
+     *                          are not met during the process.
+     */
+    <U> boolean createOrUpdate(
+            LockedContext<U> context,
+            QuerySpec<T, T> querySpec,
+            UnaryOperator<T> updater,
+            U parent,
+            Supplier<T> entityGenerator) {
+        return delegate.createOrUpdate(context, querySpec, updater, parent, e -> entityGenerator.get());
     }
 
     public <U> void save(LockedContext<U> context, T entity) {
@@ -147,7 +164,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         delegate.save(context, entity, handler);
     }
-
 
     /**
      * Updates an entity within a locked context using a specific ID and an updater function.
@@ -203,7 +219,11 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param numResults The number of results to retrieve from the query (pagination).
      * @return A List of query results of type T.
      */
-    <U> List<T> select(LookupDao.ReadOnlyContext<U> context, QuerySpec<T, T> querySpec, int start, int numResults) {
+    <U> List<T> select(
+            LookupDao.ReadOnlyContext<U> context,
+            QuerySpec<T, T> querySpec,
+            int start,
+            int numResults) {
         return delegate.select(context.getDelegate(), querySpec, start, numResults);
     }
 
@@ -227,7 +247,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * max N * pageSize elements
      */
     public ScrollResult<T> scrollDown(
-            final DetachedCriteria inCriteria,
+            final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
             @NonNull final String sortFieldName) {
@@ -255,7 +275,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      */
     @SneakyThrows
     public ScrollResult<T> scrollUp(
-            final DetachedCriteria inCriteria,
+            final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
             @NonNull final String sortFieldName) {
@@ -277,10 +297,9 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @return A map of shard vs result-list
      */
     @SuppressWarnings("rawtypes")
-    public Map<Integer, List> run(DetachedCriteria criteria) {
+    public Map<Integer, List> run(QuerySpec<T, T> criteria) {
         return delegate.run(tenantId, criteria);
     }
-
 
     /**
      * Run read-only queries on all shards and transform them into required types
@@ -291,18 +310,13 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @return Translated result
      */
     @SuppressWarnings("rawtypes")
-    public <U> U run(DetachedCriteria criteria, Function<Map<Integer, List>, U> translator) {
+    public <U> U run(QuerySpec<T, T> criteria, Function<Map<Integer, List>, U> translator) {
         return delegate.run(tenantId, criteria, translator);
     }
 
     public <U> U runInSession(String id, Function<Session, U> handler) {
         return delegate.runInSession(tenantId, id, handler);
     }
-
-    public boolean update(String parentKey, DetachedCriteria criteria, Function<T, T> updater) {
-        return delegate.update(tenantId, parentKey, criteria, updater);
-    }
-
 
     /**
      * Updates a single entity within a specific shard based on query criteria and an update function.
@@ -332,11 +346,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public <U> int updateUsingQuery(LockedContext<U> lockedContext, UpdateOperationMeta updateOperationMeta) {
         return delegate.updateUsingQuery(lockedContext, updateOperationMeta);
     }
-
-    public LockedContext<T> lockAndGetExecutor(String parentKey, DetachedCriteria criteria) {
-        return delegate.lockAndGetExecutor(tenantId, parentKey, criteria);
-    }
-
 
     /**
      * Acquires a write lock on entities matching the provided query criteria within a specific shard
@@ -383,35 +392,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
             Function<U, T> entityGenerator) {
         return delegate.createOrUpdate(context, querySpec, updater, parent, entityGenerator);
     }
-
-
-    /**
-     * Creates or updates a single entity within a specific shard based on a query and update logic.
-     * <p>
-     * This method performs a create or update operation on a single entity within a specific shard,
-     * as determined by the provided LockedContext and shard ID. It uses the provided query to check
-     * for the existence of an entity, and based on the result:
-     * - If no entity is found, it generates a new entity using the entity generator and saves it.
-     * - If an entity is found, it applies the provided updater function to update the entity.
-     *
-     * @param context         A LockedContext object containing information about the shard and session factory.
-     * @param querySpec       A QuerySpec object specifying the criteria for selecting an entity.
-     * @param updater         A function that takes an old entity, applies updates, and returns a new entity.
-     * @param entityGenerator A supplier function for generating a new entity if none exists.
-     * @param <U>             The type of result associated with the LockedContext.
-     * @return true if the entity was successfully created or updated, false otherwise.
-     * @throws RuntimeException If any exception occurs during the create/update operation or if criteria
-     *                          are not met during the process.
-     */
-    <U> boolean createOrUpdate(
-            LockedContext<U> context,
-            QuerySpec<T, T> querySpec,
-            UnaryOperator<T> updater,
-            U parent,
-            Supplier<T> entityGenerator) {
-        return delegate.createOrUpdate(context, querySpec, updater, parent, e -> entityGenerator.get());
-    }
-
 
     /**
      * Updates a batch of entities within a specific shard based on a query and an update function.
@@ -490,10 +470,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.select(tenantId, parentKey, querySpec, start, numResults, handler);
     }
 
-    public boolean exists(String parentKey, Object key) {
-        return delegate.exists(tenantId, parentKey, key);
-    }
-
     /**
      * Counts the number of records matching a specified query in a given shard
      * <p>
@@ -512,15 +488,12 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.count(tenantId, parentKey, querySpec);
     }
 
-    /**
-     * Queries using the specified criteria across all shards and returns the counts of rows satisfying
-     * the criteria.
-     * <b>Note:</b> This method runs the query serially and it's usage is not recommended.
-     *
-     * @param criteria The select criteria
-     * @return List of counts in each shard
-     */
-    public List<Long> countScatterGather(DetachedCriteria criteria) {
+
+    public boolean exists(String parentKey, Object key) {
+        return delegate.exists(tenantId, parentKey, key);
+    }
+
+    public List<Long> countScatterGather(QuerySpec<T, Long> criteria) {
         return delegate.countScatterGather(tenantId, criteria);
     }
 
@@ -550,7 +523,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<Criteria> criteriaUpdater) {
+                                               final UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
         return readOnlyExecutor(parentKey, key, criteriaUpdater, () -> false);
     }
 
@@ -568,7 +541,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      */
     public ReadOnlyContext<T> readOnlyExecutor(final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<Criteria> criteriaUpdater,
+                                               final UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
                                                final Supplier<Boolean> entityPopulator) {
         return new ReadOnlyContext<>(
                 delegate.readOnlyExecutor(tenantId, parentKey, key, criteriaUpdater, entityPopulator)

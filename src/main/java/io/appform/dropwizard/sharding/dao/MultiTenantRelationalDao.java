@@ -23,8 +23,21 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.operations.*;
-import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.GetAndUpdateByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.GetByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.OpContext;
+import io.appform.dropwizard.sharding.dao.operations.RunInSession;
+import io.appform.dropwizard.sharding.dao.operations.RunWithQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.Save;
+import io.appform.dropwizard.sharding.dao.operations.SaveAll;
+import io.appform.dropwizard.sharding.dao.operations.ScrollParam;
+import io.appform.dropwizard.sharding.dao.operations.Select;
+import io.appform.dropwizard.sharding.dao.operations.SelectAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.SelectParam;
+import io.appform.dropwizard.sharding.dao.operations.UpdateAll;
+import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
+import io.appform.dropwizard.sharding.dao.operations.UpdateWithScroll;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
@@ -51,7 +64,6 @@ import lombok.val;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.hibernate.LockMode;
 import org.hibernate.ScrollMode;
 import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
@@ -111,7 +123,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
          * @param lookupKey ID for which data needs to be fetched
          */
 
-        T get(final Object lookupKey) {
+        T get(final String lookupKey) {
             val q = createQuery(currentSession(),
                     entityClass,
                     (queryRoot, query, criteriaBuilder) ->
@@ -136,12 +148,17 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return uniqueResult(createQuery(currentSession(), entityClass, criteria));
         }
 
-        T getLocked(Object lookupKey, UnaryOperator<Criteria> criteriaUpdater, LockMode lockMode) {
-            Criteria criteria = criteriaUpdater.apply(currentSession()
-                    .createCriteria(entityClass)
-                    .add(Restrictions.eq(keyField.getName(), lookupKey))
-                    .setLockMode(lockMode));
-            return uniqueResult(criteria);
+        T getLocked(Object lookupKey, UnaryOperator<QuerySpec<T, T>> criteriaUpdater, LockModeType lockMode) {
+            val querySpec = new QuerySpec<T, T>() {
+                @Override
+                public void apply(Root<T> queryRoot, CriteriaQuery<T> query, CriteriaBuilder criteriaBuilder) {
+                    query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), lookupKey));
+                }
+            };
+            val updatedQuerySpec = criteriaUpdater.apply(querySpec);
+            val query = createQuery(currentSession(), entityClass, updatedQuerySpec)
+                    .setLockMode(lockMode);
+            return uniqueResult(query);
         }
 
         T save(T entity) {
@@ -311,7 +328,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = Get.<T, U>builder()
+        val opContext = GetByQuerySpec.<T, T, U>builder()
                 .getter(dao::get)
                 .criteria(dao.getDetachedCriteria(key))
                 .afterGet(function).build();
@@ -732,7 +749,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                            Function<T, T> updater,
                            boolean completeTransaction) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val opContext = GetAndUpdate.<T>builder()
+        val opContext = GetAndUpdateByQuerySpec.<T>builder()
                 .criteria(dao.getDetachedCriteria(id))
                 .getter(dao::get)
                 .mutator(updater)
@@ -1076,7 +1093,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = GetByQuerySpec.<T, T>builder()
+        val opContext = GetByQuerySpec.<T, T, T>builder()
                 .criteria(dao.get(key))
                 .getter(dao::get).build();
         Optional<T>
@@ -1204,7 +1221,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<Criteria> criteriaUpdater) {
+                                               final UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
         return readOnlyExecutor(tenantId, parentKey, key, criteriaUpdater, () -> false);
     }
 
@@ -1226,14 +1243,14 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      */
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<Criteria> criteriaUpdater,
+                                               final UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
                                                final Supplier<Boolean> entityPopulator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val shardId = shardCalculator.shardId(tenantId, parentKey);
         val dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
-                () -> Lists.newArrayList(dao.getLocked(key, criteriaUpdater, LockMode.NONE)),
+                () -> Lists.newArrayList(dao.getLocked(key, criteriaUpdater, LockModeType.NONE)),
                 entityPopulator,
                 shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
                 shardInfoProviders.get(tenantId),

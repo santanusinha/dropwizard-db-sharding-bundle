@@ -22,17 +22,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.OpContext;
-import io.appform.dropwizard.sharding.dao.operations.RunInSession;
-import io.appform.dropwizard.sharding.dao.operations.RunWithQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.Save;
-import io.appform.dropwizard.sharding.dao.operations.Select;
-import io.appform.dropwizard.sharding.dao.operations.SelectParam;
-import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
+import io.appform.dropwizard.sharding.dao.operations.*;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
+import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
@@ -56,7 +50,6 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.hibernate.LockMode;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.query.Query;
@@ -177,7 +170,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(tenantId, key, x -> x, t -> t));
     }
 
-    public Optional<T> get(String tenantId, String key, UnaryOperator<Criteria> criteriaUpdater)
+    public Optional<T> get(String tenantId, String key, UnaryOperator<QuerySpec<T, T>> criteriaUpdater)
             throws Exception {
         return Optional.ofNullable(get(tenantId, key, criteriaUpdater, t -> t));
     }
@@ -199,7 +192,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = GetByLookupKey.<T, U>builder()
+        val opContext = GetByLookupKeyByQuerySpec.<T, U>builder()
                 .id(key)
                 .getter(dao::get)
                 .afterGet(handler)
@@ -209,13 +202,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     }
 
     @SuppressWarnings("java:S112")
-    public <U> U get(String tenantId, String key, UnaryOperator<Criteria> criteriaUpdater,
+    public <U> U get(String tenantId, String key, UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
                      Function<T, U> handler)
             throws Exception {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = GetByLookupKey.<T, U>builder()
+        val opContext = GetByLookupKeyByQuerySpec.<T, U>builder()
                 .id(key)
                 .getter(dao::get)
                 .criteriaUpdater(criteriaUpdater)
@@ -454,13 +447,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return A new ReadOnlyContext for executing read operations on the specified entity.
      */
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId, String id,
-                                               UnaryOperator<Criteria> criteriaUpdater) {
+                                               UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
-                key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
+                key -> dao.getLocked(key, criteriaUpdater, LockModeType.NONE),
                 null,
                 id,
                 shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
@@ -490,14 +483,14 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId,
                                                String id,
-                                               UnaryOperator<Criteria> criteriaUpdater,
+                                               UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
                                                Supplier<Boolean> entityPopulator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
-                key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
+                key -> dao.getLocked(key, criteriaUpdater, LockModeType.NONE),
                 entityPopulator,
                 id,
                 shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
@@ -613,7 +606,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * results with max N * pageSize elements
      */
     public ScrollResult<T> scrollDown(String tenantId,
-                                      final DetachedCriteria inCriteria,
+                                      final QuerySpec<T, T> inCriteria,
                                       final ScrollPointer inPointer,
                                       final int pageSize,
                                       @NonNull final String sortFieldName) {
@@ -625,7 +618,10 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         return scrollImpl(tenantId, inCriteria,
                 pointer,
                 pageSize,
-                criteria -> criteria.addOrder(Order.asc(sortFieldName)),
+                incomingQuerySpec -> (queryRoot, query, criteriaBuilder) -> {
+                    incomingQuerySpec.apply(queryRoot, query, criteriaBuilder);
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get(sortFieldName)));
+                },
                 new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
                         .thenComparing(ScrollResultItem::getShardIdx),
                 "scrollDown");
@@ -652,7 +648,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     @SneakyThrows
     public ScrollResult<T> scrollUp(String tenantId,
-                                    final DetachedCriteria inCriteria,
+                                    final QuerySpec<T, T> inCriteria,
                                     final ScrollPointer inPointer,
                                     final int pageSize,
                                     @NonNull final String sortFieldName) {
@@ -663,7 +659,10 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         return scrollImpl(tenantId, inCriteria,
                 pointer,
                 pageSize,
-                criteria -> criteria.addOrder(Order.desc(sortFieldName)),
+                incomingQuerySpec -> (queryRoot, query, criteriaBuilder) -> {
+                    incomingQuerySpec.apply(queryRoot, query, criteriaBuilder);
+                    query.orderBy(criteriaBuilder.desc(queryRoot.get(sortFieldName)));
+                },
                 new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
                         .reversed()
                         .thenComparing(ScrollResultItem::getShardIdx),
@@ -766,10 +765,14 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                 Collectors.toList()));
         return lookupKeysGroupByShards.keySet().stream().map(shardId -> {
             try {
-                DetachedCriteria criteria = DetachedCriteria.forClass(entityClass)
-                        .add(Restrictions.in(keyField.getName(), lookupKeysGroupByShards.get(shardId)));
-                val opContext = Get.<List<T>, List<T>>builder()
-                        .criteria(criteria)
+                var querySpec = new QuerySpec<T, T>() {
+                    @Override
+                    public void apply(Root<T> queryRoot, CriteriaQuery<T> query, CriteriaBuilder criteriaBuilder) {
+                        query.where(queryRoot.get(keyField.getName()).in(lookupKeysGroupByShards.get(shardId)));
+                    }
+                };
+                val opContext = GetByQuerySpec.<T, List<T>, List<T>>builder()
+                        .criteria(querySpec)
                         .getter(daos.get(tenantId).get(shardId)::select)
                         .build();
                 return transactionExecutor.get(tenantId)
@@ -873,10 +876,10 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
 
     @SneakyThrows
     private ScrollResult<T> scrollImpl(String tenantId,
-                                       final DetachedCriteria inCriteria,
+                                       final QuerySpec<T, T> inCriteria,
                                        final ScrollPointer pointer,
                                        final int pageSize,
-                                       final UnaryOperator<DetachedCriteria> criteriaMutator,
+                                       final UnaryOperator<QuerySpec<T, T>> criteriaMutator,
                                        final Comparator<ScrollResultItem<T>> comparator,
                                        String methodName) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
@@ -884,11 +887,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         val results = daos.get(tenantId).stream()
                 .flatMap(dao -> {
                     val currIdx = daoIndex.getAndIncrement();
-                    val criteria = criteriaMutator.apply(InternalUtils.cloneObject(inCriteria));
+                    val criteria = criteriaMutator.apply(inCriteria);
                     val opContext = Select.<T, List<T>>builder()
                             .getter(dao::select)
                             .selectParam(SelectParam.<T>builder()
-                                    .criteria(criteria)
+                                    .querySpec(criteria)
                                     .start(pointer.getCurrOffset(currIdx))
                                     .numRows(pageSize)
                                     .build())
@@ -1193,11 +1196,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          * @return The retrieved entity, or null if the entity is not found.
          */
         T get(String lookupKey) {
-            return getLocked(lookupKey, x -> x, LockMode.READ);
+            return getLocked(lookupKey, x -> x, LockModeType.READ);
         }
 
-        T get(String lookupKey, UnaryOperator<Criteria> criteriaUpdater) {
-            return getLocked(lookupKey, criteriaUpdater, LockMode.READ);
+        T get(String lookupKey, UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
+            return getLocked(lookupKey, criteriaUpdater, LockModeType.READ);
         }
 
         /**
@@ -1207,12 +1210,17 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          * @param criteriaUpdater Function to update criteria to add additional params
          * @return Extracted element or null if not found.
          */
-        T getLocked(String lookupKey, UnaryOperator<Criteria> criteriaUpdater, LockMode lockMode) {
-            Criteria criteria = criteriaUpdater.apply(currentSession()
-                    .createCriteria(entityClass)
-                    .add(Restrictions.eq(keyField.getName(), lookupKey))
-                    .setLockMode(lockMode));
-            return uniqueResult(criteria);
+        T getLocked(String lookupKey, UnaryOperator<QuerySpec<T, T>> criteriaUpdater, LockModeType lockMode) {
+            val querySpec = new QuerySpec<T, T>() {
+                @Override
+                public void apply(Root<T> queryRoot, CriteriaQuery<T> query, CriteriaBuilder criteriaBuilder) {
+                    query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), lookupKey));
+                }
+            };
+            val updatedQuerySpec = criteriaUpdater.apply(querySpec);
+            val query = createQuery(currentSession(), entityClass, updatedQuerySpec)
+                    .setLockMode(lockMode);
+            return uniqueResult(query);
         }
 
         /**

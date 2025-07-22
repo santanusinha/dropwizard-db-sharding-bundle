@@ -80,7 +80,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(key, x -> x, t -> t));
     }
 
-    public Optional<T> get(String key, UnaryOperator<Criteria> criteriaUpdater) throws Exception {
+    public Optional<T> get(String key, UnaryOperator<QuerySpec<T, T>> criteriaUpdater) throws Exception {
         return Optional.ofNullable(get(key, criteriaUpdater, t -> t));
     }
 
@@ -101,7 +101,7 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     @SuppressWarnings("java:S112")
-    public <U> U get(String key, UnaryOperator<Criteria> criteriaUpdater, Function<T, U> handler)
+    public <U> U get(String key, UnaryOperator<QuerySpec<T, T>> criteriaUpdater, Function<T, U> handler)
             throws Exception {
         return delegate.get(dbNamespace, key, criteriaUpdater, handler);
     }
@@ -237,7 +237,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @param criteriaUpdater A method that lets clients add additional changes to the criteria before the get
      * @return A new ReadOnlyContext for executing read operations on the specified entity.
      */
-    public ReadOnlyContext<T> readOnlyExecutor(String id, UnaryOperator<Criteria> criteriaUpdater) {
+    public ReadOnlyContext<T> readOnlyExecutor(String id, UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
         return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, criteriaUpdater));
     }
 
@@ -260,7 +260,7 @@ public class LookupDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(
             String id,
-            UnaryOperator<Criteria> criteriaUpdater,
+            UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
             Supplier<Boolean> entityPopulator) {
         return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, criteriaUpdater, entityPopulator));
     }
@@ -335,7 +335,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      * max N * pageSize elements
      */
     public ScrollResult<T> scrollDown(
-            final DetachedCriteria inCriteria,
+            final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
             @NonNull final String sortFieldName) {
@@ -363,7 +363,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     @SneakyThrows
     public ScrollResult<T> scrollUp(
-            final DetachedCriteria inCriteria,
+            final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
             @NonNull final String sortFieldName) {

@@ -1,14 +1,15 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.dropwizard.util.Generics;
+import jakarta.persistence.criteria.CriteriaQuery;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
+import org.hibernate.NonUniqueResultException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.query.Query;
 
-import jakarta.persistence.criteria.CriteriaQuery;
-import java.io.Serializable;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -25,7 +26,7 @@ public class AbstractDAO<E> {
     /**
      * Creates a new DAO with a given session provider.
      *
-     * @param sessionFactory a session provider
+     * @param sessionFactory    a session provider
      */
     public AbstractDAO(SessionFactory sessionFactory) {
         this.sessionFactory = requireNonNull(sessionFactory);
@@ -101,12 +102,23 @@ public class AbstractDAO<E> {
      * @return the single result or {@code null}
      * @throws HibernateException if there is more than one matching result
      */
-    protected E uniqueResult(CriteriaQuery<E> criteriaQuery) throws HibernateException {
-        return AbstractProducedQuery.uniqueElement(
+    protected @Nullable E uniqueResult(CriteriaQuery<E> criteriaQuery) throws HibernateException {
+        return uniqueElement(
                 currentSession()
                         .createQuery(requireNonNull(criteriaQuery))
                         .getResultList()
         );
+    }
+
+    private static <T> @Nullable T uniqueElement(List<T> list) throws NonUniqueResultException {
+        if (list.isEmpty()) {
+            return null;
+        }
+        final T head = list.get(0);
+        if (list.stream().anyMatch(element -> element != head)) {
+            throw new NonUniqueResultException(list.size());
+        }
+        return head;
     }
 
     /**
@@ -151,20 +163,19 @@ public class AbstractDAO<E> {
      * @param id an identifier
      * @return a persistent instance or {@code null}
      * @throws HibernateException
-     * @see Session#get(Class, Serializable)
+     * @see Session#get(Class, Object)
      */
     @SuppressWarnings("unchecked")
-    protected E get(Serializable id) {
+    protected E get(Object id) {
         return (E) currentSession().get(entityClass, requireNonNull(id));
     }
 
     /**
      * Either save or update the given instance, depending upon resolution of the unsaved-value
      * checks (see the manual for discussion of unsaved-value checking).
-     * <p>
+     * <p/>
      * This operation cascades to associated instances if the association is mapped with
-     * <code>cascade="save-update"</code>.
-     * </p>
+     * <tt>cascade="save-update"</tt>.
      *
      * @param entity a transient or detached instance containing new or updated state
      * @throws HibernateException
@@ -177,13 +188,12 @@ public class AbstractDAO<E> {
 
     /**
      * Force initialization of a proxy or persistent collection.
-     * <p>
+     * <p/>
      * Note: This only ensures initialization of a proxy object or collection;
      * it is not guaranteed that the elements INSIDE the collection will be initialized/materialized.
-     * </p>
      *
      * @param proxy a persistable object, proxy, persistent collection or {@code null}
-     * @throws HibernateException if we can't initialize the proxy at this time, eg. the {@link Session} was closed
+     * @throws HibernateException if we can't initialize the proxy at this time, e.g. the {@link Session} was closed
      */
     protected <T> T initialize(T proxy) throws HibernateException {
         if (!Hibernate.isInitialized(proxy)) {

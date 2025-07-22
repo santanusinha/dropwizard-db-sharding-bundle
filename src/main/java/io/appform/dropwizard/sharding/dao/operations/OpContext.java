@@ -30,9 +30,7 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
         P visit(CountByQuerySpec opContext);
 
-        <T, R> P visit(GetByQuerySpec<T, R> opContext);
-
-        <T> P visit(GetAndUpdate<T> opContext);
+        <T, G, R> P visit(GetByQuerySpec<T, G, R> opContext);
 
         <T, R> P visit(GetByLookupKeyByQuerySpec<T, R> opContext);
 
@@ -70,6 +68,7 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
         <U, T> P visit(RunWithQuerySpec<U, T> opContext);
 
+        <T> P visit(GetAndUpdateByQuerySpec<T> opContext);
     }
 
 }
