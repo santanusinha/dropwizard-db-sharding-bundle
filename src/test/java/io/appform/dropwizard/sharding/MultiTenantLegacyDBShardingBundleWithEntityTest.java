@@ -20,7 +20,6 @@ package io.appform.dropwizard.sharding;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
-import io.appform.dropwizard.sharding.dao.testdata.entities.TestEncryptedEntity;
 import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 
@@ -28,8 +27,7 @@ public class MultiTenantLegacyDBShardingBundleWithEntityTest extends MultiTenant
 
     @Override
     protected MultiTenantDBShardingBundleBase<TestConfig> getBundle() {
-        return new MultiTenantDBShardingBundle<TestConfig>(Order.class, OrderItem.class,
-            TestEncryptedEntity.class) {
+        return new MultiTenantDBShardingBundle<TestConfig>(Order.class, OrderItem.class) {
             @Override
             protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
                 config.getShards().getTenants().forEach((tenant, factory) -> {

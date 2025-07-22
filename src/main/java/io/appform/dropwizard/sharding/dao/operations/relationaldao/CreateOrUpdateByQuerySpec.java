@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NonNull;
 import lombok.val;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;

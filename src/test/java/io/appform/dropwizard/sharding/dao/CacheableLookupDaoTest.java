@@ -36,8 +36,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -325,8 +323,9 @@ public class CacheableLookupDaoTest {
 
     @Test
     public void testScatterGather() throws Exception {
-        List<TestEntity> results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("externalId", "testId")));
+        List<TestEntity> results = lookupDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId"));
+        });
         assertTrue(results.isEmpty());
 
         TestEntity testEntity = TestEntity.builder()
@@ -334,8 +333,9 @@ public class CacheableLookupDaoTest {
                 .text("Some Text")
                 .build();
         lookupDao.save(testEntity);
-        results = lookupDao.scatterGather(DetachedCriteria.forClass(TestEntity.class)
-                .add(Restrictions.eq("externalId", "testId")));
+        results = lookupDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("externalId"), "testId"));
+        });
         assertFalse(results.isEmpty());
         assertEquals("Some Text",
                 results.get(0)
@@ -379,11 +379,13 @@ public class CacheableLookupDaoTest {
         saveAudit(phoneNumber, "testTxn", "Underway");
         saveAudit(phoneNumber, "testTxn", "Completed");
 
-        assertEquals(3, auditDao.count(phoneNumber, DetachedCriteria.forClass(Audit.class)
-                .add(Restrictions.eq("transaction.transactionId", "testTxn"))));
+        assertEquals(3, auditDao.count(phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "testTxn"));
+        }));
 
-        List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
-                .add(Restrictions.eq("transaction.transactionId", "testTxn")), 0, 10);
+        List<Audit> audits = auditDao.select(phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "testTxn"));
+        }, 0, 10);
         assertEquals("Started",
                 audits.get(0)
                         .getText());
@@ -405,12 +407,15 @@ public class CacheableLookupDaoTest {
         saveHierarchy(phoneNumber);
         saveHierarchy("9986402019");
 
-        List<Audit> audits = auditDao.select(phoneNumber, DetachedCriteria.forClass(Audit.class)
-                .add(Restrictions.eq("transaction.transactionId", "newTxn-" + phoneNumber)), 0, 10);
+        List<Audit> audits = auditDao.select(phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+            query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "newTxn-" + phoneNumber));
+        }, 0, 10);
 
         assertEquals(2, audits.size());
 
-        List<Audit> allAudits = auditDao.scatterGather(DetachedCriteria.forClass(Audit.class), 0, 10);
+        List<Audit> allAudits = auditDao.scatterGather((queryRoot, query, criteriaBuilder) -> {
+            // No restrictions, select all
+        }, 0, 10);
         assertEquals(4, allAudits.size());
     }
 
@@ -438,3 +443,4 @@ public class CacheableLookupDaoTest {
         transactionDao.save(phone, transaction);
     }
 }
+

@@ -6,14 +6,14 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.dropwizard.Configuration;
+import io.dropwizard.core.Configuration;
+import io.dropwizard.core.setup.Bootstrap;
+import io.dropwizard.core.setup.Environment;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jersey.DropwizardResourceConfig;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
-import io.dropwizard.setup.AdminEnvironment;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
+import io.dropwizard.core.setup.AdminEnvironment;
 import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 
