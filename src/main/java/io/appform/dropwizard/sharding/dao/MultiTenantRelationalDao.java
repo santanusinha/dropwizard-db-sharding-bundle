@@ -1099,7 +1099,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = GetByQuerySpec.<T, T, T>builder()
-                .criteria(dao.get(key))
+                .criteria(dao.getQuerySpec(key))
                 .getter(dao::get).build();
         Optional<T>
                 result = Optional.ofNullable(transactionExecutor.get(tenantId).execute(dao.sessionFactory,
