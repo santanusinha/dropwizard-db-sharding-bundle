@@ -673,6 +673,48 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     }
 
     /**
+     * Provides a scroll api for records across shards. This api will scroll down in ascending order
+     * of the 'sortFieldName' field. Newly added records can be polled by passing the pointer
+     * repeatedly. If nothing new is available, it will return an empty set of results. If the passed
+     * pointer is null, it will return the first pageSize records with a pointer to be passed to get
+     * the next pageSize set of records.
+     * <p>
+     * NOTES: - Do not modify the criteria between subsequent calls - It is important to provide a
+     * sort field that is perpetually increasing - Pointer returned can be used to _only_ scroll down
+     *
+     * @param tenantId      Tenant id
+     * @param inCriteria    The core criteria for the query
+     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
+     *                      session
+     * @param pageSize      Page size of scroll result
+     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
+     *                      ever-increasing one
+     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
+     * results with max N * pageSize elements
+     */
+    public ScrollResult<T> scrollDown(String tenantId,
+                                      final QuerySpec<T, T> inCriteria,
+                                      final ScrollPointer inPointer,
+                                      final int pageSize,
+                                      @NonNull final String sortFieldName) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        log.trace("Scroll Pointer: {}", inPointer);
+        val pointer = inPointer == null ? new ScrollPointer(ScrollPointer.Direction.DOWN) : inPointer;
+        Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.DOWN),
+                "A down scroll pointer needs to be passed to this method");
+        return scrollImpl(tenantId, inCriteria,
+                pointer,
+                pageSize,
+                incomingQuerySpec -> (queryRoot, query, criteriaBuilder) -> {
+                    incomingQuerySpec.apply(queryRoot, query, criteriaBuilder);
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get(sortFieldName)));
+                },
+                new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
+                        .thenComparing(ScrollResultItem::getShardIdx),
+                "scrollDown");
+    }
+
+    /**
      * Provides a scroll api for records across shards. This api will scroll up in descending order of
      * the 'sortFieldName' field. As this api goes back in order, newly added records will not be
      * available in the scroll. If the passed pointer is null, it will return the last pageSize
@@ -705,6 +747,48 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 pointer,
                 pageSize,
                 criteria -> criteria.addOrder(Order.desc(sortFieldName)),
+                new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
+                        .reversed()
+                        .thenComparing(ScrollResultItem::getShardIdx),
+                "scrollUp");
+    }
+
+    /**
+     * Provides a scroll api for records across shards. This api will scroll up in descending order of
+     * the 'sortFieldName' field. As this api goes back in order, newly added records will not be
+     * available in the scroll. If the passed pointer is null, it will return the last pageSize
+     * records with a pointer to be passed to get the previous pageSize set of records.
+     * <p>
+     * NOTES: - Do not modify the criteria between subsequent calls - It is important to provide a
+     * sort field that is perpetually increasing - Pointer returned can be used to _only_ scroll up
+     *
+     * @param tenantId      Tenant id
+     * @param inCriteria    The core criteria for the query
+     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
+     *                      session
+     * @param pageSize      Count of records per shard
+     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
+     *                      ever-increasing one
+     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
+     * results with max N * pageSize elements
+     */
+    @SneakyThrows
+    public ScrollResult<T> scrollUp(String tenantId,
+                                    final QuerySpec<T, T> inCriteria,
+                                    final ScrollPointer inPointer,
+                                    final int pageSize,
+                                    @NonNull final String sortFieldName) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        val pointer = null == inPointer ? new ScrollPointer(ScrollPointer.Direction.UP) : inPointer;
+        Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.UP),
+                "An up scroll pointer needs to be passed to this method");
+        return scrollImpl(tenantId, inCriteria,
+                pointer,
+                pageSize,
+                incomingQuerySpec -> (queryRoot, query, criteriaBuilder) -> {
+                    incomingQuerySpec.apply(queryRoot, query, criteriaBuilder);
+                    query.orderBy(criteriaBuilder.desc(queryRoot.get(sortFieldName)));
+                },
                 new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
                         .reversed()
                         .thenComparing(ScrollResultItem::getShardIdx),
@@ -1009,6 +1093,46 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                             .getter(dao::select)
                             .selectParam(SelectParam.<T>builder()
                                     .criteria(criteria)
+                                    .start(pointer.getCurrOffset(currIdx))
+                                    .numRows(pageSize)
+                                    .build())
+                            .build();
+                    return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                                    true, methodName,
+                                    opContext, currIdx)
+                            .stream()
+                            .map(item -> new ScrollResultItem<>(item, currIdx));
+                })
+                .sorted(comparator)
+                .limit(pageSize)
+                .collect(Collectors.toList());
+        //This list will be of _pageSize_ long but max fetched might be _pageSize_ * numShards long
+        val outputBuilder = ImmutableList.<T>builder();
+        results.forEach(result -> {
+            outputBuilder.add(result.getData());
+            pointer.advance(result.getShardIdx(), 1);// will get advanced
+        });
+        return new ScrollResult<>(pointer, outputBuilder.build());
+    }
+
+    @SneakyThrows
+    private ScrollResult<T> scrollImpl(String tenantId,
+                                       final QuerySpec<T, T> inCriteria,
+                                       final ScrollPointer pointer,
+                                       final int pageSize,
+                                       final UnaryOperator<QuerySpec<T, T>> criteriaMutator,
+                                       final Comparator<ScrollResultItem<T>> comparator,
+                                       String methodName) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        val daoIndex = new AtomicInteger();
+        val results = daos.get(tenantId).stream()
+                .flatMap(dao -> {
+                    val currIdx = daoIndex.getAndIncrement();
+                    val criteria = criteriaMutator.apply(inCriteria);
+                    val opContext = Select.<T, List<T>>builder()
+                            .getter(dao::select)
+                            .selectParam(SelectParam.<T>builder()
+                                    .querySpec(criteria)
                                     .start(pointer.getCurrOffset(currIdx))
                                     .numRows(pageSize)
                                     .build())

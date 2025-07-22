@@ -359,6 +359,33 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     /**
+     * Provides a scroll api for records across shards. This api will scroll down in ascending order of the
+     * 'sortFieldName' field. Newly added records can be polled by passing the pointer repeatedly. If nothing new is
+     * available, it will return an empty set of results.
+     * If the passed pointer is null, it will return the first pageSize records with a pointer to be passed to get the
+     * next pageSize set of records.
+     * <p>
+     * NOTES:
+     * - Do not modify the criteria between subsequent calls
+     * - It is important to provide a sort field that is perpetually increasing
+     * - Pointer returned can be used to _only_ scroll down
+     *
+     * @param inCriteria    The core criteria for the query
+     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll session
+     * @param pageSize      Page size of scroll result
+     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an ever-increasing one
+     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of results with
+     * max N * pageSize elements
+     */
+    public ScrollResult<T> scrollDown(
+            final QuerySpec<T, T> inCriteria,
+            final ScrollPointer inPointer,
+            final int pageSize,
+            @NonNull final String sortFieldName) {
+        return delegate.scrollDown(dbNamespace, inCriteria, inPointer, pageSize, sortFieldName);
+    }
+
+    /**
      * Provides a scroll api for records across shards. This api will scroll up in descending order of the
      * 'sortFieldName' field.
      * As this api goes back in order, newly added records will not be available in the scroll.
@@ -380,6 +407,34 @@ public class LookupDao<T> implements ShardedDao<T> {
     @SneakyThrows
     public ScrollResult<T> scrollUp(
             final DetachedCriteria inCriteria,
+            final ScrollPointer inPointer,
+            final int pageSize,
+            @NonNull final String sortFieldName) {
+        return delegate.scrollUp(dbNamespace, inCriteria, inPointer, pageSize, sortFieldName);
+    }
+
+    /**
+     * Provides a scroll api for records across shards. This api will scroll up in descending order of the
+     * 'sortFieldName' field.
+     * As this api goes back in order, newly added records will not be available in the scroll.
+     * If the passed pointer is null, it will return the last pageSize records with a pointer to be passed to get the
+     * previous pageSize set of records.
+     * <p>
+     * NOTES:
+     * - Do not modify the criteria between subsequent calls
+     * - It is important to provide a sort field that is perpetually increasing
+     * - Pointer returned can be used to _only_ scroll up
+     *
+     * @param inCriteria    The core criteria for the query
+     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll session
+     * @param pageSize      Count of records per shard
+     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an ever-increasing one
+     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of results with
+     * max N * pageSize elements
+     */
+    @SneakyThrows
+    public ScrollResult<T> scrollUp(
+            final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
             @NonNull final String sortFieldName) {
