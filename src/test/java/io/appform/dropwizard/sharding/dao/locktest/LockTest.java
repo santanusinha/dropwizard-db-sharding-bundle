@@ -1139,6 +1139,36 @@ public class LockTest {
         assertFalse(testExecuted.get());
     }
 
+    @Test
+    public void testUpdateWithLockAndExecuteConsumerAddsAnotherOperationInSameTransaction() throws Exception {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+            .myId("0")
+            .name("Parent 1")
+            .build();
+
+        SomeOtherObject c1 = relationDao.save(p1.getMyId(), SomeOtherObject.builder()
+            .myId(p1.getMyId())
+            .value("Hello")
+            .build()).get();
+
+
+        var lockedContext  = lookupDao.saveAndGetExecutor(p1)
+            .filter(parent -> !Strings.isNullOrEmpty(parent.getName()));
+
+        lockedContext.mutate(someLookupObject -> {
+            someLookupObject.setName("Changed");
+            lockedContext.save(relationDao, c1, child -> {
+                c1.setValue(someLookupObject.getName());
+                return c1;
+            });
+        }).execute();
+
+
+        assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
+        assertEquals("Changed", lookupDao.get("0").get().getName());
+        assertEquals("Changed", relationDao.get("0", 1L).get().getValue());
+    }
+
     private boolean saveEntity(LockedContext<SomeLookupObject> lockedContext) {
         return lockedContext
                 .filter(parent -> !Strings.isNullOrEmpty(parent.getName()))
