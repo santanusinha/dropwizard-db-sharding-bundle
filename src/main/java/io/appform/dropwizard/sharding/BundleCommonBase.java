@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,12 +50,12 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   protected final List<Class<?>> initialisedEntities = new ArrayList<>();
   protected final Map<String, EntityMeta> initialisedEntitiesMeta = new HashMap<>();
 
-  private volatile boolean entityInitialisationBlocked = false;
+  private volatile boolean bundleInitialised = false;
 
   protected TransactionObserver rootObserver;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
-    initialiseEntitiesAndMeta(ImmutableList.<Class<?>>builder()
+    initialiseEntities(ImmutableList.<Class<?>>builder()
             .add(entity).add(entities).build());
   }
 
@@ -62,37 +63,37 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     final var entities = new Reflections(classPathPrefixList).getTypesAnnotatedWith(Entity.class);
     Preconditions.checkArgument(!entities.isEmpty(),
             String.format("No entity class found at %s", String.join(",", classPathPrefixList)));
-    initialiseEntitiesAndMeta(entities);
+    initialiseEntities(entities);
   }
 
   public final void registerEntities(@NonNull final Class<?>... entities) {
-      initialisePendingInitialisationEntitiesAndMeta(Arrays.asList(entities));
+      initialiseEntities(Arrays.asList(entities));
   }
 
   public final void registerEntities(@NonNull final List<String> classPathPrefixList) {
       final var entities = new Reflections(classPathPrefixList).getTypesAnnotatedWith(Entity.class);
       Preconditions.checkArgument(!entities.isEmpty(),
               String.format("No entity class found at %s", String.join(",", classPathPrefixList)));
-      initialisePendingInitialisationEntitiesAndMeta(entities);
+      initialiseEntities(entities);
   }
 
-  private synchronized void initialisePendingInitialisationEntitiesAndMeta(final Collection<Class<?>> entities) {
-    if (entityInitialisationBlocked) {
+  private synchronized void initialiseEntities(final Collection<Class<?>> entities) {
+    if (this.bundleInitialised) {
       throw new UnsupportedOperationException("Entity registration is not supported after run method execution.");
+    }
+    if (this.initialisedEntities.isEmpty()) {
+      this.initialisedEntities.addAll(entities);
+      return;
     }
     final var pendingInitialisationEntities = entities.stream()
             .filter(entity -> !this.initialisedEntities.contains(entity))
             .collect(Collectors.toList());
-    initialiseEntitiesAndMeta(pendingInitialisationEntities);
+    this.initialisedEntities.addAll(pendingInitialisationEntities);
   }
 
-  private void initialiseEntitiesAndMeta(final Collection<Class<?>> entities) {
-    this.initialisedEntities.addAll(entities);
-    validateAndBuildEntitiesMeta(entities);
-  }
-
-  protected final synchronized void blockEntityInitialisation() {
-    this.entityInitialisationBlocked = true;
+  protected final synchronized void completeBundleInitialization() {
+    validateAndBuildEntitiesMeta(this.initialisedEntities);
+    this.bundleInitialised = true;
   }
 
   protected ShardBlacklistingStore getBlacklistingStore() {
@@ -100,10 +101,10 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   }
 
   public List<Class<?>> getInitialisedEntities() {
-    if (this.initialisedEntities.isEmpty()) {
+    if (!this.bundleInitialised) {
       throw new IllegalStateException("DB sharding bundle is not initialised !");
     }
-    return List.copyOf(this.initialisedEntities);
+    return Collections.unmodifiableList(this.initialisedEntities);
   }
 
   public final void registerObserver(final TransactionObserver observer) {

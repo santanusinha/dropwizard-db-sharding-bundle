@@ -112,7 +112,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   @Override
   public void run(T configuration, Environment environment) {
-    this.blockEntityInitialisation();
+    this.completeBundleInitialization();
     final var tenantedConfig = getConfig(configuration);
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
       //Encryption Support through jasypt-hibernate5
