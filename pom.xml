@@ -78,8 +78,8 @@
         <guava-retrying.version>2.0.0</guava-retrying.version>
         <caffeine.version>2.9.3</caffeine.version>
         <jasypt-hibernate5.version>1.9.5</jasypt-hibernate5.version>
-        <junit.jupiter.version>5.7.2</junit.jupiter.version>
-        <h2.version>1.4.196</h2.version>
+        <junit.jupiter.version>5.9.3</junit.jupiter.version>
+        <h2.version>2.2.224</h2.version>
         <mockito.version>4.3.1</mockito.version>
     </properties>
 

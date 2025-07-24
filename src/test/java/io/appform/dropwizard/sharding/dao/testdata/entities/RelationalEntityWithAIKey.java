@@ -23,9 +23,10 @@ public class RelationalEntityWithAIKey {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     long id;
 
-    @Column(name = "key", nullable = false)
+    @Column(name = "`key`", nullable = false)
     private String key;
 
+    @Column(name = "`value`")
     private String value;
 
     @Builder
