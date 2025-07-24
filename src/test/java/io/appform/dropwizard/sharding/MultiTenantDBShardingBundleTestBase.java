@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import lombok.SneakyThrows;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Restrictions;
 import org.junit.jupiter.api.Assertions;
@@ -150,11 +152,13 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
     }
 
     @Test
+    @SneakyThrows
+    @SuppressWarnings("unchecked")
     public void testRegisterAlreadyRegisteredEntityClassesBeforeRun() {
         MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
-        final var alreadyRegisteredEntityClasses = bundle.getInitialisedEntities()
-                .toArray(new Class<?>[0]);
+        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(bundle, "initialisedEntities", true);
+        final var alreadyRegisteredEntityClasses = initializedEntities.toArray(new Class<?>[0]);
         Assertions.assertDoesNotThrow(() -> bundle.registerEntities(alreadyRegisteredEntityClasses));
         Assertions.assertDoesNotThrow(() -> bundle.run(testConfig, environment));
     }
@@ -172,11 +176,13 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
     }
 
     @Test
+    @SneakyThrows
+    @SuppressWarnings("unchecked")
     public void testRegisterAlreadyRegisteredEntityPackagesBeforeRun() {
         MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
-        final var alreadyRegisteredEntityPackages = bundle.getInitialisedEntities()
-                .stream()
+        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(bundle, "initialisedEntities", true);
+        final var alreadyRegisteredEntityPackages = initializedEntities.stream()
                 .map(Class::getPackageName)
                 .collect(Collectors.toList());
         Assertions.assertDoesNotThrow(() -> bundle.registerEntities(alreadyRegisteredEntityPackages));
