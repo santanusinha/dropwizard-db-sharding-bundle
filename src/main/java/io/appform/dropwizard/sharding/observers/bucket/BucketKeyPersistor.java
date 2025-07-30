@@ -5,9 +5,11 @@ import io.appform.dropwizard.sharding.dao.operations.Count;
 import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.GetByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
 import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
+import io.appform.dropwizard.sharding.dao.operations.RunWithQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveAll;
 import io.appform.dropwizard.sharding.dao.operations.Select;
@@ -20,8 +22,10 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByL
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
+import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
@@ -257,6 +261,41 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T, R> Void visit(Select<T, R> select) {
+        return null;
+    }
+
+    @Override
+    public <T, R> Void visit(GetByQuerySpec<T, R> opContext) {
+        return null;
+    }
+
+    @Override
+    public <U, T> Void visit(RunWithQuerySpec<U, T> opContext) {
+        return null;
+    }
+
+    @Override
+    public <T, R> Void visit(GetByLookupKeyByQuerySpec<T, R> opContext) {
+        return null;
+    }
+
+    @Override
+    public <U, T> Void visit(CreateOrUpdateByQuerySpec<U, T> opContext) {
+        final var oldMutator = opContext.getMutator();
+        opContext.setMutator(result -> {
+            if (result != null) {
+                T value = oldMutator.apply(result);
+                addBucketId(value);
+                return value;
+            }
+            return null;
+        });
+
+        final var oldSaver = opContext.getSaver();
+        opContext.setSaver((T entity) -> {
+            addBucketId(entity);
+            return oldSaver.apply(entity);
+        });
         return null;
     }
 

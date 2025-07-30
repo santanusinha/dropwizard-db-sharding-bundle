@@ -396,20 +396,6 @@ public class LockedContext<T> {
         });
     }
 
-    public <U> LockedContext<T> createOrUpdate(
-            RelationalDao<U> relationalDao,
-            DetachedCriteria criteria,
-            UnaryOperator<U> updater,
-            Function<T, U> entityGenerator) {
-        return apply(parent -> {
-            try {
-                relationalDao.createOrUpdate(this, criteria, updater, parent, entityGenerator);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
     /**
      * Creates or updates using this context using the provided relational data access object (DAO),
      * query specification, updater function, and entity generator
@@ -440,6 +426,35 @@ public class LockedContext<T> {
             }
         });
     }
+
+    public <U> LockedContext<T> createOrUpdate(
+            RelationalDao<U> relationalDao,
+            DetachedCriteria criteria,
+            UnaryOperator<U> updater,
+            Function<T, U> entityGenerator) {
+        return apply(parent -> {
+            try {
+                relationalDao.createOrUpdate(this, criteria, updater, parent, entityGenerator);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    public <U> LockedContext<T> createOrUpdate(
+            RelationalDao<U> relationalDao,
+            QuerySpec<U, U> criteria,
+            UnaryOperator<U> updater,
+            Function<T, U> entityGenerator) {
+        return apply(parent -> {
+            try {
+                relationalDao.createOrUpdate(this, criteria, updater, parent, entityGenerator);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
 
     /**
      * Updates entities in the context using the provided relational data access object (DAO),
