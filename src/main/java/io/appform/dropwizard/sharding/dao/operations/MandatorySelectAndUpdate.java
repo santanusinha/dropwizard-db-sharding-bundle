@@ -2,16 +2,17 @@ package io.appform.dropwizard.sharding.dao.operations;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NonNull;
 import org.hibernate.Session;
 
-import javax.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 @Data
 @Builder
+@EqualsAndHashCode(callSuper = true)
 public class MandatorySelectAndUpdate<T> extends OpContext<T> {
     @NonNull
     private SelectParam<T> selectParam;
@@ -25,17 +26,13 @@ public class MandatorySelectAndUpdate<T> extends OpContext<T> {
     @Override
     public T apply(Session session) {
         List<T> entityList = selector.apply(selectParam);
-        if (entityList == null || entityList.isEmpty()) {
-            throw new EntityNotFoundException("No entity found for the given selected parameters");
+        if (entityList == null || entityList.isEmpty() || entityList.get(0)==null) {
+            throw new IllegalStateException("No entity found for the given selection criteria");
         }
         T oldEntity = entityList.get(0);
-//        confirm from vidhya
-//        if (null == oldEntity) {
-//            return false;
-//        }
         T newEntity = mutator.apply(oldEntity);
         if (null == newEntity) {
-            throw new IllegalStateException("Mutation process failed to create a new entity based on the existing entity");
+            throw new IllegalArgumentException("Mutation process failed to create a new entity based on the existing entity");
         }
         updater.accept(oldEntity, newEntity);
         return newEntity;
