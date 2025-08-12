@@ -27,6 +27,7 @@ import io.appform.dropwizard.sharding.dao.operations.Count;
 import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.MandatorySelectAndUpdate;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
 import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
@@ -888,6 +889,49 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .numRows(1)
                 .build();
         val opContext = SelectAndUpdate.<T>builder()
+                .selectParam(selectParam)
+                .selector(dao::select)
+                .mutator(updater)
+                .updater(dao::update).build();
+        try {
+            return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                    true,
+                    "update",
+                    opContext,
+                    shardId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
+        }
+    }
+
+    /**
+     * Updates a single entity within a specific shard based on mandatory selection criteria and an update
+     * function.
+     * <p>
+     * This method performs a mandatory select and update operation within a specific shard, as determined
+     * by the provided parent key and shard calculator. It uses the provided criteria to select exactly one
+     * entity to be updated. The update operation will fail if no entity is found or if the mutation process fails.
+     *
+     * @param tenantId  The tenant ID associated with the entity.
+     * @param parentKey A string representing the parent key that determines the shard for updating the entity.
+     * @param criteria  A DetachedCriteria object specifying the selection criteria for the entity to update.
+     * @param updater   A function that takes the existing entity and returns the modified entity.
+     * @return The updated entity after the modification is applied and persisted.
+     * @throws IllegalStateException If no entity is found matching the given criteria.
+     * @throws IllegalArgumentException If the mutation process fails to create a valid updated entity.
+     * @throws RuntimeException If any other error occurs during the update operation.
+     */
+    public T updateEntity(String tenantId, String parentKey, DetachedCriteria criteria,
+                          Function<T, T> updater) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        int shardId = shardCalculator.shardId(tenantId, parentKey);
+        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
+        val selectParam = SelectParam.<T>builder()
+                .criteria(criteria)
+                .start(0)
+                .numRows(1)
+                .build();
+        val opContext = MandatorySelectAndUpdate.<T>builder()
                 .selectParam(selectParam)
                 .selector(dao::select)
                 .mutator(updater)

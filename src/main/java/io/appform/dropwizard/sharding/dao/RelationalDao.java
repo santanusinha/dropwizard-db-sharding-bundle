@@ -343,6 +343,10 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.update(tenantId, parentKey, criteria, updater);
     }
 
+    public T updateEntity(String parentKey, DetachedCriteria criteria, Function<T, T> updater) {
+        return delegate.updateEntity(tenantId, parentKey, criteria, updater);
+    }
+
 
     /**
      * Updates a single entity within a specific shard based on query criteria and an update function.
