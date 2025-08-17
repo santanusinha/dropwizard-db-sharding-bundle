@@ -18,7 +18,7 @@ class FindShard(object):
 
     @staticmethod
     def __as_int(h):
-        return h[0] | numpy.int32(h[1] << 8) | numpy.int32(h[2] << 16) | numpy.int32(h[3] << 24)
+        return h[0] | numpy.int32(h[1]) << 8 | numpy.int32(h[2]) << 16 | numpy.int32(h[3]) << 24
 
     @staticmethod
     def __get_key(k):
