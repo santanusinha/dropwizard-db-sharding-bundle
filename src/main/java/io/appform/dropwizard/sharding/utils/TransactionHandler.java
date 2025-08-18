@@ -39,7 +39,8 @@ public class TransactionHandler {
     private Session session;
     private final SessionFactory sessionFactory;
     private final boolean readOnly;
-    private final boolean skipCommit;
+    private boolean skipCommit;
+    private boolean sessionAcquired = false;
 
     public TransactionHandler(SessionFactory sessionFactory, boolean readOnly) {
         this(sessionFactory, readOnly, false);
@@ -51,20 +52,50 @@ public class TransactionHandler {
         this.skipCommit = skipCommit;
     }
 
+    /**
+     * Prepares the transactional context before executing a unit of work.
+     * <p>
+     * This method implements the core logic for the Unit of Work pattern, providing support
+     * for nested transactions. It first checks if a Hibernate {@link Session} is already bound
+     * to the current thread using {@link ManagedSessionContext}.
+     * <ul>
+     * <li><b>If a session exists:</b> It is reused. The handler checks if a transaction is
+     * already active and updates its internal state to skip the final commit, thereby "joining"
+     * the existing transaction.</li>
+     * <li><b>If no session exists:</b> A new session is opened, configured, and bound to the
+     * context. This handler instance then takes "ownership" of the session by setting the
+     * {@code sessionAcquired} flag, becoming responsible for its closure and transaction completion.
+     * </li>
+     * </ul>
+     * <p>
+     * If this handler is determined to be the owner of the transaction, it begins one after the
+     * session is successfully set up. In case of any setup failure, it also ensures proper cleanup.
+     *
+     */
     public void beforeStart() {
-        session = sessionFactory.openSession();
         try {
-            configureSession();
-            ManagedSessionContext.bind(session);
+            if (ManagedSessionContext.hasBind(sessionFactory)) {
+                session = sessionFactory.getCurrentSession();
+                final var existingTransaction = session.getTransaction();
+                skipCommit = skipCommit
+                        || (existingTransaction != null && existingTransaction.isActive());
+            }
+            else {
+                session = sessionFactory.openSession();
+                configureSession();
+                ManagedSessionContext.bind(session);
+                sessionAcquired = true;
+            }
             if (!skipCommit) {
                 beginTransaction();
             }
         } catch (Throwable th) {
-            session.close();
-            session = null;
-            ManagedSessionContext.unbind(sessionFactory);
-            //Clean up tenant id
-            MDC.remove(TENANT_ID);
+            // Only the owner handler instance to acquire the session, will close it.
+            if (sessionAcquired) {
+                session.close();
+                ManagedSessionContext.unbind(sessionFactory);
+                MDC.remove(TENANT_ID);
+            }
             throw th;
         }
     }
@@ -83,13 +114,12 @@ public class TransactionHandler {
             }
             throw e;
         } finally {
-            session.close();
-            session = null;
-            ManagedSessionContext.unbind(sessionFactory);
-            //Clean up tenant id
-            MDC.remove(TENANT_ID);
+            if (sessionAcquired) {
+                session.close();
+                ManagedSessionContext.unbind(sessionFactory);
+                MDC.remove(TENANT_ID);
+            }
         }
-
     }
 
     public void onError() {
@@ -97,13 +127,15 @@ public class TransactionHandler {
             return;
         }
         try {
-            rollbackTransaction();
+            if (!skipCommit) {
+                rollbackTransaction();
+            }
         } finally {
-            session.close();
-            session = null;
-            ManagedSessionContext.unbind(sessionFactory);
-            //Clean up tenant id
-            MDC.remove(TENANT_ID);
+            if (sessionAcquired) {
+                session.close();
+                ManagedSessionContext.unbind(sessionFactory);
+                MDC.remove(TENANT_ID);
+            }
         }
     }
 
@@ -111,7 +143,7 @@ public class TransactionHandler {
         session.setDefaultReadOnly(readOnly);
         session.setCacheMode(CacheMode.NORMAL);
         session.setHibernateFlushMode(FlushMode.AUTO);
-        //If the bundle is initialized in multitenant mode, each session factory is tagged to
+        //If the bundle is initialized in multi-tenant mode, each session factory is tagged to
         //a tenant id. It will be used in encryption support to fetch the appropriate encryptor for the tenant.
         if(sessionFactory.getProperties().containsKey(TENANT_ID)) {
             MDC.put(TENANT_ID, sessionFactory.getProperties().get(TENANT_ID).toString());
