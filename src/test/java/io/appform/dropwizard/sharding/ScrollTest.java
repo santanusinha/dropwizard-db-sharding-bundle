@@ -328,7 +328,9 @@ public class ScrollTest {
         If it is not such a field, the results of scroll would be wrong for obvious reasons*/
 
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
+            result = lookupDao.scrollDown((queryRoot, query, criteriaBuilder) -> {
+
+            },
                     pointer,
                     10,
                     "id");
