@@ -17,6 +17,10 @@
 
 package io.appform.dropwizard.sharding;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
@@ -25,6 +29,8 @@ import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.dao.testdata.OrderDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
+import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntity;
+import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntityWithAIId;
 import jakarta.persistence.criteria.Join;
 import org.junit.jupiter.api.Test;
 
@@ -32,9 +38,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.util.stream.Collectors;
+import lombok.SneakyThrows;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.junit.jupiter.api.Assertions;
 
 
 /**
@@ -133,6 +140,88 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         bundle.getShardManagers().get("TENANT1").blacklistShard(1);
         //no healthchecks for blacklisting aware bundle
         assertEquals(0, bundle.healthStatus().get("TENANT1").size());
+    }
 
+    @Test
+    public void testRegisterEntityClassesBeforeRun() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.registerEntities(PendingRegistrationTestEntity.class, PendingRegistrationTestEntityWithAIId.class);
+        bundle.run(testConfig, environment);
+        assertTrue(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntity.class));
+        assertTrue(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntityWithAIId.class));
+    }
+
+    @Test
+    @SneakyThrows
+    @SuppressWarnings("unchecked")
+    public void testRegisterAlreadyRegisteredEntityClassesBeforeRun() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(bundle, "initialisedEntities", true);
+        final var alreadyRegisteredEntityClasses = initializedEntities.toArray(new Class<?>[0]);
+        Assertions.assertDoesNotThrow(() -> bundle.registerEntities(alreadyRegisteredEntityClasses));
+        Assertions.assertDoesNotThrow(() -> bundle.run(testConfig, environment));
+    }
+
+    @Test
+    public void testRegisterEntityPackagesBeforeRun() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.registerEntities(List.of("io.appform.dropwizard.sharding.dao.testdata.pending"));
+        bundle.run(testConfig, environment);
+        assertTrue(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntity.class));
+        assertTrue(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntityWithAIId.class));
+    }
+
+    @Test
+    @SneakyThrows
+    @SuppressWarnings("unchecked")
+    public void testRegisterAlreadyRegisteredEntityPackagesBeforeRun() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(bundle, "initialisedEntities", true);
+        final var alreadyRegisteredEntityPackages = initializedEntities.stream()
+                .map(Class::getPackageName)
+                .collect(Collectors.toList());
+        Assertions.assertDoesNotThrow(() -> bundle.registerEntities(alreadyRegisteredEntityPackages));
+        Assertions.assertDoesNotThrow(() -> bundle.run(testConfig, environment));
+    }
+
+    @Test
+    public void testRegisterEntityClassesFailsAfterRun() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+        final var unsupportedOperationException = Assertions.assertThrows(UnsupportedOperationException.class, () -> {
+            bundle.registerEntities(PendingRegistrationTestEntity.class, PendingRegistrationTestEntityWithAIId.class);
+        });
+        assertEquals("Entity registration is not supported after run method execution.",
+                unsupportedOperationException.getMessage());
+        assertFalse(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntity.class));
+        assertFalse(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntityWithAIId.class));
+    }
+
+    @Test
+    public void testRegisterEntityPackagesFailsAfterRun() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+        final var packagesToRegister = List.of("io.appform.dropwizard.sharding.dao.testdata.pending");
+        final var unsupportedOperationException = Assertions.assertThrows(UnsupportedOperationException.class, () -> {
+            bundle.registerEntities(packagesToRegister);
+        });
+        assertEquals("Entity registration is not supported after run method execution.",
+                unsupportedOperationException.getMessage());
+        assertFalse(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntity.class));
+        assertFalse(bundle.getInitialisedEntities()
+                .contains(PendingRegistrationTestEntityWithAIId.class));
     }
 }

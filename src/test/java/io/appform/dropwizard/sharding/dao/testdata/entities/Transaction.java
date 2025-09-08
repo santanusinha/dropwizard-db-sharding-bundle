@@ -45,7 +45,7 @@ public class Transaction {
     @Column(name = "transaction_id", nullable = false, unique = true)
     private String transactionId;
 
-    @Column(name = "to", nullable = false)
+    @Column(name = "`to`", nullable = false)
     private String to;
 
     @Column(name = "amount")

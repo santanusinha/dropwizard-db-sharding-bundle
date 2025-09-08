@@ -23,11 +23,12 @@ import jakarta.persistence.Table;
 public class RelationalEntity {
 
     @Id
-    @Column(name = "key", nullable = false, unique = true)
+    @Column(name = "`key`", nullable = false, unique = true)
     private String key;
 
     private String keyTwo;
 
+    @Column(name = "`value`")
     private String value;
 
 }

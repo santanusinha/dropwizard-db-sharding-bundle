@@ -78,8 +78,7 @@ import java.util.stream.IntStream;
  * Base for Multi-Tenant sharding bundles. Clients cannot use this. Use one of the derived classes.
  */
 @Slf4j
-public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends
-    BundleCommonBase<T> {
+public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends BundleCommonBase<T> {
 
   @Getter
   private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
@@ -113,6 +112,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   @Override
   public void run(T configuration, Environment environment) {
+    this.completeBundleInitialization();
     final var tenantedConfig = getConfig(configuration);
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
       //Encryption Support through jasypt-hibernate5

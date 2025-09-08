@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.10-10]
+- Added changes for new central deployment.
+- Exposed interface for entity registration in `DbShardingBundle`. ([#130](https://github.com/santanusinha/dropwizard-db-sharding-bundle/pull/130))
+- Allowed locked context operations to add more operations during `execute()` phase. ([#133](https://github.com/santanusinha/dropwizard-db-sharding-bundle/pull/133))
+- Added Shard Order Test. ([#129](https://github.com/santanusinha/dropwizard-db-sharding-bundle/pull/129))
+- LookupDAO ScatterGather pagination support with `QuerySpec`. ([#126](https://github.com/santanusinha/dropwizard-db-sharding-bundle/pull/126))
+- Upgraded H2 database version.
+- Fixed `BucketKeyPersistorTest`.
+- Updated and fixed changelog.
+
 ## [2.1.10-9]
 
 ### Added

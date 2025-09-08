@@ -47,6 +47,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.SessionFactory;
 
 /**
  * Base for bundles. This cannot be used by clients. Use one of the derived classes.
@@ -115,6 +119,14 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
                 return DBShardingBundleBase.this.getBlacklistingStore();
             }
         };
+    }
+
+    public final void registerEntities(@NonNull final Class<?>... entities) {
+        delegate.registerEntities(entities);
+    }
+
+    public final void registerEntities(@NonNull final List<String> classPathPrefixList) {
+        delegate.registerEntities(classPathPrefixList);
     }
 
     protected ShardBlacklistingStore getBlacklistingStore() {

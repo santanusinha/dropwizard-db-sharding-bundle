@@ -36,7 +36,7 @@ public class SimpleChild {
     @ShardingKey
     private String parent;
 
-    @Column
+    @Column (name = "`value`")
     private String value;
 
     @Column
