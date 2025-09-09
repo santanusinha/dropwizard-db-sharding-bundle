@@ -11,7 +11,6 @@ import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import lombok.Getter;
 import lombok.val;
 import org.hibernate.SessionFactory;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
 import java.util.function.BooleanSupplier;
@@ -350,53 +349,6 @@ public class LockedContext<T> {
     }
 
     /**
-     * Creates or updates an associated entity using a relational DAO, criteria, an updater function, and an entity generator.
-     *
-     * @param <U>             The type of the parent entity associated with LockedContext
-     * @param relationalDao   The relational DAO responsible for creating or updating the associated entity.
-     * @param criteria        The criteria used to determine whether to create or update the entity.
-     * @param updater         A function that can modify the associated entity before updating or creating.
-     * @param entityGenerator A supplier function that generates a new entity if needed.
-     * @return A reference to this LockedContext, enabling method chaining.
-     *
-     * <p>
-     * This method allows for the creation or updating of an associated entity using a provided relational DAO, criteria,
-     * an updater function, and an entity generator. The criteria are used to determine whether to create a new entity or
-     * update an existing one.
-     * </p>
-     *
-     * <p>
-     * The {@code relationalDao} parameter represents an instance of a {@link RelationalDao} responsible for the
-     * create or update operation. The {@code criteria} parameter defines the criteria for determining whether to
-     * create or update the entity. The {@code updater} function can modify the associated entity before the create or
-     * update operation is performed, and the {@code entityGenerator} is used to supply a new entity if creation is required.
-     * </p>
-     *
-     * <p>
-     * After the create or update operation is applied, this method returns a reference to the current LockedContext,
-     * enabling method chaining or further operations on the context.
-     * </p>
-     *
-     * <p>
-     * If an exception occurs during the create or update operation, it is wrapped in a {@link RuntimeException},
-     * indicating that the operation was unsuccessful.
-     * </p>
-     */
-    public <U> LockedContext<T> createOrUpdate(
-            RelationalDao<U> relationalDao,
-            DetachedCriteria criteria,
-            UnaryOperator<U> updater,
-            Supplier<U> entityGenerator) {
-        return apply(parent -> {
-            try {
-                relationalDao.createOrUpdate(this, criteria, updater, parent, p -> entityGenerator.get());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
-    /**
      * Creates or updates using this context using the provided relational data access object (DAO),
      * query specification, updater function, and entity generator
      *
@@ -429,20 +381,6 @@ public class LockedContext<T> {
 
     public <U> LockedContext<T> createOrUpdate(
             RelationalDao<U> relationalDao,
-            DetachedCriteria criteria,
-            UnaryOperator<U> updater,
-            Function<T, U> entityGenerator) {
-        return apply(parent -> {
-            try {
-                relationalDao.createOrUpdate(this, criteria, updater, parent, entityGenerator);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
-
-    public <U> LockedContext<T> createOrUpdate(
-            RelationalDao<U> relationalDao,
             QuerySpec<U, U> criteria,
             UnaryOperator<U> updater,
             Function<T, U> entityGenerator) {
@@ -456,40 +394,6 @@ public class LockedContext<T> {
     }
 
 
-    /**
-     * Updates entities in the context using the provided relational data access object (DAO),
-     * criteria for selecting entities, an updater function, and a boolean supplier for
-     * determining whether to continue updating the next matching entity.
-     *
-     * @param <U>           The type of entity being operated upon by the DAO and updater.
-     * @param relationalDao The relational data access object responsible for performing the update
-     *                      operation on the selected entities.
-     * @param criteria      The criteria that define which entities should be updated. This can be a
-     *                      specification of the conditions that entities must meet to be considered
-     *                      for updating.
-     * @param updater       A function that specifies how to update an entity. It takes an existing
-     *                      entity as input and returns the updated entity.
-     * @param updateNext    A boolean supplier that determines whether to continue updating the next
-     *                      matching entity. If this supplier returns true, the update operation
-     *                      continues to the next matching entity; if it returns false, the operation
-     *                      stops.
-     * @return A LockedContext representing the result of the update operation
-     * @throws RuntimeException If an exception occurs during the update operation, it is wrapped
-     *                          in a RuntimeException and thrown.
-     */
-    public <U> LockedContext<T> update(
-            RelationalDao<U> relationalDao,
-            DetachedCriteria criteria,
-            UnaryOperator<U> updater,
-            BooleanSupplier updateNext) {
-        return apply(parent -> {
-            try {
-                relationalDao.update(this, criteria, updater, updateNext);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-    }
 
     /**
      * Updates entities in the context using the provided relational data access object (DAO),

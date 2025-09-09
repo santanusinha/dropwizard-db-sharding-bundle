@@ -12,10 +12,12 @@ import io.appform.dropwizard.sharding.observers.entity.HierarchicalChildImpl;
 import io.appform.dropwizard.sharding.observers.entity.ParentWithoutBucketKey;
 import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
 import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
+import io.appform.dropwizard.sharding.query.QuerySpec;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import lombok.SneakyThrows;
 import lombok.val;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Property;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +35,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
 
     @Override
     protected DBShardingBundleBase<TestConfig> getBundle() {
-        return new BalancedDBShardingBundle<TestConfig>(SimpleChild.class, SimpleParent.class,
+        return new BalancedDBShardingBundle<>(SimpleChild.class, SimpleParent.class,
                 ParentWithoutBucketKey.class, HierarchicalBaseChild.class, HierarchicalBaseChildImpl.class,
                 HierarchicalChildImpl.class) {
             @Override
@@ -68,11 +70,13 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
 
         val childObj = buildSimpleChildObj(shardingKey, childValue);
         childDao.save(shardingKey, childObj);
-        val persistedChild = childDao.select(shardingKey,  DetachedCriteria.forClass(SimpleChild.class)
-                        .add(Property.forName(SimpleChild.Fields.parent)
-                                .eq(shardingKey)),
-                0,
-                Integer.MAX_VALUE);
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
+        val persistedChild = childDao.select(shardingKey, criteria, 0, Integer.MAX_VALUE);
         assertNotNull(persistedChild.get(0));
         assertEquals(preComputedBucketKeyValue, persistedChild.get(0).getBucketKey());
     }
@@ -93,11 +97,13 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
 
         val childObj = buildSimpleChildObj(shardingKey, childValue);
         childDao.saveAll(shardingKey, Collections.singletonList(childObj));
-        val persistedChild = childDao.select(shardingKey,  DetachedCriteria.forClass(SimpleChild.class)
-                        .add(Property.forName(SimpleChild.Fields.parent)
-                                .eq(shardingKey)),
-                0,
-                Integer.MAX_VALUE);
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
+        val persistedChild = childDao.select(shardingKey, criteria, 0, Integer.MAX_VALUE);
         assertNotNull(persistedChild.get(0));
         assertEquals(preComputedBucketKeyValue, persistedChild.get(0).getBucketKey());
     }
@@ -107,8 +113,12 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
     public void testObserverForCreateAndUpdate() {
         val bundle = createBundle();
         val childDao = bundle.createRelatedObjectDao(SimpleChild.class);
-        val criteria = DetachedCriteria.forClass(SimpleChild.class)
-                .add(Property.forName(SimpleChild.Fields.parent).eq(shardingKey));
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
         val childObj = buildSimpleChildObj(shardingKey, childValue);
         childDao.createOrUpdate(shardingKey, criteria, t -> t, () -> childObj);
 
@@ -132,8 +142,12 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         val bundle = createBundle();
         val childDao = bundle.createRelatedObjectDao(SimpleChild.class);
 
-        val criteria = DetachedCriteria.forClass(SimpleChild.class)
-                .add(Property.forName(SimpleChild.Fields.parent).eq(shardingKey));
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
         val childObj = buildSimpleChildObj(shardingKey, childValue);
 
         var lockedContext = childDao.saveAndGetExecutor(shardingKey, childObj);
@@ -209,8 +223,12 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         val bundle = createBundle();
         val childDao = bundle.createRelatedObjectDao(SimpleChild.class);
 
-        val criteria = DetachedCriteria.forClass(SimpleChild.class)
-                .add(Property.forName(SimpleChild.Fields.parent).eq(shardingKey));
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
         val childObj = buildSimpleChildObj(shardingKey, childValue);
 
         childDao.save(shardingKey, childObj);
@@ -234,8 +252,12 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         val bundle = createBundle();
         val childDao = bundle.createRelatedObjectDao(SimpleChild.class);
 
-        val criteria = DetachedCriteria.forClass(SimpleChild.class)
-                .add(Property.forName(SimpleChild.Fields.parent).eq(shardingKey));
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
         val childObj = buildSimpleChildObj(shardingKey, childValue);
 
         childDao.save(shardingKey, childObj);
@@ -259,8 +281,12 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         val bundle = createBundle();
         val childDao = bundle.createRelatedObjectDao(SimpleChild.class);
 
-        val criteria = DetachedCriteria.forClass(SimpleChild.class)
-                .add(Property.forName(SimpleChild.Fields.parent).eq(shardingKey));
+        val criteria = new QuerySpec<SimpleChild, SimpleChild>() {
+            @Override
+            public void apply(Root<SimpleChild> queryRoot, CriteriaQuery<SimpleChild> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), shardingKey));
+            }
+        };
         val childObj = buildSimpleChildObj(shardingKey, childValue);
 
         childDao.save(shardingKey, childObj);
@@ -309,11 +335,13 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
 
         val childObj = buildHierarchicalChildImplObj(shardingKey, childValue);
         childDao.save(shardingKey, childObj);
-        val persistedChild = childDao.select(shardingKey,  DetachedCriteria.forClass(HierarchicalChildImpl.class)
-                        .add(Property.forName("parent")
-                                .eq(shardingKey)),
-                0,
-                Integer.MAX_VALUE);
+        val criteria = new QuerySpec<HierarchicalChildImpl, HierarchicalChildImpl>() {
+            @Override
+            public void apply(Root<HierarchicalChildImpl> queryRoot, CriteriaQuery<HierarchicalChildImpl> query, CriteriaBuilder criteriaBuilder) {
+                query.where(criteriaBuilder.equal(queryRoot.get("parent"), shardingKey));
+            }
+        };
+        val persistedChild = childDao.select(shardingKey, criteria, 0, Integer.MAX_VALUE);
         assertNotNull(persistedChild.get(0));
         assertEquals(preComputedBucketKeyValue, persistedChild.get(0).getBucketKey());
     }
@@ -360,7 +388,7 @@ public class BucketKeyPersistorTest extends BundleBasedTestBase {
         return obj;
     }
 
-    private ParentWithoutBucketKey buildParentWithoutBucketKeyObj (final String lookupKey) {
+    private ParentWithoutBucketKey buildParentWithoutBucketKeyObj(final String lookupKey) {
         val obj = new ParentWithoutBucketKey();
         obj.setName(lookupKey);
         // setting incorrect bucketKey, should not be persisted or updated anywhere.

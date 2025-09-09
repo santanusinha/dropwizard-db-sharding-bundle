@@ -23,13 +23,11 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.operations.Count;
 import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.Get;
-import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.GetAndUpdateByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.GetByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
-import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
 import io.appform.dropwizard.sharding.dao.operations.RunWithQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveAll;
@@ -40,7 +38,6 @@ import io.appform.dropwizard.sharding.dao.operations.SelectParam;
 import io.appform.dropwizard.sharding.dao.operations.UpdateAll;
 import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
 import io.appform.dropwizard.sharding.dao.operations.UpdateWithScroll;
-import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
@@ -67,23 +64,17 @@ import lombok.val;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.hibernate.Criteria;
-import org.hibernate.LockMode;
 import org.hibernate.ScrollMode;
 import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Projections;
-import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 
-import javax.persistence.Id;
-import javax.persistence.LockModeType;
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Root;
+import jakarta.persistence.Id;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Comparator;
@@ -132,19 +123,13 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
          * @param lookupKey ID for which data needs to be fetched
          */
 
-        T get(final Object lookupKey) {
+        T get(final String lookupKey) {
             val q = createQuery(currentSession(),
                     entityClass,
                     (queryRoot, query, criteriaBuilder) ->
                             query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()),
                                     lookupKey)));
             return uniqueResult(q.setLockMode(LockModeType.NONE));
-        }
-
-
-        T getLockedForWrite(DetachedCriteria criteria) {
-            return uniqueResult(criteria.getExecutableCriteria(currentSession())
-                    .setLockMode(LockMode.UPGRADE_NOWAIT));
         }
 
         /**
@@ -159,20 +144,21 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return uniqueResult(q.setLockMode(LockModeType.PESSIMISTIC_WRITE));
         }
 
-        T get(DetachedCriteria criteria) {
-            return uniqueResult(criteria.getExecutableCriteria(currentSession()));
-        }
-
         T get(QuerySpec<T, T> criteria) {
             return uniqueResult(createQuery(currentSession(), entityClass, criteria));
         }
 
-        T getLocked(Object lookupKey, UnaryOperator<Criteria> criteriaUpdater, LockMode lockMode) {
-            Criteria criteria = criteriaUpdater.apply(currentSession()
-                    .createCriteria(entityClass)
-                    .add(Restrictions.eq(keyField.getName(), lookupKey))
-                    .setLockMode(lockMode));
-            return uniqueResult(criteria);
+        T getLocked(Object lookupKey, UnaryOperator<QuerySpec<T, T>> criteriaUpdater, LockModeType lockMode) {
+            val querySpec = new QuerySpec<T, T>() {
+                @Override
+                public void apply(Root<T> queryRoot, CriteriaQuery<T> query, CriteriaBuilder criteriaBuilder) {
+                    query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), lookupKey));
+                }
+            };
+            val updatedQuerySpec = criteriaUpdater.apply(querySpec);
+            val query = createQuery(currentSession(), entityClass, updatedQuerySpec)
+                    .setLockMode(lockMode);
+            return uniqueResult(query);
         }
 
         T save(T entity) {
@@ -192,16 +178,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
 
         List<T> select(SelectParam selectParam) {
-            if (selectParam.criteria != null) {
-                val criteria = selectParam.criteria.getExecutableCriteria(currentSession());
-                if (-1 != selectParam.getStart()) {
-                    criteria.setFirstResult(selectParam.start);
-                }
-                if (-1 != selectParam.getNumRows()) {
-                    criteria.setMaxResults(selectParam.numRows);
-                }
-                return list(criteria);
-            }
             val query = InternalUtils.createQuery(currentSession(), entityClass, selectParam.querySpec);
             if (-1 != selectParam.getStart()) {
                 query.setFirstResult(selectParam.start);
@@ -213,25 +189,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
 
         ScrollableResults scroll(ScrollParam<T> scrollDetails) {
-            if (scrollDetails.getCriteria() != null) {
-                final Criteria criteria = scrollDetails.getCriteria()
-                        .getExecutableCriteria(currentSession());
-                return criteria.scroll(ScrollMode.FORWARD_ONLY);
-            }
             return InternalUtils.createQuery(currentSession(), entityClass, scrollDetails.getQuerySpec())
                     .scroll(ScrollMode.FORWARD_ONLY);
-        }
-
-        /**
-         * Run a query inside this shard and return the matching list.
-         *
-         * @param criteria selection criteria to be applied.
-         * @return List of elements or empty list if none found
-         */
-        @SuppressWarnings("rawtypes")
-        List run(DetachedCriteria criteria) {
-            return criteria.getExecutableCriteria(currentSession())
-                    .list();
         }
 
         /**
@@ -244,12 +203,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         List run(QuerySpec<T, T> criteria) {
             return createQuery(currentSession(), entityClass, criteria)
                     .list();
-        }
-
-        long count(final DetachedCriteria criteria) {
-            return (long) criteria.getExecutableCriteria(currentSession())
-                    .setProjection(Projections.rowCount())
-                    .uniqueResult();
         }
 
         /**
@@ -275,10 +228,9 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return query.executeUpdate();
         }
 
-        private DetachedCriteria getDetachedCriteria(Object lookupKey) {
-            return DetachedCriteria.forClass(entityClass).add(
-                            Restrictions.eq(keyField.getName(), lookupKey))
-                    .setLockMode(LockMode.READ);
+        public QuerySpec<T, T> getQuerySpec(final Object key) {
+            return (queryRoot, query, criteriaBuilder) ->
+                    query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), key));
         }
 
         private Query<T> createQuery(
@@ -381,9 +333,9 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = Get.<T, U>builder()
+        val opContext = GetByQuerySpec.<T, T, U>builder()
                 .getter(dao::get)
-                .criteria(dao.getDetachedCriteria(key))
+                .criteria(dao.getQuerySpec(key))
                 .afterGet(function).build();
         return transactionExecutor.get(tenantId)
                 .execute(dao.sessionFactory, true, "get", opContext, shardId);
@@ -442,32 +394,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return transactionExecutor.get(tenantId)
                 .execute(dao.sessionFactory, false, "saveAll", opContext, shardId);
     }
-
-    public Optional<T> createOrUpdate(String tenantId,
-                                      final String parentKey,
-                                      final DetachedCriteria selectionCriteria,
-                                      final UnaryOperator<T> updater,
-                                      final Supplier<T> entityGenerator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, parentKey);
-        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = CreateOrUpdate.<T>builder()
-                .criteria(selectionCriteria)
-                .getLockedForWrite(dao::getLockedForWrite)
-                .entityGenerator(entityGenerator)
-                .saver(dao::save)
-                .mutator(updater)
-                .updater(dao::update)
-                .getter(dao::get)
-                .build();
-        return Optional.of(transactionExecutor.get(tenantId).execute(
-                dao.sessionFactory,
-                false,
-                "createOrUpdate",
-                opContext,
-                shardId));
-    }
-
 
     public Optional<T> createOrUpdate(String tenantId,
                                       final String parentKey,
@@ -531,53 +457,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     }
 
     /**
-     * Updates entities matching the specified criteria within a locked context using an updater
-     * function.
-     * <p>
-     * This method updates entities within a locked context based on the provided criteria and an
-     * updater function. It allows you to specify a DetachedCriteria object to filter the entities to
-     * be updated. The method iterates through the matched entities, applies the updater function to
-     * each entity, and performs the update operation. The update process continues as long as the
-     * `updateNext` supplier returns `true` and there are more matching entities.
-     *
-     * @param context    The locked context within which entities are updated.
-     * @param criteria   A DetachedCriteria object representing the criteria for filtering entities to
-     *                   update.
-     * @param updater    A function that takes an entity and returns the updated entity.
-     * @param updateNext A BooleanSupplier that determines whether to continue updating the next
-     *                   entity in the result set.
-     * @return `true` if at least one entity is successfully updated, or `false` if no entities are
-     * updated or the update process fails.
-     * @throws RuntimeException If an error occurs during the update process.
-     */
-    <U> boolean update(
-            LockedContext<U> context,
-            DetachedCriteria criteria,
-            UnaryOperator<T> updater,
-            BooleanSupplier updateNext) {
-        val tenantId = context.getTenantId();
-        val dao = daos.get(tenantId).get(context.getShardId());
-        val opContext = UpdateWithScroll.<T>builder()
-                .scroll(dao::scroll)
-                .scrollParam(ScrollParam.<T>builder()
-                        .criteria(criteria)
-                        .build())
-                .mutator(updater)
-                .updater(dao::update)
-                .updateNext(updateNext)
-                .build();
-        try {
-            return transactionExecutor.get(tenantId).execute(context.getSessionFactory(),
-                    true,
-                    "update",
-                    opContext,
-                    context.getShardId(), false);
-        } catch (Exception e) {
-            throw new RuntimeException("Error updating entity with scroll: " + criteria, e);
-        }
-    }
-
-    /**
      * Updates entities within a specific shard based on a query, an update function, and scrolling
      * through results.
      * <p>
@@ -624,25 +503,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
     }
 
-    <U> List<T> select(
-            MultiTenantLookupDao.ReadOnlyContext<U> context,
-            DetachedCriteria criteria,
-            int start,
-            int numResults) {
-        val tenantId = context.getTenantId();
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
-        val opContext = Select.<T, List<T>>builder()
-                .getter(dao::select)
-                .selectParam(SelectParam.<T>builder()
-                        .criteria(criteria)
-                        .start(start)
-                        .numRows(numResults)
-                        .build())
-                .build();
-        return transactionExecutor.get(tenantId).execute(context.getSessionFactory(), true,
-                "select", opContext, context.getShardId(), false);
-    }
-
     /**
      * Executes a database query within a specific shard, retrieving a list of query results.
      * <p>
@@ -682,25 +542,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
 
     <U> List<T> select(
             MultiTenantRelationalDao.ReadOnlyContext<U> context,
-            DetachedCriteria criteria,
-            int start,
-            int numResults) {
-        val tenantId = context.getTenantId();
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
-        val opContext = Select.<T, List<T>>builder()
-                .getter(dao::select)
-                .selectParam(SelectParam.<T>builder()
-                        .criteria(criteria)
-                        .start(start)
-                        .numRows(numResults)
-                        .build())
-                .build();
-        return transactionExecutor.get(tenantId).execute(context.getSessionFactory(), true,
-                "select", opContext, context.getShardId(), false);
-    }
-
-    <U> List<T> select(
-            MultiTenantRelationalDao.ReadOnlyContext<U> context,
             QuerySpec<T, T> querySpec,
             int start,
             int numResults) {
@@ -719,45 +560,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .execute(context.getSessionFactory(), true, "select", opContext,
                         context.getShardId(),
                         false);
-    }
-
-    /**
-     * Provides a scroll api for records across shards. This api will scroll down in ascending order
-     * of the 'sortFieldName' field. Newly added records can be polled by passing the pointer
-     * repeatedly. If nothing new is available, it will return an empty set of results. If the passed
-     * pointer is null, it will return the first pageSize records with a pointer to be passed to get
-     * the next pageSize set of records.
-     * <p>
-     * NOTES: - Do not modify the criteria between subsequent calls - It is important to provide a
-     * sort field that is perpetually increasing - Pointer returned can be used to _only_ scroll down
-     *
-     * @param tenantId      The tenant ID associated with the entity.
-     * @param inCriteria    The core criteria for the query
-     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
-     *                      session
-     * @param pageSize      Count of records per shard
-     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
-     *                      ever-increasing one
-     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
-     * results with max N * pageSize elements
-     */
-    public ScrollResult<T> scrollDown(String tenantId,
-                                      final DetachedCriteria inCriteria,
-                                      final ScrollPointer inPointer,
-                                      final int pageSize,
-                                      @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        log.debug("SCROLL POINTER: {}", inPointer);
-        val pointer = inPointer == null ? new ScrollPointer(ScrollPointer.Direction.DOWN) : inPointer;
-        Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.DOWN),
-                "A down scroll pointer needs to be passed to this method");
-        return scrollImpl(tenantId, inCriteria,
-                pointer,
-                pageSize,
-                criteria -> criteria.addOrder(Order.asc(sortFieldName)),
-                new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
-                        .thenComparing(ScrollResultItem::getShardIdx),
-                "scrollDown");
     }
 
     /**
@@ -823,45 +625,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      */
     @SneakyThrows
     public ScrollResult<T> scrollUp(String tenantId,
-                                    final DetachedCriteria inCriteria,
-                                    final ScrollPointer inPointer,
-                                    final int pageSize,
-                                    @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val pointer = null == inPointer ? new ScrollPointer(ScrollPointer.Direction.UP) : inPointer;
-        Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.UP),
-                "An up scroll pointer needs to be passed to this method");
-        return scrollImpl(tenantId, inCriteria,
-                pointer,
-                pageSize,
-                criteria -> criteria.addOrder(Order.desc(sortFieldName)),
-                new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
-                        .reversed()
-                        .thenComparing(ScrollResultItem::getShardIdx),
-                "scrollUp");
-    }
-
-    /**
-     * Provides a scroll api for records across shards. This api will scroll up in descending order of
-     * the 'sortFieldName' field. As this api goes back in order, newly added records will not be
-     * available in the scroll. If the passed pointer is null, it will return the last pageSize
-     * records with a pointer to be passed to get the previous pageSize set of records.
-     * <p>
-     * NOTES: - Do not modify the criteria between subsequent calls - It is important to provide a
-     * sort field that is perpetually increasing - Pointer returned can be used to _only_ scroll up
-     *
-     * @param tenantId      The tenant ID associated with the entity.
-     * @param inCriteria    The core criteria for the query
-     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
-     *                      session
-     * @param pageSize      Count of records per shard
-     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
-     *                      ever-increasing one
-     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
-     * results with max N * pageSize elements
-     */
-    @SneakyThrows
-    public ScrollResult<T> scrollUp(String tenantId,
                                     final QuerySpec<T, T> inCriteria,
                                     final ScrollPointer inPointer,
                                     final int pageSize,
@@ -881,23 +644,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                         .reversed()
                         .thenComparing(ScrollResultItem::getShardIdx),
                 "scrollUp");
-    }
-
-    <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
-                       DetachedCriteria criteria,
-                       int first, int numResults) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
-        val opContext = Select.<T, List<T>>builder()
-                .getter(dao::select)
-                .selectParam(SelectParam.<T>builder()
-                        .criteria(criteria)
-                        .start(first)
-                        .numRows(numResults)
-                        .build())
-                .build();
-        return transactionExecutor.get(tenantId).execute(context.getSessionFactory(), true,
-                "select", opContext, context.getShardId(), false);
     }
 
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
@@ -934,51 +680,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * @return A map of shard vs result-list
      */
     @SuppressWarnings("rawtypes")
-    public Map<Integer, List> run(String tenantId, DetachedCriteria criteria) {
-        return run(tenantId, criteria, Function.identity());
-    }
-
-    /**
-     * Run arbitrary read-only queries on all shards and return results.
-     *
-     * @param tenantId The tenant ID associated with the entity.
-     * @param criteria The detached criteria. Typically, a grouping or counting query
-     * @return A map of shard vs result-list
-     */
-    @SuppressWarnings("rawtypes")
     public Map<Integer, List> run(String tenantId, QuerySpec<T, T> criteria) {
         return run(tenantId, criteria, Function.identity());
-    }
-
-
-    /**
-     * Run read-only queries on all shards and transform them into required types
-     *
-     * @param criteria   The detached criteria. Typically, a grouping or counting query
-     * @param translator A method to transform results to required type
-     * @param <U>        Return type
-     * @return Translated result
-     */
-    @SuppressWarnings("rawtypes")
-    public <U> U run(String tenantId,
-                     DetachedCriteria criteria,
-                     Function<Map<Integer, List>, U> translator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val output = IntStream.range(0, daos.get(tenantId).size())
-                .boxed()
-                .collect(Collectors.toMap(Function.identity(), shardId -> {
-                    final RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List> opContext = RunWithCriteria.<List>builder()
-                            .detachedCriteria(criteria)
-                            .handler(dao::run)
-                            .build();
-                    return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                            true,
-                            "run",
-                            opContext,
-                            shardId);
-                }));
-        return translator.apply(output);
     }
 
     /**
@@ -1051,8 +754,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                            Function<T, T> updater,
                            boolean completeTransaction) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val opContext = GetAndUpdate.<T>builder()
-                .criteria(dao.getDetachedCriteria(id))
+        val opContext = GetAndUpdateByQuerySpec.<T>builder()
+                .criteria(dao.getQuerySpec(id))
                 .getter(dao::get)
                 .mutator(updater)
                 .updater(dao::update).build();
@@ -1063,33 +766,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             throw new RuntimeException("Error updating entity: " + id, e);
         }
     }
-
-    public boolean update(String tenantId, String parentKey, DetachedCriteria criteria,
-                          Function<T, T> updater) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, parentKey);
-        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val selectParam = SelectParam.<T>builder()
-                .criteria(criteria)
-                .start(0)
-                .numRows(1)
-                .build();
-        val opContext = SelectAndUpdate.<T>builder()
-                .selectParam(selectParam)
-                .selector(dao::select)
-                .mutator(updater)
-                .updater(dao::update).build();
-        try {
-            return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                    true,
-                    "update",
-                    opContext,
-                    shardId);
-        } catch (Exception e) {
-            throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
-        }
-    }
-
 
     /**
      * Updates a single entity within a specific shard based on query criteria and an update
@@ -1162,16 +838,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 lockedContext.getShardId(), false);
     }
 
-    public LockedContext<T> lockAndGetExecutor(String tenantId, String parentKey,
-                                               DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, parentKey);
-        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(criteria),
-                DaoType.RELATIONAL, entityClass, shardInfoProviders.get(tenantId), observer);
-    }
-
-
     /**
      * Acquires a write lock on entities matching the provided query criteria within a specific shard
      * and returns a LockedContext for further operations.
@@ -1219,40 +885,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, dao::save, DaoType.RELATIONAL, entity,
                 entityClass, shardInfoProviders.get(tenantId), observer);
-    }
-
-    <U> boolean createOrUpdate(
-            LockedContext<U> context,
-            DetachedCriteria criteria,
-            UnaryOperator<T> updater,
-            U parent,
-            Function<U, T> entityGenerator) {
-        val tenantId = context.getTenantId();
-        val dao = daos.get(tenantId).get(context.getShardId());
-        val selectParam = SelectParam.<T>builder()
-                .criteria(criteria)
-                .start(0)
-                .numRows(1)
-                .build();
-        val opContext = CreateOrUpdateInLockedContext.<T, U>builder()
-                .lockedEntity(parent)
-                .selector(dao::select)
-                .selectParam(selectParam)
-                .entityGenerator(entityGenerator)
-                .saver(dao::save)
-                .mutator(updater)
-                .updater(dao::update)
-                .build();
-
-        try {
-            return transactionExecutor.get(tenantId).execute(context.getSessionFactory(),
-                    true,
-                    "createOrUpdate",
-                    opContext,
-                    context.getShardId(), false);
-        } catch (Exception e) {
-            throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
-        }
     }
 
     <U> boolean createOrUpdate(
@@ -1321,31 +953,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 e -> entityGenerator.get());
     }
 
-
-    public boolean updateAll(final String tenantId, String parentKey,
-                             int start, int numRows, DetachedCriteria criteria, Function<T, T> updater) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, parentKey);
-        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        try {
-            val opContext = UpdateAll.<T>builder()
-                    .selectParam(
-                            SelectParam.<T>builder()
-                                    .criteria(criteria)
-                                    .start(start)
-                                    .numRows(numRows).build())
-                    .selector(dao::select)
-                    .mutator(updater)
-                    .updater(dao::update).build();
-            return transactionExecutor.get(tenantId)
-                    .<Boolean>execute(dao.sessionFactory, true, "updateAll",
-                            opContext, shardId);
-        } catch (Exception e) {
-            throw new RuntimeException("Error updating entity with criteria: " + criteria, e);
-        }
-    }
-
-
     /**
      * Updates a batch of entities within a specific shard based on a query and an update function.
      * <p>
@@ -1389,12 +996,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
     }
 
-    public List<T> select(final String tenantId, String parentKey, DetachedCriteria criteria,
-                          int start, int numResults)
-            throws Exception {
-        return select(tenantId, parentKey, criteria, start, numResults, t -> t);
-    }
-
     /**
      * Executes a database query within a specific shard, retrieving a list of query results.
      * <p>
@@ -1416,32 +1017,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                           int start, int numResults)
             throws Exception {
         return select(tenantId, parentKey, querySpec, start, numResults, t -> t);
-    }
-
-    public <U> U select(final String tenantId,
-                        String parentKey,
-                        DetachedCriteria criteria,
-                        int start,
-                        int numResults,
-                        Function<List<T>, U> handler) throws Exception {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, parentKey);
-        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = Select.<T, U>builder()
-                .getter(dao::select)
-                .selectParam(SelectParam.<T>builder()
-                        .criteria(criteria)
-                        .start(start)
-                        .numRows(numResults)
-                        .build())
-                .afterSelect(handler)
-                .build();
-        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                true,
-                "select",
-                opContext,
-                shardId);
-
     }
 
     /**
@@ -1490,20 +1065,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 shardId);
     }
 
-    public long count(final String tenantId, String parentKey, DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, parentKey);
-        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = Count.<DetachedCriteria>builder()
-                .counter(dao::count)
-                .criteria(criteria)
-                .build();
-        return transactionExecutor.get(tenantId).<Long>execute(dao.sessionFactory,
-                true,
-                "count", opContext,
-                shardId);
-    }
-
     /**
      * Counts the number of records matching a specified query in a given shard
      * <p>
@@ -1537,8 +1098,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = Get.<T, T>builder()
-                .criteria(dao.getDetachedCriteria(key))
+        val opContext = GetByQuerySpec.<T, T, T>builder()
+                .criteria(dao.getQuerySpec(key))
                 .getter(dao::get).build();
         Optional<T>
                 result = Optional.ofNullable(transactionExecutor.get(tenantId).execute(dao.sessionFactory,
@@ -1547,31 +1108,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 opContext,
                 shardId));
         return result.isPresent();
-    }
-
-    /**
-     * Queries using the specified criteria across all shards and returns the counts of rows
-     * satisfying the criteria.
-     * <b>Note:</b> This method runs the query serially and it's usage is not recommended.
-     *
-     * @param tenantId The tenant ID associated with the entity.
-     * @param criteria The select criteria
-     * @return List of counts in each shard
-     */
-    public List<Long> countScatterGather(final String tenantId, DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
-                .mapToObj(shardId -> {
-                    val dao = daos.get(tenantId).get(shardId);
-                    try {
-                        val opContext = Count.builder()
-                                .counter(dao::count).criteria(criteria).build();
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory, true,
-                                "countScatterGather", opContext, shardId);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).collect(Collectors.toList());
     }
 
     /**
@@ -1599,32 +1135,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                         throw new RuntimeException(e);
                     }
                 }).collect(Collectors.toList());
-    }
-
-    public List<T> scatterGather(final String tenantId, DetachedCriteria criteria, int start,
-                                 int numRows) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
-                .mapToObj(shardId -> {
-                    val dao = daos.get(tenantId).get(shardId);
-                    try {
-                        val opContext = Select.<T, List<T>>builder()
-                                .getter(dao::select)
-                                .selectParam(SelectParam.<T>builder()
-                                        .criteria(criteria)
-                                        .start(start)
-                                        .numRows(numRows)
-                                        .build())
-                                .build();
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                                true,
-                                "scatterGather",
-                                opContext,
-                                shardId);
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }).flatMap(Collection::stream).collect(Collectors.toList());
     }
 
     /**
@@ -1667,46 +1177,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
 
     protected Field getKeyField() {
         return this.keyField;
-    }
-
-    @SneakyThrows
-    private ScrollResult<T> scrollImpl(String tenantId,
-                                       final DetachedCriteria inCriteria,
-                                       final ScrollPointer pointer,
-                                       final int pageSize,
-                                       final UnaryOperator<DetachedCriteria> criteriaMutator,
-                                       final Comparator<ScrollResultItem<T>> comparator,
-                                       String methodName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val daoIndex = new AtomicInteger();
-        val results = daos.get(tenantId).stream()
-                .flatMap(dao -> {
-                    val currIdx = daoIndex.getAndIncrement();
-                    val criteria = criteriaMutator.apply(InternalUtils.cloneObject(inCriteria));
-                    val opContext = Select.<T, List<T>>builder()
-                            .getter(dao::select)
-                            .selectParam(SelectParam.<T>builder()
-                                    .criteria(criteria)
-                                    .start(pointer.getCurrOffset(currIdx))
-                                    .numRows(pageSize)
-                                    .build())
-                            .build();
-                    return transactionExecutor.get(tenantId)
-                            .execute(dao.sessionFactory, true,
-                                    methodName, opContext, currIdx)
-                            .stream()
-                            .map(item -> new ScrollResultItem<>(item, currIdx));
-                })
-                .sorted(comparator)
-                .limit(pageSize)
-                .collect(Collectors.toList());
-        //This list will be of _pageSize_ long but max fetched might be _pageSize_ * numShards long
-        val outputBuilder = ImmutableList.<T>builder();
-        results.forEach(result -> {
-            outputBuilder.add(result.getData());
-            pointer.advance(result.getShardIdx(), 1);// will get advanced
-        });
-        return new ScrollResult<>(pointer, outputBuilder.build());
     }
 
     @SneakyThrows
@@ -1756,7 +1226,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<Criteria> criteriaUpdater) {
+                                               final UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
         return readOnlyExecutor(tenantId, parentKey, key, criteriaUpdater, () -> false);
     }
 
@@ -1778,14 +1248,14 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      */
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<Criteria> criteriaUpdater,
+                                               final UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
                                                final Supplier<Boolean> entityPopulator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val shardId = shardCalculator.shardId(tenantId, parentKey);
         val dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
-                () -> Lists.newArrayList(dao.getLocked(key, criteriaUpdater, LockMode.NONE)),
+                () -> Lists.newArrayList(dao.getLocked(key, criteriaUpdater, LockModeType.NONE)),
                 entityPopulator,
                 shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
                 shardInfoProviders.get(tenantId),
@@ -1793,14 +1263,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 entityClass,
                 observer
         );
-    }
-
-    public ReadOnlyContext<T> readOnlyExecutor(final String tenantId,
-                                               final String parentKey,
-                                               final DetachedCriteria criteria,
-                                               final int first,
-                                               final int numResults) {
-        return readOnlyExecutor(tenantId, parentKey, criteria, first, numResults, () -> false);
     }
 
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId,
@@ -1809,49 +1271,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                                                final int first,
                                                final int numResults) {
         return readOnlyExecutor(tenantId, parentKey, querySpec, first, numResults, () -> false);
-    }
-
-    /**
-     * Creates and returns a read-only context for executing read operations on an entities for
-     * provided {@code querySpec}
-     *
-     * <p>This method calculates the shard ID based on the provided {@code parentKey}, retrieves the
-     * SelectParamPriv for the corresponding shard, and creates a read-only context for executing read
-     * operations on the entities.
-     *
-     * @param tenantId        Tenant Id.
-     * @param parentKey       parentKey of the entity will be used to decide shard.
-     * @param criteria        used to provide query details to fetch parent entities
-     * @param first           The index of the first parent entity to retrieve.
-     * @param numResults      The maximum number of parent entities to retrieve.
-     * @param entityPopulator A supplier that determines whether entity population should be
-     *                        performed.
-     * @return A new ReadOnlyContext for executing read operations on the selected entities.
-     */
-    public ReadOnlyContext<T> readOnlyExecutor(final String tenantId,
-                                               final String parentKey,
-                                               final DetachedCriteria criteria,
-                                               final int first,
-                                               final int numResults,
-                                               final Supplier<Boolean> entityPopulator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val shardId = shardCalculator.shardId(tenantId, parentKey);
-        val dao = daos.get(tenantId).get(shardId);
-        val selectParam = SelectParam.<T>builder()
-                .criteria(criteria)
-                .start(first)
-                .numRows(numResults)
-                .build();
-        return new ReadOnlyContext<>(tenantId, shardId,
-                dao.sessionFactory,
-                () -> dao.select(selectParam),
-                entityPopulator,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
-                shardInfoProviders.get(tenantId),
-                DaoType.RELATIONAL,
-                entityClass,
-                observer
-        );
     }
 
     /**
@@ -1914,7 +1333,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * <ul>
      *   <li>associationMappingSpecs : child and parent column mapping details can be given here,
      *      which are used to take equality join with parent table</li>
-     *   <li>criteria : querying child using {@link DetachedCriteria}</li>
      *   <li>querySpec : querying child using {@link QuerySpec}.</li>
      *  </ul>
      *
@@ -1925,7 +1343,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     public static class QueryFilterSpec<T> {
 
         private List<AssociationMappingSpec> associationMappingSpecs;
-        private DetachedCriteria criteria;
         private QuerySpec<T, T> querySpec;
     }
 
@@ -2003,7 +1420,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
          * <p>
          * This method reads and potentially augments a parent entity using a provided relational DAO
          * and queryFilterSpec within the current context. queryFilterSpec can be passed as
-         * {@link AssociationMappingSpec}, {@link DetachedCriteria} or {@link QuerySpec}. It applies a
+         * {@link AssociationMappingSpec or {@link QuerySpec}. It applies a
          * filter to the parent entity and, if the filter condition is met, executes a query to retrieve
          * related child entities. The retrieved child entities are then passed to a consumer function
          * for further processing </p>
@@ -2044,12 +1461,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                         else if (queryFilterSpec.querySpec != null) {
                             consumer.accept(parent,
                                     relationalDao.select(tenantId, this, queryFilterSpec.querySpec, first,
-                                            numResults));
-                        }
-                        // Querying based on crieria
-                        else if (queryFilterSpec.criteria != null) {
-                            consumer.accept(parent,
-                                    relationalDao.select(tenantId, this, queryFilterSpec.criteria, first,
                                             numResults));
                         } else {
                             throw new UnsupportedOperationException("Missing queryFilterSpec provided.");
@@ -2117,7 +1528,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                             val parentValue = extractParentValue(parent, spec.getParentMappingKey());
                             return equalityFilter(criteriaBuilder, queryRoot, childKey, parentValue);
                         })
-                        .toArray(javax.persistence.criteria.Predicate[]::new);
+                        .toArray(jakarta.persistence.criteria.Predicate[]::new);
                 query.where(restrictions);
             };
         }
