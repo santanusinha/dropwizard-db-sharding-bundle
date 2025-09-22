@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
+import java.util.Map;
 import lombok.Builder;
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
@@ -88,13 +89,15 @@ public class LegacyShardManager extends ShardManager {
 
     @Override
     protected int shardForBucketImpl(int bucketId) {
-        Preconditions.checkArgument(bucketId >= MIN_BUCKET && bucketId <= MAX_BUCKET, "Bucket id can only be in the range of [1-1000] (inclusive)");
-        val entry = buckets.getEntry(bucketId);
+        Map.Entry<Range<Integer>, Integer> entry;
+        if (bucketId >= MIN_BUCKET) {
+          entry = buckets.getEntry(bucketId);
+        } else { // Fix: https://github.com/santanusinha/dropwizard-db-sharding-bundle/issues/140
+          entry = buckets.getEntry(MAX_BUCKET);
+        }
         if (null == entry) {
             throw new IllegalAccessError("Bucket not mapped to any shard");
         }
         return entry.getValue();
     }
-
-
 }

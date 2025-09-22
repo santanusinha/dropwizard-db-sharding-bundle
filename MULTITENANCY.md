@@ -3,7 +3,7 @@
 Multi tenancy support for sharded databases built on top of the same time and scale tested db sharding framework.
 
 ## Background
-More and more platform services that built using db sharding framework that is being used by multitude of businesses are required to isolate data that is being stored for different businesses. 
+More and more platform services that are built using the db sharding framework that is being used by a multitude of businesses are required to isolate data that is being stored for different businesses. 
 This is where multi-tenancy support comes into play. The db sharding framework is extended to support multi tenancy by adding a tenant id to the same sharding configuration that we are familiar with.
 This allows for asymmetric shard configuration per tenant and also allows for tenant-specific sharding options. 
 
