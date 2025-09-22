@@ -92,7 +92,7 @@ public class LegacyShardManager extends ShardManager {
         Map.Entry<Range<Integer>, Integer> entry;
         if (bucketId >= MIN_BUCKET) {
           entry = buckets.getEntry(bucketId);
-        } else { // Patch for the overflow bug introduced because numBuckets is not a power of 2.
+        } else { // Fix: https://github.com/santanusinha/dropwizard-db-sharding-bundle/issues/140
           entry = buckets.getEntry(MAX_BUCKET);
         }
         if (null == entry) {
