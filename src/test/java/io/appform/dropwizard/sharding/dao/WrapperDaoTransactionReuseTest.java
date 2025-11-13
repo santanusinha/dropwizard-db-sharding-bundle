@@ -224,4 +224,23 @@ class WrapperDaoTransactionReuseTest {
         ManagedSessionContext.unbind(sf);
         ver.close();
     }
+
+    @Test
+    void testAutoTransactionWhenNoOuterSessionBound() {
+        String parentKey = "customer-auto";
+        // Direct DAO call without binding should internally create session + transaction and commit.
+        Order order = Order.builder().customerId(parentKey).build();
+        order.setItems(List.of(OrderItem.builder().order(order).name("auto-item").build()));
+        Order persisted = dao.forParent(parentKey).save(order);
+        assertTrue(persisted.getId() > 0);
+
+        // Determine shard & verify using fresh manual session
+        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        SessionFactory sf = sessionFactories.get(shardId);
+        Session s = sf.openSession();
+        ManagedSessionContext.bind(s);
+        assertNotNull(s.get(Order.class, persisted.getId()));
+        ManagedSessionContext.unbind(sf);
+        s.close();
+    }
 }
