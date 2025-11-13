@@ -126,4 +126,53 @@ class WrapperDaoTransactionReuseTest {
         verificationSession.close();
         ManagedSessionContext.unbind(targetSessionFactory);
     }
+
+    @Test
+    void testMultipleWritesReuseSameOuterTransaction() {
+        String parentKey = "customer-multi-write";
+        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        SessionFactory sf = sessionFactories.get(shardId);
+        Session outer = sf.openSession();
+        ManagedSessionContext.bind(outer);
+        Transaction outerTxn = outer.beginTransaction();
+        assertTrue(outerTxn.isActive());
+        assertReuse(sf, outer, outerTxn);
+
+        // First save
+        Order o1 = Order.builder().customerId(parentKey).build();
+        o1.setItems(List.of(OrderItem.builder().order(o1).name("item-1").build()));
+        Order p1 = dao.forParent(parentKey).save(o1);
+        assertTrue(p1.getId() > 0);
+        assertTrue(outerTxn.isActive());
+        assertReuse(sf, outer, outerTxn);
+
+        // Second save
+        Order o2 = Order.builder().customerId(parentKey).build();
+        o2.setItems(List.of(OrderItem.builder().order(o2).name("item-2").build()));
+        Order p2 = dao.forParent(parentKey).save(o2);
+        assertTrue(p2.getId() > 0);
+        assertTrue(outerTxn.isActive());
+        assertReuse(sf, outer, outerTxn);
+
+        // Read both before commit
+        Order r1 = dao.forParent(parentKey).get(p1.getId());
+        Order r2 = dao.forParent(parentKey).get(p2.getId());
+        assertNotNull(r1);
+        assertNotNull(r2);
+        assertTrue(outerTxn.isActive());
+        assertReuse(sf, outer, outerTxn);
+
+        outerTxn.commit();
+        assertEquals(TransactionStatus.COMMITTED, outerTxn.getStatus());
+        ManagedSessionContext.unbind(sf);
+        outer.close();
+
+        // Verify after commit
+        Session ver = sf.openSession();
+        ManagedSessionContext.bind(ver);
+        assertNotNull(ver.get(Order.class, p1.getId()));
+        assertNotNull(ver.get(Order.class, p2.getId()));
+        ManagedSessionContext.unbind(sf);
+        ver.close();
+    }
 }
