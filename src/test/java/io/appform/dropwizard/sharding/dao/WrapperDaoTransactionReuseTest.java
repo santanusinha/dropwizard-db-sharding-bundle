@@ -175,4 +175,53 @@ class WrapperDaoTransactionReuseTest {
         ManagedSessionContext.unbind(sf);
         ver.close();
     }
+
+    @Test
+    void testOuterRollbackDiscardsInnerDaoWork() {
+        // TC to verify that inner DAO calls within an outer transaction
+        // that is rolled back do not persist any data.
+        String parentKey = "customer-rollback";
+        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        SessionFactory sf = sessionFactories.get(shardId);
+        Session outer = sf.openSession();
+        ManagedSessionContext.bind(outer);
+        Transaction outerTxn = outer.beginTransaction();
+        assertTrue(outerTxn.isActive());
+        assertReuse(sf, outer, outerTxn);
+
+        // First inner write
+        Order order = Order.builder().customerId(parentKey).build();
+        order.setItems(List.of(OrderItem.builder().order(order).name("rollback-item-1").build()));
+        Order persisted1 = dao.forParent(parentKey).save(order);
+        assertTrue(persisted1.getId() > 0);
+        assertReuse(sf, outer, outerTxn);
+
+        // Second inner write
+        Order order2 = Order.builder().customerId(parentKey).build();
+        order2.setItems(List.of(OrderItem.builder().order(order2).name("rollback-item-2").build()));
+        Order persisted2 = dao.forParent(parentKey).save(order2);
+        assertTrue(persisted2.getId() > 0);
+        assertReuse(sf, outer, outerTxn);
+
+        // Inner reads (should see both inside same transaction/session)
+        Order loaded1 = dao.forParent(parentKey).get(persisted1.getId());
+        Order loaded2 = dao.forParent(parentKey).get(persisted2.getId());
+        assertNotNull(loaded1);
+        assertNotNull(loaded2);
+        assertReuse(sf, outer, outerTxn);
+
+        // Rollback instead of commit - both writes should vanish
+        outerTxn.rollback();
+        assertEquals(TransactionStatus.ROLLED_BACK, outerTxn.getStatus());
+        ManagedSessionContext.unbind(sf);
+        outer.close();
+
+        // New session should not find either entity
+        Session ver = sf.openSession();
+        ManagedSessionContext.bind(ver);
+        assertNull(ver.get(Order.class, persisted1.getId()));
+        assertNull(ver.get(Order.class, persisted2.getId()));
+        ManagedSessionContext.unbind(sf);
+        ver.close();
+    }
 }
