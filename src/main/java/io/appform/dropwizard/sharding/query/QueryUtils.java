@@ -69,7 +69,7 @@ public class QueryUtils {
      */
     public static <T> Predicate inFilter(final Root<T> queryRoot,
                                          final String column,
-                                         final Collection<Object> values) {
+                                         final Collection<?> values) {
         return queryRoot.get(column).in(values);
     }
 
@@ -85,7 +85,7 @@ public class QueryUtils {
     public static <T> Predicate notInFilter(final CriteriaBuilder criteriaBuilder,
                                             final Root<T> queryRoot,
                                             final String column,
-                                            final Collection<Object> values) {
+                                            final Collection<?> values) {
         return criteriaBuilder.not(queryRoot.get(column).in(values));
     }
 
