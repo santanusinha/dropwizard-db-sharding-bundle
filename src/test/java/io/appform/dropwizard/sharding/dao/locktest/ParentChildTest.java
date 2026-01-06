@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import javax.persistence.criteria.Order;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -131,6 +132,24 @@ public class ParentChildTest {
         Assertions.assertDoesNotThrow(() -> {
             QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
                 Predicate parentColumnPredicate = QueryUtils.inFilter(queryRoot, "type", List.of(Category.CATEGORYA));
+                query.where(parentColumnPredicate);
+            };
+            List<ParentClass> parentColumnQuery = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
+            Assertions.assertNotNull(parentColumnQuery);
+            for (ParentClass ele : parentColumnQuery) {
+                Assertions.assertEquals(Category.CATEGORYA, ele.getType());
+            }
+        });
+    }
+
+    @SneakyThrows
+    @Test
+    void testQueryingInClauseWithEnumCollection() {
+        Assertions.assertDoesNotThrow(() -> {
+            QuerySpec<ParentClass, ParentClass> querySpec = (queryRoot, query, criteriaBuilder) -> {
+                List<Category> categoryList = new ArrayList<>();
+                categoryList.add(Category.CATEGORYA);
+                Predicate parentColumnPredicate = QueryUtils.inFilter(queryRoot, "type", categoryList);
                 query.where(parentColumnPredicate);
             };
             List<ParentClass> parentColumnQuery = parentClassRelationalDao.select(PARENT_KEY, querySpec, 0, Integer.MAX_VALUE);
