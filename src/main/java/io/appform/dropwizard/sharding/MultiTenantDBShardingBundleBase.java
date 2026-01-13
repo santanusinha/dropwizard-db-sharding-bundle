@@ -172,6 +172,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
               this.initialisedEntitiesMeta);
         environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
         environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
+
+        // Doubt : for all tenant same shardManagers being used ? this is same like observers context
+        registerBucketIdExtractor(tenantId, this.shardManagers);
       } finally {
         executorService.shutdown();
         try {

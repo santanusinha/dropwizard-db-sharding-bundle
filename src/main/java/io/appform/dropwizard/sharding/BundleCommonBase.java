@@ -6,12 +6,16 @@ import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
+import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.BucketKey;
+import io.appform.dropwizard.sharding.sharding.BucketKeyReader;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardingKey;
+import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import java.lang.annotation.Annotation;
@@ -49,6 +53,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
 
   protected final List<Class<?>> initialisedEntities = new ArrayList<>();
   protected final Map<String, EntityMeta> initialisedEntitiesMeta = new HashMap<>();
+  protected final Map<String, BucketIdExtractor<String>> bucketIdExtractors = new HashMap<>();
 
   private volatile boolean bundleInitialised = false;
 
@@ -105,6 +110,25 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       throw new IllegalStateException("DB sharding bundle is not initialised !");
     }
     return Collections.unmodifiableList(this.initialisedEntities);
+  }
+
+  public Map<String, EntityMeta> getInitialisedEntitiesMeta() {
+    if (!this.bundleInitialised) {
+      throw new IllegalStateException("DB sharding bundle is not initialised !");
+    }
+    return Collections.unmodifiableMap(this.initialisedEntitiesMeta);
+  }
+
+  public Map<String, BucketIdExtractor<String>> getBucketIdExtractors() {
+    if (!this.bundleInitialised) {
+      throw new IllegalStateException("DB sharding bundle is not initialised !");
+    }
+    return Collections.unmodifiableMap(this.bucketIdExtractors);
+  }
+
+  protected void registerBucketIdExtractor(final String tenantId,
+                                           final Map<String, ShardManager> shardManagers) {
+    bucketIdExtractors.put(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers));
   }
 
   public final void registerObserver(final TransactionObserver observer) {
@@ -222,24 +246,31 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
                 MethodHandles.privateLookupIn(bucketKeyFieldEntry.get().getValue(), MethodHandles.lookup());
         final var bucketKeyField = bucketKeyFieldEntry.get().getKey();
         final var bucketKeySetter = bucketKeyFieldDeclaringClassLookup.unreflectSetter(bucketKeyField);
+        final var bucketKeyFieldName = bucketKeyField.getName();
 
         MethodHandle shardingKeyGetter;
+        String shardingKeyFieldName;
         if (shardingKeyField.isPresent()) {
           final var shardingKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(shardingKeyFieldEntry.get().getValue(), MethodHandles.lookup());
-          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyField.get());
+          final var shardingKeyFieldData = shardingKeyField.get();
+          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyFieldData);
+          shardingKeyFieldName = shardingKeyFieldData.getName();
         } else {
           final var lookupKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(lookupKeyFieldEntry.get().getValue(), MethodHandles.lookup());
-          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyField.get());
+          final var lookupKeyFieldData = lookupKeyField.get();
+          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyFieldData);
+          shardingKeyFieldName = lookupKeyFieldData.getName();
         }
 
         final var entityMeta = EntityMeta.builder()
                 .bucketKeySetter(bucketKeySetter)
                 .shardingKeyGetter(shardingKeyGetter)
+                .bucketKeyFieldName(bucketKeyFieldName)
+                .shardingKeyFieldName(shardingKeyFieldName)
                 .build();
         initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
-
       } catch (Exception e) {
         log.error("Error validating/resolving entity meta for class: {}", clazz.getName(), e);
         throw new RuntimeException("Failed to validate/resolve entity meta for " + clazz.getName(), e);
