@@ -82,6 +82,7 @@
         <dropwizard.version>2.1.12</dropwizard.version>
 
         <hibernate.version>6.6.0.Final</hibernate.version>
+        <hibernate-validator.version>6.2.5.Final</hibernate-validator.version>
         <jackson-datatype-hibernate6.version>2.16.1</jackson-datatype-hibernate6.version>
         <jasypt-hibernate6.version>1.9.4</jasypt-hibernate6.version>
 
@@ -147,6 +148,16 @@
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-core</artifactId>
             <version>${hibernate.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-envers</artifactId>
+            <version>${hibernate.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+            <version>${hibernate-validator.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
