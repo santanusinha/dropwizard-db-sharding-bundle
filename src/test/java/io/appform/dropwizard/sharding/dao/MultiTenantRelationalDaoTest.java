@@ -28,6 +28,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntityWithAIKey;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.query.QueryUtils;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -38,8 +39,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Property;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -134,7 +133,7 @@ public class MultiTenantRelationalDaoTest {
     relationalDao.saveAll("TENANT1", key, Lists.newArrayList(entityOne, entityTwo));
     relationalDao.saveAll("TENANT1", key, Lists.newArrayList(entityOne, entityTwo));
     List<RelationalEntity> entities = relationalDao.select("TENANT1", key,
-        DetachedCriteria.forClass(RelationalEntity.class),
+            (root, query, cb) -> {},
         0,
         10);
     assertEquals(2, entities.size());
@@ -144,8 +143,9 @@ public class MultiTenantRelationalDaoTest {
   @Test
   public void testCreateOrUpdate() throws Exception {
     val saved = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
-            DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
-                .add(Property.forName("key").eq("testId")),
+                    (queryRoot, query, criteriaBuilder) -> {
+                      query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "key", "testId"));
+                    },
             e -> e.setValue("Some Other Text"),
             () -> RelationalEntityWithAIKey.builder()
                 .key("testId")
@@ -156,8 +156,9 @@ public class MultiTenantRelationalDaoTest {
     assertEquals("Some New Text", saved.getValue());
 
     val updated = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
-            DetachedCriteria.forClass(RelationalEntityWithAIKey.class)
-                .add(Property.forName("key").eq("testId")),
+                    (queryRoot, query, criteriaBuilder) -> {
+                      query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "key", "testId"));
+                    },
             e -> e.setValue("Some Other Text"),
             () -> RelationalEntityWithAIKey.builder()
                 .key("testId")
@@ -303,7 +304,7 @@ public class MultiTenantRelationalDaoTest {
 
       do {
         nextPtr = relationalDao.scrollUp("TENANT1",
-            DetachedCriteria.forClass(RelationalEntity.class),
+                (root, query, cb) -> {},
             null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
         nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
       }
@@ -316,7 +317,7 @@ public class MultiTenantRelationalDaoTest {
 
       do {
         nextPtr = relationalDao.scrollDown("TENANT1",
-            DetachedCriteria.forClass(RelationalEntity.class),
+                (root, query, cb) -> {},
             null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
         nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
       }
@@ -343,7 +344,7 @@ public class MultiTenantRelationalDaoTest {
           }
         });
     assertEquals(ids,
-        relationalDao.run("TENANT1", DetachedCriteria.forClass(RelationalEntity.class))
+        relationalDao.run("TENANT1", (root, query, cb) -> {})
             .values()
             .stream()
             .flatMap(Collection::stream)

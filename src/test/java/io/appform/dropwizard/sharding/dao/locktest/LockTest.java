@@ -32,17 +32,18 @@ import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
+import io.appform.dropwizard.sharding.query.QueryUtils;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Order;
-import org.hibernate.criterion.Restrictions;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -125,7 +126,7 @@ public class LockTest {
 
         assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         assertEquals("Changed", lookupDao.get("0").get().getName());
-        assertEquals(6, relationDao.select("0", DetachedCriteria.forClass(SomeOtherObject.class), 0, 10).size());
+        assertEquals(6, relationDao.select("0", (queryRoot, query, criteriaBuilder) -> {}, 0, 10).size());
         assertEquals("Hello", relationDao.get("0", 1L).get().getValue());
     }
 
@@ -288,11 +289,12 @@ public class LockTest {
         //test existing entity update
         final String childModifiedValue = "Hello Modified";
         final String parentModifiedValue = "Changed";
-        final DetachedCriteria updateCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("myId", parent.getMyId()));
+        final QuerySpec<SomeOtherObject, SomeOtherObject> updateQuerySpec = (root, query, cb) -> {
+            query.where(QueryUtils.equalityFilter(cb, root, "myId", parent.getMyId()));
+        };
 
         lookupDao.lockAndGetExecutor(parent.getMyId())
-                .createOrUpdate(relationDao, updateCriteria, childObj -> {
+                .createOrUpdate(relationDao, updateQuerySpec, childObj -> {
                     childObj.setValue(childModifiedValue);
                     return childObj;
                 }, () -> {
@@ -311,11 +313,11 @@ public class LockTest {
         //test non existing entity creation
         final String newChildValue = "Newly created child";
         final String newParentValue = "New parent Value";
-        final DetachedCriteria creationCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("value", newChildValue));
-
+        final QuerySpec<SomeOtherObject, SomeOtherObject> creationQuerySpec = (root, query, cb) -> {
+            query.where(QueryUtils.equalityFilter(cb, root, "value", newChildValue));
+        };
         lookupDao.lockAndGetExecutor(parent.getMyId())
-                .createOrUpdate(relationDao, creationCriteria, childObj -> {
+                .createOrUpdate(relationDao, creationQuerySpec, childObj -> {
                     assertNotEquals(null, childObj);
                     fail("New Entity is getting updated. It should have been created.");
 
@@ -329,7 +331,7 @@ public class LockTest {
                 .mutate(parentObj -> parentObj.setName(newParentValue))
                 .execute();
 
-        final SomeOtherObject savedChild = relationDao.select(parent.getMyId(), creationCriteria, 0, 1)
+        final SomeOtherObject savedChild = relationDao.select(parent.getMyId(), creationQuerySpec, 0, 1)
                 .stream()
                 .findFirst()
                 .get();
@@ -404,15 +406,16 @@ public class LockTest {
         lookupDao.save(parent2);
 
         //test full update
-        final DetachedCriteria allSelectCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("myId", parent1.getMyId()))
-                .addOrder(Order.asc("id"));
+        final QuerySpec<SomeOtherObject, SomeOtherObject> allSelectQuerySpec = (root, query, cb) -> {
+            query.where(QueryUtils.equalityFilter(cb, root, "myId", parent1.getMyId()));
+            query.orderBy(QueryUtils.ascOrder(cb, root, "id"));
+        };
 
         final String childModifiedValue = "Hello Modified";
         final String parentModifiedValue = "Parent Changed";
 
         lookupDao.lockAndGetExecutor(parent1.getMyId())
-                .update(relationDao, allSelectCriteria, entityObj -> {
+                .update(relationDao, allSelectQuerySpec, entityObj -> {
                     entityObj.setValue(childModifiedValue);
                     return entityObj;
                 }, () -> true)
@@ -433,7 +436,7 @@ public class LockTest {
         final String childModifiedValue2 = "Hello Modified Partial";
         final String parentModifiedValue2 = "Parent Changed Partial";
         lookupDao.lockAndGetExecutor(parent1.getMyId())
-                .update(relationDao, allSelectCriteria, entityObj -> {
+                .update(relationDao, allSelectQuerySpec, entityObj -> {
                     entityObj.setValue(childModifiedValue2);
 
                     if (entityObj.getId() == child1.getId()) {
@@ -462,12 +465,14 @@ public class LockTest {
                 .build();
         saveEntity(lookupDao.saveAndGetExecutor(p1));
 
-        final DetachedCriteria allSelectCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("myId", p1.getMyId()))
-                .addOrder(Order.asc("id"));
+        final QuerySpec<SomeOtherObject, SomeOtherObject> allSelectQuerySpec = (root, query, cb) -> {
+            query.where(QueryUtils.equalityFilter(cb, root, "myId", p1.getMyId()));
+            query.orderBy(QueryUtils.ascOrder(cb, root, "id"));
+        };
+
         val testExecuted = new AtomicBoolean();
         val res = lookupDao.readOnlyExecutor(p1.getMyId())
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationDao, allSelectQuerySpec, 0, Integer.MAX_VALUE, (parent, children) -> {
                     assertNull(parent.getChildren());
                     assertEquals(6, children.size());
                     assertNotNull(parent);
@@ -513,8 +518,7 @@ public class LockTest {
 
         // update
         LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(someOtherObject.getMyId(),
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("myId", someOtherObject.getMyId())));
+                (queryRoot, query, criteriaBuilder) -> query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", someOtherObject.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
         contextUpdate.execute();
 
@@ -590,8 +594,8 @@ public class LockTest {
 
         // update
         LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(someOtherObject.getMyId(),
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("myId", someOtherObject.getMyId())));
+                (queryRoot, query, criteriaBuilder) -> query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", someOtherObject.getMyId())));
+
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
         contextUpdate.update(relationDao, someOtherObject2.getId(),
@@ -683,8 +687,7 @@ public class LockTest {
 
         // update
         LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(someOtherObject.getMyId(),
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("myId", someOtherObject.getMyId())));
+                (queryRoot, query, criteriaBuilder) -> query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", someOtherObject.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
         contextUpdate.update(relationDao, someOtherObject2.getId(),
@@ -733,13 +736,12 @@ public class LockTest {
 
         // update
         LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(p1.getMyId(),
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("myId", p1.getMyId())));
+                (queryRoot, query, criteriaBuilder) -> query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", p1.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
         contextUpdate.update(relationDao,
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("id", c1.getId())),
+                (queryRoot, query, criteriaBuilder) ->
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "id", c1.getId())),
                 child -> {
                     child.setValue("CHILD_ONE");
                     return child;
@@ -784,8 +786,8 @@ public class LockTest {
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
         contextUpdate.update(relationDao,
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("id", c1.getId())),
+                (queryRoot, query, criteriaBuilder) ->
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "id", c1.getId())),
                 child -> {
                     child.setValue("CHILD_ONE");
                     return child;
@@ -834,21 +836,21 @@ public class LockTest {
 
         // update
         LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(p1.getMyId(),
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("myId", p1.getMyId())));
+                (queryRoot, query, criteriaBuilder) ->
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", p1.getMyId())));
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
         contextUpdate.update(relationDao,
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("id", c1.getId())),
+                (queryRoot, query, criteriaBuilder) ->
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "id", c1.getId())),
                 child -> {
                     child.setValue("CHILD_ONE");
                     return child;
                 }, () -> false);
 
         contextUpdate.update(relationDao,
-                DetachedCriteria.forClass(SomeOtherObject.class)
-                        .add(Restrictions.eq("id", c2.getId())),
+                (queryRoot, query, criteriaBuilder) ->
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "id", c2.getId())),
                 child -> {
                     child.setValue("CHILD_TWO");
                     return child;
@@ -903,13 +905,13 @@ public class LockTest {
         // update
         LockedContext<SomeOtherObject> contextUpdate = relationDao.lockAndGetExecutor(p1.getMyId(),
                 (queryRoot, query, criteriaBuilder) ->
-                        query.where(criteriaBuilder.equal(queryRoot.get("myId"), p1.getMyId())));
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", p1.getMyId())));
 
         contextUpdate.mutate(parent -> parent.setValue("UPDATE"));
 
         contextUpdate.update(relationDao,
                 (queryRoot, query, criteriaBuilder) ->
-                        query.where(criteriaBuilder.equal(queryRoot.get("id"), c1.getId())),
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "id", c1.getId())),
                 child -> {
                     child.setValue("CHILD_ONE");
                     return child;
@@ -917,7 +919,7 @@ public class LockTest {
 
         contextUpdate.update(relationDao,
                 (queryRoot, query, criteriaBuilder) ->
-                        query.where(criteriaBuilder.equal(queryRoot.get("id"), c2.getId())),
+                        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "id", c2.getId())),
                 child -> {
                     child.setValue("CHILD_TWO");
                     return child;
@@ -949,16 +951,19 @@ public class LockTest {
                 .build();
 
 
-        final DetachedCriteria allSelectCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("myId", p1.getMyId()))
-                .addOrder(Order.asc("id"));
-
+        var selectionQuerySpec = new QuerySpec<SomeOtherObject, SomeOtherObject>(){
+            @Override
+            public void apply(Root<SomeOtherObject> queryRoot, CriteriaQuery<SomeOtherObject> query, CriteriaBuilder criteriaBuilder) {
+                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", p1.getMyId()));
+                query.orderBy(QueryUtils.ascOrder(criteriaBuilder, queryRoot, "id"));
+            }
+        };
         assertFalse(lookupDao.readOnlyExecutor(p1.getMyId()).execute().isPresent());
 
         val testExecuted = new AtomicBoolean();
         val res = lookupDao.readOnlyExecutor(p1.getMyId(),
                         () -> saveEntity(lookupDao.saveAndGetExecutor(p1)))
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationDao, selectionQuerySpec, 0, Integer.MAX_VALUE, (parent, children) -> {
                     assertNull(parent.getChildren());
                     assertEquals(6, children.size());
                     assertNotNull(parent);
@@ -1009,14 +1014,18 @@ public class LockTest {
     @Test
     @SneakyThrows
     public void testReadMultiChildRetrieveNoPopulate() {
-        final DetachedCriteria allSelectCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("myId", "0"))
-                .addOrder(Order.asc("id"));
+        var selectionQuerySpec = new QuerySpec<SomeOtherObject, SomeOtherObject>(){
+            @Override
+            public void apply(Root<SomeOtherObject> queryRoot, CriteriaQuery<SomeOtherObject> query, CriteriaBuilder criteriaBuilder) {
+                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", "0"));
+                query.orderBy(QueryUtils.ascOrder(criteriaBuilder, queryRoot, "id"));
+            }
+        };
         assertFalse(lookupDao.readOnlyExecutor("0").execute().isPresent());
 
         assertFalse(lookupDao.readOnlyExecutor("0", () -> false)
                 .readAugmentParent(relationDao,
-                        allSelectCriteria,
+                        selectionQuerySpec,
                         0,
                         Integer.MAX_VALUE,
                         (parent, children) -> {
@@ -1029,10 +1038,8 @@ public class LockTest {
     @SneakyThrows
     public void testReadMultiChildRetrieveNoPopulateWithQuerySpec() {
         final QuerySpec<SomeOtherObject, SomeOtherObject> querySpec = (queryRoot, query, criteriaBuilder) -> {
-            query.where(
-                    criteriaBuilder.equal(queryRoot.get("myId"), "0")
-            );
-            query.orderBy(criteriaBuilder.asc(queryRoot.get("id")));
+            query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", "0"));
+            query.orderBy(QueryUtils.ascOrder(criteriaBuilder, queryRoot,"id"));
         };
         assertFalse(lookupDao.readOnlyExecutor("0").execute().isPresent());
         assertFalse(lookupDao.readOnlyExecutor("0", () -> false)
@@ -1060,12 +1067,16 @@ public class LockTest {
                 .build();
         saveEntity(lookupDao.saveAndGetExecutor(p2));
 
-        final DetachedCriteria allSelectCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
-                .add(Restrictions.eq("myId", p1.getMyId()))
-                .addOrder(Order.asc("id"));
+        var selectionQuerySpec = new QuerySpec<SomeOtherObject, SomeOtherObject>(){
+            @Override
+            public void apply(Root<SomeOtherObject> queryRoot, CriteriaQuery<SomeOtherObject> query, CriteriaBuilder criteriaBuilder) {
+                query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "myId", p1.getMyId()));
+                query.orderBy(QueryUtils.ascOrder(criteriaBuilder, queryRoot, "id"));
+            }
+        };
         val testExecuted = new AtomicBoolean();
         val res = lookupDao.readOnlyExecutor(p1.getMyId())
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationDao, selectionQuerySpec, 0, Integer.MAX_VALUE, (parent, children) -> {
                     assertNull(parent.getChildren());
                     assertEquals(6, children.size());
                     assertNotNull(parent);
@@ -1081,7 +1092,7 @@ public class LockTest {
 
         testExecuted.set(false);
         val res2 = lookupDao.readOnlyExecutor(p2.getMyId())
-                .readAugmentParent(relationDao, allSelectCriteria, 0, Integer.MAX_VALUE, (parent, children) -> {
+                .readAugmentParent(relationDao, selectionQuerySpec, 0, Integer.MAX_VALUE, (parent, children) -> {
                             testExecuted.set(true);
                         },
                         p -> !p.getMyId().equals("1")) //Don't read children if object id is blah

@@ -7,11 +7,10 @@ import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
 import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
+import io.appform.dropwizard.sharding.query.QueryUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Property;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -106,9 +105,9 @@ public class ObservationTest extends BundleBasedTestBase {
         assertNotNull(parent);
         assertEquals(2, co.callCounter.get());
         assertEquals(1, childDao.select(parent.getName(),
-                        DetachedCriteria.forClass(SimpleChild.class)
-                                .add(Property.forName(SimpleChild.Fields.parent)
-                                        .eq(parent.getName())),
+                        (queryRoot, query, criteriaBuilder) -> {
+                            query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, SimpleChild.Fields.parent, parent.getName()));
+                        },
                         0,
                         Integer.MAX_VALUE)
                 .size());
@@ -132,9 +131,9 @@ public class ObservationTest extends BundleBasedTestBase {
         assertNotNull(parent);
         assertEquals(2, co.callCounter.get());
         val augmentedParent = parentDao.readOnlyExecutor(parent.getName())
-                .readAugmentParent(childDao, DetachedCriteria.forClass(SimpleChild.class)
-                                .add(Property.forName(SimpleChild.Fields.parent)
-                                        .eq(parent.getName())),
+                .readAugmentParent(childDao, (queryRoot, query, criteriaBuilder) -> {
+                            query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, SimpleChild.Fields.parent, parent.getName()));
+                        },
                         0,
                         Integer.MAX_VALUE,
                         (parentObject, children) -> parentObject.getChildren().addAll(children))

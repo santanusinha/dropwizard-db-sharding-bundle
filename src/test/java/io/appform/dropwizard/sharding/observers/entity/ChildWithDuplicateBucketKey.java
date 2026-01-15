@@ -1,15 +1,16 @@
 package io.appform.dropwizard.sharding.observers.entity;
 
 import io.appform.dropwizard.sharding.sharding.BucketKey;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import lombok.experimental.FieldNameConstants;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Table;
+
 
 @Entity
 @Table(name = "child")

@@ -30,15 +30,18 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntityWithAIId;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
+import io.appform.dropwizard.sharding.query.QueryUtils;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -210,8 +213,9 @@ public class MultiTenantLookupDaoTest {
   @Test
   public void testScatterGather() throws Exception {
     List<TestEntity> results = lookupDao.scatterGather("TENANT1",
-        DetachedCriteria.forClass(TestEntity.class)
-            .add(Restrictions.eq("externalId", "testId")));
+            (queryRoot, query, criteriaBuilder) -> {
+              query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "externalId", "testId"));
+            });
     assertTrue(results.isEmpty());
 
     TestEntity testEntity = TestEntity.builder()
@@ -219,8 +223,9 @@ public class MultiTenantLookupDaoTest {
         .text("Some Text")
         .build();
     lookupDao.save("TENANT1", testEntity);
-    results = lookupDao.scatterGather("TENANT1", DetachedCriteria.forClass(TestEntity.class)
-        .add(Restrictions.eq("externalId", "testId")));
+    results = lookupDao.scatterGather("TENANT1", (queryRoot, query, criteriaBuilder) -> {
+      query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "externalId", "testId"));
+    });
     assertFalse(results.isEmpty());
     assertEquals("Some Text",
         results.get(0)
@@ -238,8 +243,9 @@ public class MultiTenantLookupDaoTest {
             .text("Some Text")
             .build();
     lookupDao.save("TENANT1", testEntity);
-    results = lookupDao.scatterGather("TENANT1", DetachedCriteria.forClass(TestEntity.class)
-            .add(Restrictions.eq("externalId", "testId")));
+    results = lookupDao.scatterGather("TENANT1",(queryRoot, query, criteriaBuilder) -> {
+      query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "externalId", "testId"));
+    });
     assertFalse(results.isEmpty());
     assertEquals("Some Text",
             results.get(0)
@@ -256,8 +262,9 @@ public class MultiTenantLookupDaoTest {
             .text("Some Text")
             .build();
     lookupDao.save("TENANT1", testEntity);
-    results = lookupDao.scatterGather("TENANT1", DetachedCriteria.forClass(TestEntity.class)
-            .add(Restrictions.eq("externalId", "testId")));
+    results = lookupDao.scatterGather("TENANT1", (queryRoot, query, criteriaBuilder) -> {
+      query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "externalId", "testId"));
+    });
     assertFalse(results.isEmpty());
     assertEquals("Some Text",
             results.get(0)
@@ -375,12 +382,14 @@ public class MultiTenantLookupDaoTest {
     saveAudit(phoneNumber, "testTxn", "Underway");
     saveAudit(phoneNumber, "testTxn", "Completed");
 
-    assertEquals(3, auditDao.count("TENANT1", phoneNumber, DetachedCriteria.forClass(Audit.class)
-        .add(Restrictions.eq("transaction.transactionId", "testTxn"))));
+    assertEquals(3, auditDao.count("TENANT1", phoneNumber, (queryRoot, query, criteriaBuilder) -> {
+      query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "testTxn"));
+    }));
 
     List<Audit> audits = auditDao.select("TENANT1", phoneNumber,
-        DetachedCriteria.forClass(Audit.class)
-            .add(Restrictions.eq("transaction.transactionId", "testTxn")), 0, 10);
+            (queryRoot, query, criteriaBuilder) -> {
+              query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "testTxn"));
+            }, 0, 10);
     assertEquals("Started",
         audits.get(0)
             .getText());
@@ -403,13 +412,16 @@ public class MultiTenantLookupDaoTest {
     saveHierarchy("9986402019");
 
     List<Audit> audits = auditDao.select("TENANT1", phoneNumber,
-        DetachedCriteria.forClass(Audit.class)
-            .add(Restrictions.eq("transaction.transactionId", "newTxn-" + phoneNumber)), 0, 10);
+            (queryRoot, query, criteriaBuilder) -> {
+              query.where(criteriaBuilder.equal(queryRoot.get("transaction").get("transactionId"), "newTxn-" + phoneNumber));
+            }, 0, 10);
 
     assertEquals(2, audits.size());
 
     List<Audit> allAudits = auditDao.scatterGather("TENANT1",
-        DetachedCriteria.forClass(Audit.class), 0, 10);
+            (queryRoot, query, criteriaBuilder) -> {
+              // No restrictions, select all
+            }, 0, 10);
     assertEquals(4, allAudits.size());
   }
 
@@ -453,12 +465,16 @@ public class MultiTenantLookupDaoTest {
 
   @Test
   public void testCount() throws Exception {
-    DetachedCriteria criteria = DetachedCriteria.forClass(TestEntity.class)
-        .add(Restrictions.eq("text", "TEST_TYPE"));
+    var  querySpec = new QuerySpec<TestEntity, TestEntity>() {
+      @Override
+      public void apply(Root<TestEntity> queryRoot, CriteriaQuery<TestEntity> query, CriteriaBuilder criteriaBuilder) {
+        query.where(QueryUtils.equalityFilter(criteriaBuilder, queryRoot, "text", "TEST_TYPE"));
+      }
+    };
 
     assertEquals(
         0L,
-        (long) lookupDao.count("TENANT1", criteria).stream().reduce(0L, Long::sum)
+        (long) lookupDao.count("TENANT1", querySpec).stream().reduce(0L, Long::sum)
     );
 
     TestEntity testEntity = TestEntity.builder()
@@ -472,13 +488,13 @@ public class MultiTenantLookupDaoTest {
 
     assertEquals(
         2L,
-        (long) lookupDao.count("TENANT1", criteria).stream().reduce(0L, Long::sum)
+        (long) lookupDao.count("TENANT1", querySpec).stream().reduce(0L, Long::sum)
     );
 
     lookupDao.delete("TENANT1", "testId2");
     assertEquals(
         1L,
-        (long) lookupDao.count("TENANT1", criteria).stream().reduce(0L, Long::sum)
+        (long) lookupDao.count("TENANT1", querySpec).stream().reduce(0L, Long::sum)
     );
   }
 }

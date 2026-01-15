@@ -17,32 +17,22 @@
 
 package io.appform.dropwizard.sharding.dao.testdata.entities;
 
+import io.appform.dropwizard.sharding.converters.StringAttributeConverter;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.Hibernate;
-import org.hibernate.annotations.Type;
-import org.hibernate.annotations.TypeDef;
-import org.hibernate.annotations.TypeDefs;
 import org.hibernate.validator.constraints.NotEmpty;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
 import java.util.Objects;
-@TypeDefs({
-        @TypeDef(
-                name = "EncryptedString",
-                typeClass = org.jasypt.hibernate5.type.EncryptedStringType.class,
-                parameters = {
-                        @org.hibernate.annotations.Parameter(name="encryptorRegisteredName", value = "encryptedString")
-                }
-        )
-})
 
 @Entity
 @Table(name = "test_enc_entity")
@@ -61,7 +51,7 @@ public class TestEncryptedEntity {
 
     @Column(name = "enc_text", nullable = false)
     @NotEmpty
-    @Type(type = "EncryptedString")
+    @Convert(converter = StringAttributeConverter.class)
     private String encText;
 
     @Override

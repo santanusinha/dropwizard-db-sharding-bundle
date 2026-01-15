@@ -6,7 +6,6 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import lombok.val;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -37,8 +36,9 @@ class CreateOrUpdateInLockedContextTest {
 
         val createOrUpdateInLockedContext = CreateOrUpdateInLockedContext.<OrderItem, Order>builder()
             .lockedEntity(o)
-            .selectParam(SelectParam.<OrderItem>builder().criteria(DetachedCriteria.forClass(
-                OrderItem.class)).build())
+            .selectParam(SelectParam.<OrderItem>builder()
+                    .querySpec((queryRoot, query, criteriaBuilder) -> {})
+                    .build())
             .entityGenerator((o1) -> oi)
             .saver(spiedSaver)
             .updater(spiedUpdater)
@@ -67,8 +67,9 @@ class CreateOrUpdateInLockedContextTest {
 
         val createOrUpdateInLockedContext = CreateOrUpdateInLockedContext.<OrderItem, Order>builder()
             .lockedEntity(o)
-            .selectParam(SelectParam.<OrderItem>builder().criteria(DetachedCriteria.forClass(
-                OrderItem.class)).build())
+            .selectParam(SelectParam.<OrderItem>builder()
+                    .querySpec((queryRoot, query, criteriaBuilder) -> {})
+                    .build())
             .entityGenerator(spiedEntityGenerator)
             .saver(spiedSaver)
             .updater(spiedUpdater)
@@ -102,8 +103,9 @@ class CreateOrUpdateInLockedContextTest {
 
         val createOrUpdateInLockedContext = CreateOrUpdateInLockedContext.<OrderItem, Order>builder()
             .lockedEntity(o)
-            .selectParam(SelectParam.<OrderItem>builder().criteria(DetachedCriteria.forClass(
-                OrderItem.class)).build())
+            .selectParam(SelectParam.<OrderItem>builder()
+                    .querySpec((queryRoot, query, criteriaBuilder) -> {})
+                    .build())
             .entityGenerator(spiedEntityGenerator)
             .saver(spiedSaver)
             .updater(spiedUpdater)

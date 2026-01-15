@@ -8,9 +8,9 @@
  * @param <T> The type of the entity for which the query specification is applied.
  * @param <U> The type of the result expected from the query.
  *
- * @see javax.persistence.criteria.CriteriaBuilder
- * @see javax.persistence.criteria.CriteriaQuery
- * @see javax.persistence.criteria.Root
+ * @see jakarta.persistence.criteria.CriteriaBuilder
+ * @see jakarta.persistence.criteria.CriteriaQuery
+ * @see jakarta.persistence.criteria.Root
  *
  * @author Your Name
  * @version 1.0
@@ -19,9 +19,9 @@
 
 package io.appform.dropwizard.sharding.query;
 
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Root;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 
 /**
  * A functional interface representing a query specification.

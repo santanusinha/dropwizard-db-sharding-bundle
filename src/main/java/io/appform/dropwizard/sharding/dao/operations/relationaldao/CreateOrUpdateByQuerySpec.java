@@ -23,10 +23,10 @@ import java.util.function.UnaryOperator;
  */
 @Data
 @Builder
-public class CreateOrUpdate<U, T> extends OpContext<T> {
+public class CreateOrUpdateByQuerySpec<U, T> extends OpContext<T> {
 
   @NonNull
-  QuerySpec<U, U> querySpec;
+  QuerySpec<U, U> criteria;
   UnaryOperator<T> mutator;
   Supplier<T> entityGenerator;
   private Function<QuerySpec<U, U>, T> getLockedForWrite;
@@ -36,7 +36,7 @@ public class CreateOrUpdate<U, T> extends OpContext<T> {
 
   @Override
   public T apply(Session session) {
-    T result = getLockedForWrite.apply(querySpec);
+    T result = getLockedForWrite.apply(criteria);
 
     if (null == result) {
       val newEntity = entityGenerator.get();
@@ -49,12 +49,12 @@ public class CreateOrUpdate<U, T> extends OpContext<T> {
     if (null != updated) {
       updater.accept(result, updated);
     }
-    return getter.apply(querySpec);
+    return getter.apply(criteria);
   }
 
   @Override
   public OpType getOpType() {
-    return OpType.CREATE_OR_UPDATE;
+    return OpType.CREATE_OR_UPDATE_BY_QUERY_SPEC;
   }
 
   @Override

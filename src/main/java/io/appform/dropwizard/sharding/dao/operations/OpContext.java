@@ -4,9 +4,10 @@ import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecut
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
-import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
+import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import lombok.Data;
@@ -27,15 +28,9 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
   public interface OpContextVisitor<P> {
 
-    P visit(Count opContext);
-
     P visit(CountByQuerySpec opContext);
 
-    <T, R> P visit(Get<T, R> opContext);
-
-    <T> P visit(GetAndUpdate<T> opContext);
-
-    <T, R> P visit(GetByLookupKey<T, R> opContext);
+    <T> P visit(GetAndUpdateByQuerySpec<T> opContext);
 
     <T> P visit(GetAndUpdateByLookupKey<T> opContext);
 
@@ -55,8 +50,6 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(RunInSession<T> opContext);
 
-    <T> P visit(RunWithCriteria<T> opContext);
-
     P visit(DeleteByLookupKey opContext);
 
     <U, V> P visit(Save<U, V> opContext);
@@ -65,12 +58,19 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
 
-    <T> P visit(CreateOrUpdate<T> opContext);
+    <U, T> P visit(CreateOrUpdate<U, T> opContext);
 
     <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
     <T, R> P visit(Select<T, R> opContext);
 
+    <T, G, R> P visit(GetByQuerySpec<T, G, R> opContext);
+
+    <U, T> P visit(RunWithQuerySpec<U, T> opContext);
+
+    <T, R> P visit(GetByLookupKeyByQuerySpec<T, R> opContext);
+
+    <U, T> P visit(CreateOrUpdateByQuerySpec<U, T> opContext);
   }
 
 }

@@ -1,14 +1,21 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,20 +27,13 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.Transient;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -112,8 +112,8 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val companyId1 = "CMPID1";
     val companyId2 = "CMPID2";
 
-    val parentCriteria = DetachedCriteria.forClass(Company.class)
-        .add(Restrictions.in("companyUsageId", Sets.newHashSet(companyId1, companyId2)));
+    QuerySpec<Company, Company> parentQuerySpec = (root, query, cb) ->
+            query.where(root.get("companyUsageId").in(companyId1, companyId2));
 
     val associationMappingSpecs = Lists.newArrayList(
         MultiTenantRelationalDao.AssociationMappingSpec.builder().childMappingKey("companyExtId")
@@ -126,7 +126,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         .associationMappingSpecs(associationMappingSpecs)
         .build();
 
-    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentCriteria, 0, 4)
+    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentQuerySpec, 0, 4)
         .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
         .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
@@ -167,20 +167,19 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
 
     val companyToRetrieve = "CMPID1";
 
-    val parentCriteria = DetachedCriteria.forClass(Company.class)
-        .add(Restrictions.eq("companyUsageId", companyToRetrieve));
+    QuerySpec<Company, Company> parentQuerySpec = (root, query, cb) ->
+            query.where(cb.equal(root.get("companyUsageId"), companyToRetrieve));
 
     val departmentQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<Department>builder()
-        .criteria(DetachedCriteria.forClass(Department.class)
-            .add(Restrictions.eq("companyExtId", companyToRetrieve)))
-        .build();
+            .querySpec((root, query, cb) -> query.where(cb.equal(root.get("companyExtId"), companyToRetrieve)))
+            .build();
 
     val ceoQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<Ceo>builder()
-        .criteria(DetachedCriteria.forClass(Ceo.class)
-            .add(Restrictions.eq("companyExtId", companyToRetrieve)))
-        .build();
+            .querySpec((root, query, cb) -> query.where(cb.equal(root.get("companyExtId"), companyToRetrieve)))
+            .build();
 
-    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentCriteria, 0, 4)
+
+    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentQuerySpec, 0, 4)
         .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
         .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,

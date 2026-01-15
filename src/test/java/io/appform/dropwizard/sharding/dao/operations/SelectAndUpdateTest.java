@@ -3,7 +3,6 @@ package io.appform.dropwizard.sharding.dao.operations;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import lombok.val;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -37,7 +36,7 @@ class SelectAndUpdateTest {
     val selectAndUpdate = SelectAndUpdate.<Order>builder()
         .selectParam(
             SelectParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
+                    .querySpec((queryRoot, query, criteriaBuilder) -> {})
                 .build())
         .selector(spiedSelector)
         .mutator(order -> order.setCustomerId("C2"))
@@ -63,8 +62,8 @@ class SelectAndUpdateTest {
     val selectAndUpdate = SelectAndUpdate.<Order>builder()
         .selectParam(
             SelectParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
-                .build())
+                    .querySpec((queryRoot, query, criteriaBuilder) -> {})
+                    .build())
         .selector(spiedSelector)
         .mutator(order -> order.setCustomerId("C2"))
         .updater(spiedUpdater).build();
@@ -90,8 +89,8 @@ class SelectAndUpdateTest {
     val selectAndUpdate = SelectAndUpdate.<Order>builder()
         .selectParam(
             SelectParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
-                .build())
+                    .querySpec((queryRoot, query, criteriaBuilder) -> {})
+                    .build())
         .selector(spiedSelector)
         .mutator(order -> null)
         .updater(spiedUpdater).build();

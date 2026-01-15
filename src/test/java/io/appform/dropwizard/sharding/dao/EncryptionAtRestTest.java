@@ -16,7 +16,7 @@ import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
-import org.jasypt.hibernate5.encryptor.HibernatePBEEncryptorRegistry;
+import org.jasypt.hibernate6.encryptor.HibernatePBEEncryptorRegistry;
 import org.jasypt.iv.StringFixedIvGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

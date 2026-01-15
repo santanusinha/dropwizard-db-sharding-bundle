@@ -1,24 +1,18 @@
 package io.appform.dropwizard.sharding.observers.entity;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.experimental.FieldNameConstants;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Transient;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
-import javax.persistence.Entity;
-import javax.persistence.Table;
-import javax.persistence.Transient;
 import java.util.ArrayList;
 import java.util.Collection;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "hierarchical_child")
-@FieldNameConstants
-@Getter
-@Setter
-@ToString
-@RequiredArgsConstructor
+@DiscriminatorValue("CHILD_IMPL")
 public class HierarchicalChildImpl extends HierarchicalBaseChildImpl {
 
     @Transient
