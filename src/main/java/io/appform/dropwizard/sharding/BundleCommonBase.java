@@ -140,14 +140,14 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     strongEncryptor.setPassword(shardingOption.getEncryptionPassword());
     strongEncryptor.setIvGenerator(
         new StringFixedIvGenerator(shardingOption.getEncryptionIv()));
-//    if (Objects.nonNull(tenantId)) {
-//      encryptorRegistry.registerPBEStringEncryptor(tenantId, "encryptedString", strongEncryptor);
-//      encryptorRegistry.registerPBEStringEncryptor(tenantId, "encryptedCalendarAsString",
-//          strongEncryptor);
-//    } else {
+    if (Objects.nonNull(tenantId)) {
+      encryptorRegistry.registerPBEStringEncryptor(tenantId, "encryptedString", strongEncryptor);
+      encryptorRegistry.registerPBEStringEncryptor(tenantId, "encryptedCalendarAsString",
+          strongEncryptor);
+    } else {
       encryptorRegistry.registerPBEStringEncryptor(AttributeEncryptionUtils.STRING_ENCRYPTER_NAME, strongEncryptor);
       encryptorRegistry.registerPBEStringEncryptor(AttributeEncryptionUtils.CALENDER_ENCRYPTER_NAME, strongEncryptor);
-//    }
+    }
   }
 
   protected void registerBigIntegerEncryptor(String tenantId,
@@ -158,13 +158,13 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     strongEncryptor.setPassword(shardingOption.getEncryptionPassword());
     strongEncryptor.setIvGenerator(
         new StringFixedIvGenerator(shardingOption.getEncryptionIv()));
-//    if (Objects.nonNull(tenantId)) {
-//      encryptorRegistry.registerPBEBigIntegerEncryptor(tenantId, "encryptedBigInteger",
-//          strongEncryptor);
-//    } else {
+    if (Objects.nonNull(tenantId)) {
+      encryptorRegistry.registerPBEBigIntegerEncryptor(tenantId, "encryptedBigInteger",
+          strongEncryptor);
+    } else {
       encryptorRegistry.registerPBEBigIntegerEncryptor(AttributeEncryptionUtils.BIG_INTEGER_ENCRYPTER_NAME,
           strongEncryptor);
-//    }
+    }
   }
 
   protected void registerBigDecimalEncryptor(String tenantId,
@@ -175,13 +175,13 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     strongEncryptor.setPassword(shardingOption.getEncryptionPassword());
     strongEncryptor.setIvGenerator(
         new StringFixedIvGenerator(shardingOption.getEncryptionIv()));
-//    if (Objects.nonNull(tenantId)) {
-//      encryptorRegistry.registerPBEBigDecimalEncryptor(tenantId, "encryptedBigDecimal",
-//          strongEncryptor);
-//    } else {
+    if (Objects.nonNull(tenantId)) {
+      encryptorRegistry.registerPBEBigDecimalEncryptor(tenantId, "encryptedBigDecimal",
+          strongEncryptor);
+    } else {
       encryptorRegistry.registerPBEBigDecimalEncryptor(AttributeEncryptionUtils.BIG_DECIMAL_ENCRYPTER_NAME,
           strongEncryptor);
-//    }
+    }
   }
 
   protected void registerByteEncryptor(String tenantId, ShardingBundleOptions shardingOption) {
@@ -191,11 +191,11 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     strongEncryptor.setPassword(shardingOption.getEncryptionPassword());
     strongEncryptor.setIvGenerator(
         new StringFixedIvGenerator(shardingOption.getEncryptionIv()));
-//    if (Objects.nonNull(tenantId)) {
-//      encryptorRegistry.registerPBEByteEncryptor(tenantId, "encryptedBinary", strongEncryptor);
-//    } else {
+    if (Objects.nonNull(tenantId)) {
+      encryptorRegistry.registerPBEByteEncryptor(tenantId, "encryptedBinary", strongEncryptor);
+    } else {
       encryptorRegistry.registerPBEByteEncryptor(AttributeEncryptionUtils.BYTE_ENCRYPTER_NAME, strongEncryptor);
-//    }
+    }
   }
 
   private void validateAndBuildEntitiesMeta(final Collection<Class<?>> initialisedEntities) {
