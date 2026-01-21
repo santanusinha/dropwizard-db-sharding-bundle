@@ -537,8 +537,8 @@ public class RelationalDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<QuerySpec<T, T>> querySpecUpdater) {
-        return readOnlyExecutor(parentKey, key, querySpecUpdater, () -> false);
+                                               final UnaryOperator<QuerySpec<T, T>> updater) {
+        return readOnlyExecutor(parentKey, key, updater, () -> false);
     }
 
     /**
@@ -549,16 +549,16 @@ public class RelationalDao<T> implements ShardedDao<T> {
      *
      * @param parentKey       parentKey of the entity will be used to decide shard.
      * @param key             used to provide parent key to be pulld
-     * @param querySpecUpdater Function to update criteria to add additional params
+     * @param updater Function to update criteria to add additional params
      * @param entityPopulator A supplier that determines whether entity population should be performed.
      * @return A new ReadOnlyContext for executing read operations on the selected entity.
      */
     public ReadOnlyContext<T> readOnlyExecutor(final String parentKey,
                                                final Object key,
-                                               final UnaryOperator<QuerySpec<T, T>> querySpecUpdater,
+                                               final UnaryOperator<QuerySpec<T, T>> updater,
                                                final Supplier<Boolean> entityPopulator) {
         return new ReadOnlyContext<>(
-                delegate.readOnlyExecutor(tenantId, parentKey, key, querySpecUpdater, entityPopulator)
+                delegate.readOnlyExecutor(tenantId, parentKey, key, updater, entityPopulator)
         );
     }
 

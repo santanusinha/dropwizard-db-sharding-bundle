@@ -4,10 +4,9 @@ import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecut
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
-import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
-import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import lombok.Data;
@@ -28,9 +27,9 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
   public interface OpContextVisitor<P> {
 
-    P visit(CountByQuerySpec opContext);
+    P visit(Count opContext);
 
-    <T> P visit(GetAndUpdateByQuerySpec<T> opContext);
+    <T> P visit(GetAndUpdate<T> opContext);
 
     <T> P visit(GetAndUpdateByLookupKey<T> opContext);
 
@@ -64,13 +63,12 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T, R> P visit(Select<T, R> opContext);
 
-    <T, G, R> P visit(GetByQuerySpec<T, G, R> opContext);
+    <T, G, R> P visit(Get<T, G, R> opContext);
 
-    <U, T> P visit(RunWithQuerySpec<U, T> opContext);
+    <U, T> P visit(RunWithClause<U, T> opContext);
 
-    <T, R> P visit(GetByLookupKeyByQuerySpec<T, R> opContext);
+    <T, R> P visit(GetByLookupKey<T, R> opContext);
 
-    <U, T> P visit(CreateOrUpdateByQuerySpec<U, T> opContext);
   }
 
 }

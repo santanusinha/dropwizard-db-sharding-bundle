@@ -17,7 +17,7 @@ import java.util.function.Function;
  */
 @Data
 @Builder
-public class GetAndUpdateByQuerySpec<T> extends OpContext<Boolean> {
+public class GetAndUpdate<T> extends OpContext<Boolean> {
 
     @NonNull
     private QuerySpec<T, T> querySpec;
@@ -43,7 +43,7 @@ public class GetAndUpdateByQuerySpec<T> extends OpContext<Boolean> {
 
     @Override
     public OpType getOpType() {
-        return OpType.GET_AND_UPDATE_BY_QUERY_SPEC;
+        return OpType.GET_AND_UPDATE;
     }
 
     @Override

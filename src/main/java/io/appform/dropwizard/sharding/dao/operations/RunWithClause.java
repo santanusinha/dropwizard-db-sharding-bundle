@@ -9,26 +9,27 @@ import org.hibernate.Session;
 import java.util.function.Function;
 
 /**
- * Returns count of records matching given query spec for a shard.
+ * Run a query with given criteria inside this shard and returns resulting list.
+ *
+ * @param <T> Return type on performing the operation.
  */
 @Data
 @Builder
-public class CountByQuerySpec extends OpContext<Long> {
+public class RunWithClause<U, T> extends OpContext<T> {
 
   @NonNull
-  private QuerySpec querySpec;
-
+  private Function<QuerySpec<U, U>, T> handler;
   @NonNull
-  private Function<QuerySpec, Long> counter;
+  private QuerySpec<U, U> querySpec;
 
   @Override
-  public Long apply(Session session) {
-    return counter.apply(querySpec);
+  public T apply(Session session) {
+    return handler.apply(querySpec);
   }
 
   @Override
   public OpType getOpType() {
-    return OpType.COUNT_BY_QUERY_SPEC;
+    return OpType.RUN_WITH_CLAUSE;
   }
 
   @Override

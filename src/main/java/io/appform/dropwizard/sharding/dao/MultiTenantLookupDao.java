@@ -22,11 +22,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.GetByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.Count;
+import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
-import io.appform.dropwizard.sharding.dao.operations.RunWithQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.RunWithClause;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.Select;
 import io.appform.dropwizard.sharding.dao.operations.SelectParam;
@@ -34,7 +34,7 @@ import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
-import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
+import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
@@ -180,9 +180,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(tenantId, key, x -> x, t -> t));
     }
 
-    public Optional<T> get(String tenantId, String key, UnaryOperator<QuerySpec<T, T>> querySpecUpdater)
+    public Optional<T> get(String tenantId, String key, UnaryOperator<QuerySpec<T, T>> updater)
             throws Exception {
-        return Optional.ofNullable(get(tenantId, key, querySpecUpdater, t -> t));
+        return Optional.ofNullable(get(tenantId, key, updater, t -> t));
     }
 
     /**
@@ -202,7 +202,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = GetByLookupKeyByQuerySpec.<T, U>builder()
+        val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
                 .getter(dao::get)
                 .afterGet(handler)
@@ -212,16 +212,16 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     }
 
     @SuppressWarnings("java:S112")
-    public <U> U get(String tenantId, String key, UnaryOperator<QuerySpec<T, T>> querySpecUpdater,
+    public <U> U get(String tenantId, String key, UnaryOperator<QuerySpec<T, T>> updater,
                      Function<T, U> handler)
             throws Exception {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = GetByLookupKeyByQuerySpec.<T, U>builder()
+        val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
                 .getter(dao::get)
-                .querySpecUpdater(querySpecUpdater)
+                .updater(updater)
                 .afterGet(handler)
                 .build();
         return transactionExecutor.get(tenantId)
@@ -452,18 +452,18 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *
      * @param tenantId        Tenant id
      * @param id              The ID of the entity for which the read-only context is created.
-     * @param querySpecUpdater A method that lets clients add additional changes to the querySpec before
+     * @param updater A method that lets clients add additional changes to the querySpec before
      *                        the get
      * @return A new ReadOnlyContext for executing read operations on the specified entity.
      */
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId, String id,
-                                               UnaryOperator<QuerySpec<T, T>> querySpecUpdater) {
+                                               UnaryOperator<QuerySpec<T, T>> updater) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
-                key -> dao.getLocked(key, querySpecUpdater, LockModeType.NONE),
+                key -> dao.getLocked(key, updater, LockModeType.NONE),
                 null,
                 id,
                 shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
@@ -493,14 +493,14 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId,
                                                String id,
-                                               UnaryOperator<QuerySpec<T, T>> querySpecUpdater,
+                                               UnaryOperator<QuerySpec<T, T>> updater,
                                                Supplier<Boolean> entityPopulator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
-                key -> dao.getLocked(key, querySpecUpdater, LockModeType.NONE),
+                key -> dao.getLocked(key, updater, LockModeType.NONE),
                 entityPopulator,
                 id,
                 shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
@@ -698,7 +698,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         return IntStream.range(0, daos.get(tenantId).size())
                 .mapToObj(shardId -> {
                     val dao = daos.get(tenantId).get(shardId);
-                    val opContext = CountByQuerySpec.builder()
+                    val opContext = Count.builder()
                             .counter(dao::count)
                             .querySpec(querySpec)
                             .build();
@@ -743,7 +743,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List<T>> opContext = RunWithQuerySpec.<T, List<T>>builder()
+                    OpContext<List<T>> opContext = RunWithClause.<T, List<T>>builder()
                             .handler(dao::run)
                             .querySpec(querySpec)
                             .build();
@@ -781,7 +781,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                         query.where(queryRoot.get(keyField.getName()).in(lookupKeysGroupByShards.get(shardId)));
                     }
                 };
-                val opContext = GetByQuerySpec.<T, List<T>, List<T>>builder()
+                val opContext = Get.<T, List<T>, List<T>>builder()
                         .querySpec(querySpec)
                         .getter(daos.get(tenantId).get(shardId)::select)
                         .build();
@@ -1209,25 +1209,25 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             return getLocked(lookupKey, x -> x, LockModeType.NONE);
         }
 
-        T get(String lookupKey, UnaryOperator<QuerySpec<T, T>> querySpecUpdater) {
-            return getLocked(lookupKey, querySpecUpdater, LockModeType.NONE);
+        T get(String lookupKey, UnaryOperator<QuerySpec<T, T>> updater) {
+            return getLocked(lookupKey, updater, LockModeType.NONE);
         }
 
         /**
          * Get an element from the shard.
          *
          * @param lookupKey       Id of the object
-         * @param querySpecUpdater Function to update querySpec to add additional params
+         * @param updater Function to update querySpec to add additional params
          * @return Extracted element or null if not found.
          */
-        T getLocked(String lookupKey, UnaryOperator<QuerySpec<T, T>> querySpecUpdater, LockModeType lockMode) {
+        T getLocked(String lookupKey, UnaryOperator<QuerySpec<T, T>> updater, LockModeType lockMode) {
             val querySpec = new QuerySpec<T, T>() {
                 @Override
                 public void apply(Root<T> queryRoot, CriteriaQuery<T> query, CriteriaBuilder criteriaBuilder) {
                     query.where(equalityFilter(criteriaBuilder, queryRoot, keyField.getName(), lookupKey));
                 }
             };
-            val updatedQuerySpec = querySpecUpdater.apply(querySpec);
+            val updatedQuerySpec = updater.apply(querySpec);
             val query = InternalUtils.createQuery(currentSession(), entityClass, updatedQuerySpec)
                     .setLockMode(lockMode);
             return uniqueResult(query);

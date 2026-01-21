@@ -80,8 +80,8 @@ public class LookupDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(key, x -> x, t -> t));
     }
 
-    public Optional<T> get(String key, UnaryOperator<QuerySpec<T, T>> querySpecUpdater) throws Exception {
-        return Optional.ofNullable(get(key, querySpecUpdater, t -> t));
+    public Optional<T> get(String key, UnaryOperator<QuerySpec<T, T>> updater) throws Exception {
+        return Optional.ofNullable(get(key, updater, t -> t));
     }
 
     /**
@@ -101,9 +101,9 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     @SuppressWarnings("java:S112")
-    public <U> U get(String key, UnaryOperator<QuerySpec<T, T>> querySpecUpdater, Function<T, U> handler)
+    public <U> U get(String key, UnaryOperator<QuerySpec<T, T>> updater, Function<T, U> handler)
             throws Exception {
-        return delegate.get(dbNamespace, key, querySpecUpdater, handler);
+        return delegate.get(dbNamespace, key, updater, handler);
     }
 
     /**
@@ -234,11 +234,11 @@ public class LookupDao<T> implements ShardedDao<T> {
      * It does not perform entity population during read operations.
      *
      * @param id              The ID of the entity for which the read-only context is created.
-     * @param querySpecUpdater A method that lets clients add additional changes to the querySpec before the get
+     * @param updater A method that lets clients add additional changes to the querySpec before the get
      * @return A new ReadOnlyContext for executing read operations on the specified entity.
      */
-    public ReadOnlyContext<T> readOnlyExecutor(String id, UnaryOperator<QuerySpec<T, T>> querySpecUpdater) {
-        return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, querySpecUpdater));
+    public ReadOnlyContext<T> readOnlyExecutor(String id, UnaryOperator<QuerySpec<T, T>> updater) {
+        return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, updater));
     }
 
     public ReadOnlyContext<T> readOnlyExecutor(String id, Supplier<Boolean> entityPopulator) {
@@ -260,9 +260,9 @@ public class LookupDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(
             String id,
-            UnaryOperator<QuerySpec<T, T>> querySpecUpdater,
+            UnaryOperator<QuerySpec<T, T>> updater,
             Supplier<Boolean> entityPopulator) {
-        return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, querySpecUpdater, entityPopulator));
+        return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, updater, entityPopulator));
     }
 
 

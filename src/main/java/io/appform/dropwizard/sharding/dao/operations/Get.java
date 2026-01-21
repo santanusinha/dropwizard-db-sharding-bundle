@@ -16,7 +16,7 @@ import java.util.function.Function;
  */
 @Data
 @Builder
-public class GetByQuerySpec<T, G,  R> extends OpContext<R> {
+public class Get<T, G,  R> extends OpContext<R> {
 
   @NonNull
   private QuerySpec<T, T> querySpec;
@@ -33,7 +33,7 @@ public class GetByQuerySpec<T, G,  R> extends OpContext<R> {
 
   @Override
   public OpType getOpType() {
-    return OpType.GET_BY_QUERY_SPEC;
+    return OpType.GET;
   }
 
   @Override
