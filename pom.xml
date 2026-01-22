@@ -84,7 +84,7 @@
         <hibernate.version>6.6.0.Final</hibernate.version>
         <hibernate-validator.version>6.2.5.Final</hibernate-validator.version>
         <jackson-datatype-hibernate6.version>2.16.1</jackson-datatype-hibernate6.version>
-        <jasypt-hibernate6.version>1.9.5</jasypt-hibernate6.version>
+        <jasypt-hibernate6.version>1.9.6</jasypt-hibernate6.version>
 
         <lombok.version>1.18.42</lombok.version>
         <cglib.version>3.3.0</cglib.version>
