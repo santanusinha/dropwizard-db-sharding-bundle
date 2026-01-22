@@ -17,7 +17,6 @@
 
 package io.appform.dropwizard.sharding.dao.testdata.entities;
 
-import io.appform.dropwizard.sharding.converters.StringAttributeConverter;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -31,6 +30,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.Hibernate;
 import org.hibernate.validator.constraints.NotEmpty;
+import org.jasypt.hibernate6.encryptor.converters.StringAttributeConverter;
 
 import java.util.Objects;
 
