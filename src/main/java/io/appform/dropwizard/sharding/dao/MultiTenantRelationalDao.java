@@ -222,13 +222,13 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return query.getSingleResult();
         }
 
-        public int update(final UpdateOperationMeta updateOperationMeta) {
+        int update(final UpdateOperationMeta updateOperationMeta) {
             val query = currentSession().createNamedQuery(updateOperationMeta.getQueryName());
             updateOperationMeta.getParams().forEach(query::setParameter);
             return query.executeUpdate();
         }
 
-        public QuerySpec<T, T> getQuerySpec(final Object key) {
+        QuerySpec<T, T> getQuerySpec(final Object key) {
             return (queryRoot, query, criteriaBuilder) ->
                     query.where(criteriaBuilder.equal(queryRoot.get(keyField.getName()), key));
         }
