@@ -2,45 +2,25 @@ package io.appform.dropwizard.sharding.sharding;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 
-public class BucketKeyReader {
+public class BucketKeyReader<T> {
 
-    private static final AtomicReference<BucketKeyReader> INSTANCE = new AtomicReference<>();
-
-    private final Map<String, BucketIdExtractor<String>> bucketIdExtractors;
+    private final BucketIdExtractor<T> bucketIdExtractor;
     private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
-    private BucketKeyReader(final Map<String, BucketIdExtractor<String>> bucketIdExtractors,
+    public BucketKeyReader(final BucketIdExtractor<T> bucketIdExtractor,
                             final Map<String, EntityMeta> initialisedEntitiesMeta) {
         Preconditions.checkArgument(initialisedEntitiesMeta != null, "initialisedEntitiesMeta must not be null");
-        Preconditions.checkArgument(bucketIdExtractors != null, "BucketIdExtractor must not be null");
-        this.bucketIdExtractors = bucketIdExtractors;
+        Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
+        this.bucketIdExtractor = bucketIdExtractor;
         this.initialisedEntitiesMeta = initialisedEntitiesMeta;
     }
 
-    public static BucketKeyReader getInstance(final Map<String, BucketIdExtractor<String>> bucketIdExtractors,
-                                              final Map<String, EntityMeta> initialisedEntitiesMeta) {
-        BucketKeyReader current = INSTANCE.get();
-        if (current == null) {
-            synchronized (BucketKeyReader.class) {
-                BucketKeyReader reader = new BucketKeyReader(bucketIdExtractors, initialisedEntitiesMeta);
-                if(INSTANCE.compareAndSet(null, reader)) {
-                    return reader;
-                }
-                return INSTANCE.get();
-            }
-        }
-        return current;
-    }
-
     public <U> BucketKeyInfo getBucketId(final String tenantId,
-                                         final String shardingKey,
+                                         final T shardingKey,
                                          final Class<U> clazz) {
         if (MapUtils.isEmpty(initialisedEntitiesMeta)) {
             return null;
@@ -51,11 +31,6 @@ public class BucketKeyReader {
             return null;
         }
 
-        if (MapUtils.isEmpty(bucketIdExtractors)) {
-            return null;
-        }
-
-        final var bucketIdExtractor = bucketIdExtractors.get(tenantId);
         if (Objects.isNull(bucketIdExtractor)) {
             return null;
         }

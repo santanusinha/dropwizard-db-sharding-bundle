@@ -6,8 +6,8 @@ import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.BucketKey;
+import io.appform.dropwizard.sharding.sharding.BucketKeyInfo;
 import io.appform.dropwizard.sharding.sharding.BucketKeyReader;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
@@ -53,11 +53,11 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
 
   protected final List<Class<?>> initialisedEntities = new ArrayList<>();
   protected final Map<String, EntityMeta> initialisedEntitiesMeta = new HashMap<>();
-  protected final Map<String, BucketIdExtractor<String>> bucketIdExtractors = new HashMap<>();
 
   private volatile boolean bundleInitialised = false;
 
   protected TransactionObserver rootObserver;
+  protected BucketKeyReader<String> bucketKeyReader;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
     initialiseEntities(ImmutableList.<Class<?>>builder()
@@ -119,16 +119,21 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     return Collections.unmodifiableMap(this.initialisedEntitiesMeta);
   }
 
-  public Map<String, BucketIdExtractor<String>> getBucketIdExtractors() {
+  public BucketKeyReader<String> getBucketKeyReader() {
     if (!this.bundleInitialised) {
       throw new IllegalStateException("DB sharding bundle is not initialised !");
     }
-    return Collections.unmodifiableMap(this.bucketIdExtractors);
+    return this.bucketKeyReader;
   }
 
-  protected void registerBucketIdExtractor(final String tenantId,
-                                           final Map<String, ShardManager> shardManagers) {
-    bucketIdExtractors.put(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers));
+  protected void registerBucketIdExtractor(final Map<String, ShardManager> shardManagers) {
+    this.bucketKeyReader = new BucketKeyReader<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
+  }
+
+  public <U> BucketKeyInfo getBucketId(final String tenantId,
+                                       final String shardingKey,
+                                       final Class<U> clazz) {
+    return getBucketKeyReader().getBucketId(tenantId, shardingKey, clazz);
   }
 
   public final void registerObserver(final TransactionObserver observer) {
