@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -252,28 +253,34 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
         final var bucketKeyField = bucketKeyFieldEntry.get().getKey();
         final var bucketKeySetter = bucketKeyFieldDeclaringClassLookup.unreflectSetter(bucketKeyField);
         final var bucketKeyFieldName = bucketKeyField.getName();
+        final var bucketKeyColumnName = getColumnName(bucketKeyField);
 
         MethodHandle shardingKeyGetter;
         String shardingKeyFieldName;
+        String shardingKeyColumnName;
         if (shardingKeyField.isPresent()) {
           final var shardingKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(shardingKeyFieldEntry.get().getValue(), MethodHandles.lookup());
           final var shardingKeyFieldData = shardingKeyField.get();
           shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyFieldData);
           shardingKeyFieldName = shardingKeyFieldData.getName();
+          shardingKeyColumnName = getColumnName(shardingKeyFieldData);
         } else {
           final var lookupKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(lookupKeyFieldEntry.get().getValue(), MethodHandles.lookup());
           final var lookupKeyFieldData = lookupKeyField.get();
           shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyFieldData);
           shardingKeyFieldName = lookupKeyFieldData.getName();
+          shardingKeyColumnName = getColumnName(lookupKeyFieldData);
         }
 
         final var entityMeta = EntityMeta.builder()
                 .bucketKeySetter(bucketKeySetter)
                 .shardingKeyGetter(shardingKeyGetter)
                 .bucketKeyFieldName(bucketKeyFieldName)
+                .bucketKeyColumnName(bucketKeyColumnName)
                 .shardingKeyFieldName(shardingKeyFieldName)
+                .shardingKeyColumnName(shardingKeyColumnName)
                 .build();
         initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
       } catch (Exception e) {
@@ -320,5 +327,14 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     final var errorMessage = String.format("Field annotated with @%s (%s) must be of acceptable Type: %s, but found %s",
             annotationName, field.getName(), acceptableClass.getSimpleName(), field.getType().getSimpleName());
     Preconditions.checkArgument(ClassUtils.isAssignable(field.getType(), acceptableClass), errorMessage);
+  }
+
+  public static String getColumnName(final Field field) {
+      if (field.isAnnotationPresent(Column.class)) {
+        Column column = field.getAnnotation(Column.class);
+        return !column.name().isEmpty() ? column.name() : field.getName();
+      }
+      // Snake case
+      return field.getName().replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase();
   }
 }

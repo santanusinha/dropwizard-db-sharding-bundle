@@ -39,6 +39,7 @@ public class BucketKeyReader<T> {
 
         return BucketKeyInfo.builder()
                 .fieldName(entityMeta.getBucketKeyFieldName())
+                .columnName(entityMeta.getBucketKeyColumnName())
                 .value(bucketId)
                 .build();
     }

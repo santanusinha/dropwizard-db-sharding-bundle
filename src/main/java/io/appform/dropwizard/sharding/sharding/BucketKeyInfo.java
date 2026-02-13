@@ -7,5 +7,6 @@ import lombok.Getter;
 @Getter
 public class BucketKeyInfo {
     private String fieldName;
+    private String columnName;
     private int value;
 }

@@ -16,4 +16,6 @@ public class EntityMeta {
     private MethodHandle shardingKeyGetter;
     private String bucketKeyFieldName;
     private String shardingKeyFieldName;
+    private String bucketKeyColumnName;
+    private String shardingKeyColumnName;
 }
