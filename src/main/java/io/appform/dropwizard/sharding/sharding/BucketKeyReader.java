@@ -38,8 +38,6 @@ public class BucketKeyReader<T> {
         final var bucketId = bucketIdExtractor.bucketId(tenantId, shardingKey);
 
         return BucketKeyInfo.builder()
-                .fieldName(entityMeta.getBucketKeyFieldName())
-                .columnName(entityMeta.getBucketKeyColumnName())
                 .value(bucketId)
                 .build();
     }

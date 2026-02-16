@@ -14,8 +14,6 @@ import java.lang.invoke.MethodHandle;
 public class EntityMeta {
     private MethodHandle bucketKeySetter;
     private MethodHandle shardingKeyGetter;
-    private String bucketKeyFieldName;
-    private String shardingKeyFieldName;
     private String bucketKeyColumnName;
     private String shardingKeyColumnName;
 }

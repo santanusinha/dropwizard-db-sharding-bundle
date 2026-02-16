@@ -252,34 +252,28 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
                 MethodHandles.privateLookupIn(bucketKeyFieldEntry.get().getValue(), MethodHandles.lookup());
         final var bucketKeyField = bucketKeyFieldEntry.get().getKey();
         final var bucketKeySetter = bucketKeyFieldDeclaringClassLookup.unreflectSetter(bucketKeyField);
-        final var bucketKeyFieldName = bucketKeyField.getName();
         final var bucketKeyColumnName = getColumnName(bucketKeyField);
 
         MethodHandle shardingKeyGetter;
-        String shardingKeyFieldName;
         String shardingKeyColumnName;
         if (shardingKeyField.isPresent()) {
           final var shardingKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(shardingKeyFieldEntry.get().getValue(), MethodHandles.lookup());
           final var shardingKeyFieldData = shardingKeyField.get();
           shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyFieldData);
-          shardingKeyFieldName = shardingKeyFieldData.getName();
           shardingKeyColumnName = getColumnName(shardingKeyFieldData);
         } else {
           final var lookupKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(lookupKeyFieldEntry.get().getValue(), MethodHandles.lookup());
           final var lookupKeyFieldData = lookupKeyField.get();
           shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyFieldData);
-          shardingKeyFieldName = lookupKeyFieldData.getName();
           shardingKeyColumnName = getColumnName(lookupKeyFieldData);
         }
 
         final var entityMeta = EntityMeta.builder()
                 .bucketKeySetter(bucketKeySetter)
                 .shardingKeyGetter(shardingKeyGetter)
-                .bucketKeyFieldName(bucketKeyFieldName)
                 .bucketKeyColumnName(bucketKeyColumnName)
-                .shardingKeyFieldName(shardingKeyFieldName)
                 .shardingKeyColumnName(shardingKeyColumnName)
                 .build();
         initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
@@ -330,11 +324,16 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   }
 
   public static String getColumnName(final Field field) {
-      if (field.isAnnotationPresent(Column.class)) {
-        Column column = field.getAnnotation(Column.class);
-        return !column.name().isEmpty() ? column.name() : field.getName();
-      }
-      // Snake case
-      return field.getName().replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase();
+    Column column = field.getAnnotation(Column.class);
+
+    if (column == null) {
+      throw new IllegalStateException("@Column annotation missing for field: " + field.getName());
+    }
+
+    if (column.name().isEmpty()) {
+      throw new IllegalStateException("Missing name for @Column annotation: " + field.getName());
+    }
+
+    return column.name();
   }
 }
