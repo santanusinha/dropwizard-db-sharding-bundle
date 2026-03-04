@@ -12,7 +12,7 @@ public class BucketKeyReader<T> {
     private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
     public BucketKeyReader(final BucketIdExtractor<T> bucketIdExtractor,
-                            final Map<String, EntityMeta> initialisedEntitiesMeta) {
+                           final Map<String, EntityMeta> initialisedEntitiesMeta) {
         Preconditions.checkArgument(initialisedEntitiesMeta != null, "initialisedEntitiesMeta must not be null");
         Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
         this.bucketIdExtractor = bucketIdExtractor;

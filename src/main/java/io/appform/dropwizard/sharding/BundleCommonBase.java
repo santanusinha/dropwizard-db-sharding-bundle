@@ -330,10 +330,10 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       throw new IllegalStateException("@Column annotation missing for field: " + field.getName());
     }
 
-    if (column.name().isEmpty()) {
-      throw new IllegalStateException("Missing name for @Column annotation: " + field.getName());
+    if (!column.name().isEmpty()) {
+      return column.name();
     }
 
-    return column.name();
+    return field.getName().replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase();
   }
 }
