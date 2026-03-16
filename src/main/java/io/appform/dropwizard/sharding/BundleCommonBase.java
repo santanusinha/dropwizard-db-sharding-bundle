@@ -7,8 +7,8 @@ import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BucketKey;
-import io.appform.dropwizard.sharding.sharding.BucketKeyInfo;
-import io.appform.dropwizard.sharding.sharding.BucketKeyReader;
+import io.appform.dropwizard.sharding.sharding.BucketInfo;
+import io.appform.dropwizard.sharding.sharding.BucketResolver;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
@@ -58,7 +58,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   private volatile boolean bundleInitialised = false;
 
   protected TransactionObserver rootObserver;
-  protected BucketKeyReader<String> bucketKeyReader;
+  protected BucketResolver<String> bucketResolver;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
     initialiseEntities(ImmutableList.<Class<?>>builder()
@@ -120,21 +120,21 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     return Collections.unmodifiableMap(this.initialisedEntitiesMeta);
   }
 
-  public BucketKeyReader<String> getBucketKeyReader() {
+  public BucketResolver<String> getBucketResolver() {
     if (!this.bundleInitialised) {
       throw new IllegalStateException("DB sharding bundle is not initialised !");
     }
-    return this.bucketKeyReader;
+    return this.bucketResolver;
   }
 
   protected void registerBucketIdExtractor(final Map<String, ShardManager> shardManagers) {
-    this.bucketKeyReader = new BucketKeyReader<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
+    this.bucketResolver = new BucketResolver<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
   }
 
-  public <U> BucketKeyInfo getBucketId(final String tenantId,
-                                       final String shardingKey,
-                                       final Class<U> clazz) {
-    return getBucketKeyReader().getBucketId(tenantId, shardingKey, clazz);
+  protected <U> BucketInfo getBucketInfo(final String tenantId,
+                                         final String shardingKey,
+                                         final Class<U> clazz) {
+    return getBucketResolver().getBucketInfo(tenantId, shardingKey, clazz);
   }
 
   public final void registerObserver(final TransactionObserver observer) {
@@ -235,15 +235,15 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
         }
         final var lookupKeyFieldEntry = fetchAndValidateAnnotateField(clazz, LookupKey.class, String.class);
         final var shardingKeyFieldEntry = fetchAndValidateAnnotateField(clazz, ShardingKey.class, String.class);
-        final var shardingKeyField = shardingKeyFieldEntry.map(Map.Entry::getKey);
-        final var lookupKeyField = lookupKeyFieldEntry.map(Map.Entry::getKey);
+        final var shardingKeyFieldOptional = shardingKeyFieldEntry.map(Map.Entry::getKey);
+        final var lookupKeyFieldOptional = lookupKeyFieldEntry.map(Map.Entry::getKey);
 
-        if (shardingKeyField.isEmpty() && lookupKeyField.isEmpty()) {
+        if (shardingKeyFieldOptional.isEmpty() && lookupKeyFieldOptional.isEmpty()) {
           throw new RuntimeException(String.format("Entity %s: ShardingKey or LookupKey must be present if BucketKey " +
                   "is present", clazz.getName()));
         }
 
-        if (shardingKeyField.isPresent() && lookupKeyField.isPresent()) {
+        if (shardingKeyFieldOptional.isPresent() && lookupKeyFieldOptional.isPresent()) {
           throw new RuntimeException(String.format("Entity %s: Both ShardingKey and LookupKey cannot be present at the " +
                   "same time", clazz.getName()));
         }
@@ -256,18 +256,18 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
 
         MethodHandle shardingKeyGetter;
         String shardingKeyColumnName;
-        if (shardingKeyField.isPresent()) {
+        if (shardingKeyFieldOptional.isPresent()) {
           final var shardingKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(shardingKeyFieldEntry.get().getValue(), MethodHandles.lookup());
-          final var shardingKeyFieldData = shardingKeyField.get();
-          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyFieldData);
-          shardingKeyColumnName = getColumnName(shardingKeyFieldData);
+          final var shardingKeyField = shardingKeyFieldOptional.get();
+          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyField);
+          shardingKeyColumnName = getColumnName(shardingKeyField);
         } else {
           final var lookupKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(lookupKeyFieldEntry.get().getValue(), MethodHandles.lookup());
-          final var lookupKeyFieldData = lookupKeyField.get();
-          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyFieldData);
-          shardingKeyColumnName = getColumnName(lookupKeyFieldData);
+          final var lookupKeyField = lookupKeyFieldOptional.get();
+          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyField);
+          shardingKeyColumnName = getColumnName(lookupKeyField);
         }
 
         final var entityMeta = EntityMeta.builder()

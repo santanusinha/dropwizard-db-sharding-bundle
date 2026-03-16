@@ -172,8 +172,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
               this.initialisedEntitiesMeta);
         environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
         environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
-
-        registerBucketIdExtractor(this.shardManagers);
       } finally {
         executorService.shutdown();
         try {
@@ -186,6 +184,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
       }
     });
+    registerBucketIdExtractor(this.shardManagers);
   }
 
   @Override

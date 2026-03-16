@@ -4,24 +4,23 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapUtils;
 
 import java.util.Map;
-import java.util.Objects;
 
-public class BucketKeyReader<T> {
+public class BucketResolver<T> {
 
     private final BucketIdExtractor<T> bucketIdExtractor;
     private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
-    public BucketKeyReader(final BucketIdExtractor<T> bucketIdExtractor,
-                           final Map<String, EntityMeta> initialisedEntitiesMeta) {
+    public BucketResolver(final BucketIdExtractor<T> bucketIdExtractor,
+                          final Map<String, EntityMeta> initialisedEntitiesMeta) {
         Preconditions.checkArgument(initialisedEntitiesMeta != null, "initialisedEntitiesMeta must not be null");
         Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
         this.bucketIdExtractor = bucketIdExtractor;
         this.initialisedEntitiesMeta = initialisedEntitiesMeta;
     }
 
-    public <U> BucketKeyInfo getBucketId(final String tenantId,
-                                         final T shardingKey,
-                                         final Class<U> clazz) {
+    public <U> BucketInfo getBucketInfo(final String tenantId,
+                                        final T shardingKey,
+                                        final Class<U> clazz) {
         if (MapUtils.isEmpty(initialisedEntitiesMeta)) {
             return null;
         }
@@ -31,14 +30,11 @@ public class BucketKeyReader<T> {
             return null;
         }
 
-        if (Objects.isNull(bucketIdExtractor)) {
-            return null;
-        }
-
         final var bucketId = bucketIdExtractor.bucketId(tenantId, shardingKey);
 
-        return BucketKeyInfo.builder()
+        return BucketInfo.builder()
                 .value(bucketId)
+                .key(entityMeta.getBucketKeyColumnName())
                 .build();
     }
 }

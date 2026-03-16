@@ -22,7 +22,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
-public class BucketKeyReaderTest extends BundleBasedTestBase {
+public class BucketResolverTest extends BundleBasedTestBase {
 
     private static final String shardingKey = "PV10";
     private static final String childValue = "CV10";
@@ -51,7 +51,7 @@ public class BucketKeyReaderTest extends BundleBasedTestBase {
         val savedObjWithBucketColumnAnnotation = entityWithBucketKeyWithColumnNameLookupDao.get(shardingKey).orElse(null);
         Assertions.assertNotNull(savedObjWithBucketColumnAnnotation);
 
-        val bucketKeyExtractedWithColumn = bundle.getBucketId(shardingKey, EntityWithBucketKeyWithColumnName.class);
+        val bucketKeyExtractedWithColumn = bundle.getBucketInfo(shardingKey, EntityWithBucketKeyWithColumnName.class);
         Assertions.assertNotNull(bucketKeyExtractedWithColumn);
         Assertions.assertEquals(savedObjWithBucketColumnAnnotation.getBucketKey(), bucketKeyExtractedWithColumn.getValue());
 
@@ -60,7 +60,7 @@ public class BucketKeyReaderTest extends BundleBasedTestBase {
         val savedObjWithoutBucketColumnAnnotation = entityWithBucketKeyWithoutColumnNameLookupDao.get(shardingKey).orElse(null);
         Assertions.assertNotNull(savedObjWithoutBucketColumnAnnotation);
 
-        val bucketKeyExtractedWithoutColumn = bundle.getBucketId(shardingKey, EntityWithBucketKeyWithoutColumnName.class);
+        val bucketKeyExtractedWithoutColumn = bundle.getBucketInfo(shardingKey, EntityWithBucketKeyWithoutColumnName.class);
         Assertions.assertNotNull(bucketKeyExtractedWithoutColumn);
         Assertions.assertEquals(savedObjWithoutBucketColumnAnnotation.getBucketKey(), bucketKeyExtractedWithoutColumn.getValue());
     }

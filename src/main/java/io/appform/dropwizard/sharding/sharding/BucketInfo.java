@@ -5,6 +5,7 @@ import lombok.Getter;
 
 @Builder
 @Getter
-public class BucketKeyInfo {
+public class BucketInfo {
     private int value;
+    private String key;
 }

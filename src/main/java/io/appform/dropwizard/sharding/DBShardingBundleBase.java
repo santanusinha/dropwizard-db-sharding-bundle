@@ -32,7 +32,7 @@ import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.sharding.BucketKeyInfo;
+import io.appform.dropwizard.sharding.sharding.BucketInfo;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -138,9 +138,9 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
         return delegate.getInitialisedEntities();
     }
 
-    public <U> BucketKeyInfo getBucketId(final String shardingKey,
-                                         final Class<U> clazz) {
-        return delegate.getBucketId(dbNamespace, shardingKey, clazz);
+    public <U> BucketInfo getBucketInfo(final String shardingKey,
+                                        final Class<U> clazz) {
+        return delegate.getBucketInfo(dbNamespace, shardingKey, clazz);
     }
 
     protected abstract ShardManager createShardManager(int numShards, ShardBlacklistingStore blacklistingStore);
