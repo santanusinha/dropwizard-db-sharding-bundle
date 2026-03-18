@@ -2,26 +2,27 @@ package io.appform.dropwizard.sharding.observers.entity;
 
 import io.appform.dropwizard.sharding.sharding.BucketKey;
 import io.appform.dropwizard.sharding.sharding.ShardingKey;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.experimental.FieldNameConstants;
+import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorColumn;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.Table;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
 
+@Data
 @Entity
-@Table(name = "hierarchical_child")
-@FieldNameConstants
-@Getter
-@Setter
-@ToString
-@RequiredArgsConstructor
+@Table(name = "HIERARCHICAL_CHILD")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "type")
+@DiscriminatorValue("ROOT")
+@Slf4j
 public class HierarchicalBaseChild {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,5 +35,6 @@ public class HierarchicalBaseChild {
     @Column
     @ShardingKey
     private String parent;
+
 }
 

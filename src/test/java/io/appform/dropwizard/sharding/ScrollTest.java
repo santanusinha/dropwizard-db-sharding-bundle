@@ -16,7 +16,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
- * Tests out functionality for {@link LookupDao#scrollDown(DetachedCriteria, ScrollPointer, int, String)}
+ * Tests out functionality for {@link LookupDao#scrollDown(io.appform.dropwizard.sharding.query.QuerySpec, ScrollPointer, int, String)}
  */
 @Slf4j
 public class ScrollTest {
@@ -74,7 +73,7 @@ public class ScrollTest {
 
         //Now scroll up to read everything
         do {
-            result = lookupDao.scrollUp(DetachedCriteria.forClass(ScrollTestEntity.class),
+            result = lookupDao.scrollUp((root, query, cb) -> {},
                                         pointer,
                                         pageSize,
                                         "id");
@@ -123,7 +122,7 @@ public class ScrollTest {
 
         //Now scroll up to read everything
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
+            result = lookupDao.scrollDown((root, query, cb) -> {},
                                           pointer,
                                           pageSize,
                                           "id");
@@ -168,8 +167,8 @@ public class ScrollTest {
         var result = (ScrollResult<ScrollTestEntity>) null;
         var pointer = (ScrollPointer) null;
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
-                                          pointer,
+            result = lookupDao.scrollDown((root, query, cb) -> {},
+                    pointer,
                                           10,
                                           "id");
             addValuesToSet(entities, result);
@@ -185,8 +184,8 @@ public class ScrollTest {
         If it is not such a field, the results of scroll would be wrong for obvious reasons*/
 
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
-                                          pointer,
+            result = lookupDao.scrollDown((root, query, cb) -> {},
+                    pointer,
                                           10,
                                           "id");
             addValuesToSet(entities, result);

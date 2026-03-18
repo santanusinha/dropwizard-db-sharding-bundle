@@ -18,8 +18,8 @@
 package io.appform.dropwizard.sharding;
 
 import com.codahale.metrics.MetricRegistry;
-import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module;
-import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module.Feature;
+import com.fasterxml.jackson.datatype.hibernate6.Hibernate6Module;
+import com.fasterxml.jackson.datatype.hibernate6.Hibernate6Module.Feature;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -192,7 +192,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     // Registers the Hibernate5Module with Jackson's ObjectMapper to support serialization of Hibernate entities.
     // Enables FORCE_LAZY_LOADING to automatically fetch and serialize lazy-loaded associations (e.g., @OneToMany(fetch = LAZY))
     // during JSON serialization, as long as the Hibernate session is still open.
-    bootstrap.getObjectMapper().registerModule(new Hibernate5Module().enable(Feature.FORCE_LAZY_LOADING));
+    bootstrap.getObjectMapper().registerModule(new Hibernate6Module().enable(Feature.FORCE_LAZY_LOADING));
   }
 
   @VisibleForTesting

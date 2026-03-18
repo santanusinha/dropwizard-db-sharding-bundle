@@ -1,39 +1,46 @@
 package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.DiscriminatorColumn;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Inheritance;
+import jakarta.persistence.InheritanceType;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Restrictions;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
-import javax.persistence.Transient;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +52,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
   private MultiTenantRelationalDao<Department> departmentRelationalDao;
   private MultiTenantRelationalDao<Ceo> ceoRelationalDao;
   private MultiTenantRelationalDao<Company> companyRelationalDao;
+  private MultiTenantRelationalDao<ClassicParent> classicParentRelationalDao;
 
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
@@ -60,6 +68,9 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     configuration.addAnnotatedClass(Company.class);
     configuration.addAnnotatedClass(Department.class);
     configuration.addAnnotatedClass(Ceo.class);
+    configuration.addAnnotatedClass(ClassicParent.class);
+    configuration.addAnnotatedClass(LoyalChild.class);
+    configuration.addAnnotatedClass(DisLoyalChild.class);
     StandardServiceRegistry serviceRegistry
         = new StandardServiceRegistryBuilder().applySettings(
             configuration.getProperties())
@@ -93,8 +104,11 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         shardManager, shardingOptions,
         shardInfoProvider, observer);
     ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardManager,
-        shardingOptions,
-        shardInfoProvider, observer);
+            shardingOptions,
+            shardInfoProvider, observer);
+    classicParentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, ClassicParent.class, shardManager,
+            shardingOptions,
+            shardInfoProvider, observer);
   }
 
   @AfterEach
@@ -112,8 +126,8 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val companyId1 = "CMPID1";
     val companyId2 = "CMPID2";
 
-    val parentCriteria = DetachedCriteria.forClass(Company.class)
-        .add(Restrictions.in("companyUsageId", Sets.newHashSet(companyId1, companyId2)));
+    QuerySpec<Company, Company> parentQuerySpec = (root, query, cb) ->
+            query.where(root.get("companyUsageId").in(companyId1, companyId2));
 
     val associationMappingSpecs = Lists.newArrayList(
         MultiTenantRelationalDao.AssociationMappingSpec.builder().childMappingKey("companyExtId")
@@ -123,16 +137,23 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         .associationMappingSpecs(associationMappingSpecs)
         .build();
     val ceoQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<Ceo>builder()
-        .associationMappingSpecs(associationMappingSpecs)
-        .build();
+            .associationMappingSpecs(associationMappingSpecs)
+            .build();
+    val classicParentQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<ClassicParent>builder()
+            .associationMappingSpecs(associationMappingSpecs)
+            .build();
 
-    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentCriteria, 0, 4)
+    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentQuerySpec, 0, 4)
         .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
         .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
             (parent, childList) -> {
               parent.setCeo(childList.stream().findAny().orElse(null));
             })
+            .readAugmentParent(classicParentRelationalDao, classicParentQueryFilterSpec, 0, Integer.MAX_VALUE,
+                    (parent, childList) -> {
+                      parent.setParent(childList.stream().findAny().orElse(null));
+                    })
         .execute()
         .orElse(new ArrayList<>());
 
@@ -167,20 +188,19 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
 
     val companyToRetrieve = "CMPID1";
 
-    val parentCriteria = DetachedCriteria.forClass(Company.class)
-        .add(Restrictions.eq("companyUsageId", companyToRetrieve));
+    QuerySpec<Company, Company> parentQuerySpec = (root, query, cb) ->
+            query.where(cb.equal(root.get("companyUsageId"), companyToRetrieve));
 
     val departmentQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<Department>builder()
-        .criteria(DetachedCriteria.forClass(Department.class)
-            .add(Restrictions.eq("companyExtId", companyToRetrieve)))
-        .build();
+            .querySpec((root, query, cb) -> query.where(cb.equal(root.get("companyExtId"), companyToRetrieve)))
+            .build();
 
     val ceoQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<Ceo>builder()
-        .criteria(DetachedCriteria.forClass(Ceo.class)
-            .add(Restrictions.eq("companyExtId", companyToRetrieve)))
-        .build();
+            .querySpec((root, query, cb) -> query.where(cb.equal(root.get("companyExtId"), companyToRetrieve)))
+            .build();
 
-    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentCriteria, 0, 4)
+
+    val dataList = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey, parentQuerySpec, 0, 4)
         .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0, Integer.MAX_VALUE,
             Company::setDepartments)
         .readAugmentParent(ceoRelationalDao, ceoQueryFilterSpec, 0, Integer.MAX_VALUE,
@@ -275,15 +295,22 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         .name("KING-2")
         .build();
 
+    ClassicParent parent = LoyalChild.builder()
+            .companyExtId(company2.companyUsageId)
+            .goodScore(10)
+            .build();
+
     val lockedContext1 = companyRelationalDao.saveAndGetExecutor("TENANT1", parentKey, company1);
     lockedContext1.save( departmentRelationalDao, eng1 -> eng);
     lockedContext1.save( departmentRelationalDao, fin1 -> fin);
     lockedContext1.save( ceoRelationalDao, ceo -> ceo1);
+    lockedContext1.save( classicParentRelationalDao, parent1 -> parent);
     lockedContext1.execute();
 
     val lockedContext2 = companyRelationalDao.saveAndGetExecutor("TENANT1", parentKey, company2);
     lockedContext2.save(departmentRelationalDao, hr1 -> hr);
     lockedContext2.save(ceoRelationalDao, ceo -> ceo2);
+    lockedContext1.save( classicParentRelationalDao, parent1 -> parent);
     lockedContext2.execute();
   }
 
@@ -311,6 +338,76 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     @Transient
     private Ceo ceo;
 
+    @Transient
+    private ClassicParent parent;
+
+  }
+
+  @Data
+  @Entity
+  @Table(name = "classic_case")
+  @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+  @DiscriminatorColumn(name = "type")
+  @Slf4j
+  public static abstract class ClassicParent {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column
+    private long id;
+
+    @Column(name = "type", insertable = false, updatable = false)
+    private String type;
+
+    @Column(name = "company_ext_id", nullable = false)
+    private String companyExtId;
+
+    protected ClassicParent(String type) {
+      this.type = type;
+    }
+
+    protected ClassicParent(String type,
+                            String companyExtId) {
+      this(type);
+      this.companyExtId = companyExtId;
+    }
+  }
+
+  @Data
+  @EqualsAndHashCode(callSuper = true)
+  @Entity
+  @DiscriminatorValue("LOYAL")
+  public static class LoyalChild extends ClassicParent {
+    @Column(name = "goodness_score")
+    private int goodScore;
+
+    public LoyalChild() {
+      super("LOYAL");
+    }
+
+    @Builder
+    public LoyalChild(String companyExtId, int goodScore) {
+      super("LOYAL", companyExtId);
+      this.goodScore = goodScore;
+    }
+  }
+
+  @Data
+  @EqualsAndHashCode(callSuper = true)
+  @Entity
+  @DiscriminatorValue("DISLOYAL")
+  public static class DisLoyalChild extends ClassicParent {
+    @Column(name = "badness_score")
+    private int badScore;
+
+    public DisLoyalChild() {
+      super("DISLOYAL");
+    }
+
+    @Builder
+    public DisLoyalChild(String companyExtId, int badScore) {
+      super("LOYAL", companyExtId);
+      this.badScore = badScore;
+    }
   }
 
   @Entity

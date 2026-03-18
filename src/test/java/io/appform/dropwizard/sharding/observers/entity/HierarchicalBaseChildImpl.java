@@ -1,24 +1,18 @@
 package io.appform.dropwizard.sharding.observers.entity;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.experimental.FieldNameConstants;
+import jakarta.persistence.Column;
+import jakarta.persistence.DiscriminatorValue;
+import jakarta.persistence.Entity;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Table;
-
+@Data
+@EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "hierarchical_child")
-@FieldNameConstants
-@Getter
-@Setter
-@ToString
-@RequiredArgsConstructor
+@DiscriminatorValue("BASE_IMPL")
 public class HierarchicalBaseChildImpl extends HierarchicalBaseChild {
 
     @Column(name = "`value`")
     private String value;
+
 }

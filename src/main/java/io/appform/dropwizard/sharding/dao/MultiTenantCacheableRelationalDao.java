@@ -21,9 +21,9 @@ import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import org.hibernate.SessionFactory;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
 import java.util.Map;
@@ -109,15 +109,15 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
   }
 
   @Override
-  public List<T> select(String tenantId, String parentKey, DetachedCriteria criteria, int first,
-      int numResults) throws Exception {
+  public List<T> select(String tenantId, String parentKey, QuerySpec<T, T> querySpec, int first,
+                        int numResults) throws Exception {
     List<T> result = cache.get(tenantId).select(parentKey, first, numResults);
     if (result == null) {
-      result = super.select(tenantId, parentKey, criteria, first, numResults);
+      result = super.select(tenantId, parentKey, querySpec, first, numResults);
     }
     if (result != null) {
       cache.get(tenantId).put(parentKey, first, numResults, result);
     }
-    return select(tenantId, parentKey, criteria, first, numResults, t -> t);
+    return select(tenantId, parentKey, querySpec, first, numResults, t -> t);
   }
 }

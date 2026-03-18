@@ -29,13 +29,7 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     P visit(Count opContext);
 
-    P visit(CountByQuerySpec opContext);
-
-    <T, R> P visit(Get<T, R> opContext);
-
     <T> P visit(GetAndUpdate<T> opContext);
-
-    <T, R> P visit(GetByLookupKey<T, R> opContext);
 
     <T> P visit(GetAndUpdateByLookupKey<T> opContext);
 
@@ -55,8 +49,6 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(RunInSession<T> opContext);
 
-    <T> P visit(RunWithCriteria<T> opContext);
-
     P visit(DeleteByLookupKey opContext);
 
     <U, V> P visit(Save<U, V> opContext);
@@ -65,11 +57,17 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
 
-    <T> P visit(CreateOrUpdate<T> opContext);
+    <U, T> P visit(CreateOrUpdate<U, T> opContext);
 
     <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
     <T, R> P visit(Select<T, R> opContext);
+
+    <T, G, R> P visit(Get<T, G, R> opContext);
+
+    <U, T> P visit(RunWithClause<U, T> opContext);
+
+    <T, R> P visit(GetByLookupKey<T, R> opContext);
 
   }
 

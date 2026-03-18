@@ -2,10 +2,10 @@ package io.appform.dropwizard.sharding.dao.operations.lookupdao;
 
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.OpType;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
-import org.hibernate.Criteria;
 import org.hibernate.Session;
 
 import java.util.function.BiFunction;
@@ -19,16 +19,16 @@ public class GetByLookupKey<T, R> extends OpContext<R> {
   @NonNull
   private String id;
   @NonNull
-  private BiFunction<String, UnaryOperator<Criteria>, T> getter;
+  private BiFunction<String, UnaryOperator<QuerySpec<T, T>>, T> getter;
   @Builder.Default
-  private UnaryOperator<Criteria> criteriaUpdater = t -> t;
+  private UnaryOperator<QuerySpec<T, T>> updater = t -> t;
   @Builder.Default
   private Function<T, R> afterGet = t -> (R) t;
 
 
   @Override
   public R apply(Session session) {
-    T result = getter.apply(id, criteriaUpdater);
+    T result = getter.apply(id, updater);
     return afterGet.apply(result);
   }
 

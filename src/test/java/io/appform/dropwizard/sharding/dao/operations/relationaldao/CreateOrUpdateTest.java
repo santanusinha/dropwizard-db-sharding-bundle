@@ -4,7 +4,6 @@ import io.appform.dropwizard.sharding.dao.operations.LambdaTestUtils;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import lombok.val;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -28,8 +27,8 @@ class CreateOrUpdateTest {
 
     Order o = Order.builder().id(123).customerId("C1").build();
 
-    val createOrUpdate = CreateOrUpdate.<Order>builder()
-        .criteria(DetachedCriteria.forClass(Order.class))
+    val createOrUpdate = CreateOrUpdate.<Order, Order>builder()
+         .querySpec((queryRoot, query, criteriaBuilder) -> {})
         .getLockedForWrite(s -> null)
         .entityGenerator(() -> o)
         .saver(spiedSaver)
@@ -54,8 +53,8 @@ class CreateOrUpdateTest {
 
     Order o = Order.builder().id(123).customerId("C1").build();
 
-    val createOrUpdate = CreateOrUpdate.<Order>builder()
-        .criteria(DetachedCriteria.forClass(Order.class))
+    val createOrUpdate = CreateOrUpdate.<Order, Order>builder()
+        .querySpec((queryRoot, query, criteriaBuilder) -> {})
         .getLockedForWrite(s -> o)
         .entityGenerator(() -> o)
         .saver(spiedSaver)

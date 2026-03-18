@@ -4,7 +4,6 @@ public enum OpType {
 
   // Read operations
   COUNT,
-  COUNT_BY_QUERY_SPEC,
   SELECT,
   GET,
   GET_BY_LOOKUP_KEY,
@@ -21,7 +20,7 @@ public enum OpType {
   SELECT_AND_UPDATE,
   UPDATE_ALL,
   RUN_IN_SESSION,
-  RUN_WITH_CRITERIA,
+  RUN_WITH_CLAUSE,
   SAVE_ALL,
   SAVE,
   CREATE_OR_UPDATE,

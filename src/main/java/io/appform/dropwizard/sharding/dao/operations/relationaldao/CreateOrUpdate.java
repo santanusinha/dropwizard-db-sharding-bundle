@@ -2,12 +2,12 @@ package io.appform.dropwizard.sharding.dao.operations.relationaldao;
 
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.OpType;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
 import lombok.val;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -23,19 +23,20 @@ import java.util.function.UnaryOperator;
  */
 @Data
 @Builder
-public class CreateOrUpdate<T> extends OpContext<T> {
+public class CreateOrUpdate<U, T> extends OpContext<T> {
 
-  @NonNull DetachedCriteria criteria;
+  @NonNull
+  QuerySpec<U, U> querySpec;
   UnaryOperator<T> mutator;
   Supplier<T> entityGenerator;
-  private Function<DetachedCriteria, T> getLockedForWrite;
-  private Function<DetachedCriteria, T> getter;
+  private Function<QuerySpec<U, U>, T> getLockedForWrite;
+  private Function<QuerySpec<U, U>, T> getter;
   private Function<T, T> saver;
   private BiConsumer<T, T> updater;
 
   @Override
   public T apply(Session session) {
-    T result = getLockedForWrite.apply(criteria);
+    T result = getLockedForWrite.apply(querySpec);
 
     if (null == result) {
       val newEntity = entityGenerator.get();
@@ -48,7 +49,7 @@ public class CreateOrUpdate<T> extends OpContext<T> {
     if (null != updated) {
       updater.accept(result, updated);
     }
-    return getter.apply(criteria);
+    return getter.apply(querySpec);
   }
 
   @Override

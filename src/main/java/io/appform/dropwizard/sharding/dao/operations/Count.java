@@ -1,29 +1,29 @@
 package io.appform.dropwizard.sharding.dao.operations;
 
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.Function;
 
 /**
- * Returns count of records matching given criteria for a shard.
+ * Returns count of records matching given query spec for a shard.
  */
 @Data
 @Builder
 public class Count extends OpContext<Long> {
 
   @NonNull
-  private DetachedCriteria criteria;
+  private QuerySpec querySpec;
 
   @NonNull
-  private Function<DetachedCriteria, Long> counter;
+  private Function<QuerySpec, Long> counter;
 
   @Override
   public Long apply(Session session) {
-    return counter.apply(criteria);
+    return counter.apply(querySpec);
   }
 
   @Override

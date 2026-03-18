@@ -2,12 +2,11 @@ package io.appform.dropwizard.sharding.observers.bucket;
 
 import com.google.common.base.Preconditions;
 import io.appform.dropwizard.sharding.dao.operations.Count;
-import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
-import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
+import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
-import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
+import io.appform.dropwizard.sharding.dao.operations.RunWithClause;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveAll;
 import io.appform.dropwizard.sharding.dao.operations.Select;
@@ -57,16 +56,6 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public Void visit(CountByQuerySpec countByQuerySpec) {
-        return null;
-    }
-
-    @Override
-    public <T, R> Void visit(Get<T, R> opContext) {
-        return null;
-    }
-
-    @Override
     public <T> Void visit(GetAndUpdate<T> opContext) {
         final var oldMutator = opContext.getMutator();
         opContext.setMutator((T entity) -> {
@@ -74,11 +63,6 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
             addBucketId(value);
             return value;
         });
-        return null;
-    }
-
-    @Override
-    public <T, R> Void visit(GetByLookupKey<T, R> getByLookupKey) {
         return null;
     }
 
@@ -166,11 +150,6 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(RunWithCriteria<T> runWithCriteria) {
-        return null;
-    }
-
-    @Override
     public Void visit(DeleteByLookupKey deleteByLookupKey) {
         return null;
     }
@@ -216,7 +195,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(CreateOrUpdate<T> createOrUpdate) {
+    public <U, T> Void visit(CreateOrUpdate<U, T> createOrUpdate) {
         final var oldMutator = createOrUpdate.getMutator();
         createOrUpdate.setMutator(result -> {
             if (result != null) {
@@ -257,6 +236,21 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T, R> Void visit(Select<T, R> select) {
+        return null;
+    }
+
+    @Override
+    public <T, G, R> Void visit(Get<T, G, R> opContext) {
+        return null;
+    }
+
+    @Override
+    public <U, T> Void visit(RunWithClause<U, T> opContext) {
+        return null;
+    }
+
+    @Override
+    public <T, R> Void visit(GetByLookupKey<T, R> opContext) {
         return null;
     }
 

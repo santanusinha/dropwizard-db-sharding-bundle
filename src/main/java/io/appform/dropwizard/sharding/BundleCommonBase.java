@@ -28,7 +28,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.persistence.Entity;
+
+import jakarta.persistence.Entity;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ClassUtils;
@@ -36,7 +37,8 @@ import org.jasypt.encryption.pbe.StandardPBEBigDecimalEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEBigIntegerEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEByteEncryptor;
 import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
-import org.jasypt.hibernate5.encryptor.HibernatePBEEncryptorRegistry;
+import org.jasypt.hibernate6.encryptor.HibernatePBEEncryptorRegistry;
+import org.jasypt.hibernate6.encryptor.converters.AttributeEncryptionProvider;
 import org.jasypt.iv.StringFixedIvGenerator;
 import org.reflections.Reflections;
 
@@ -143,8 +145,8 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       encryptorRegistry.registerPBEStringEncryptor(tenantId, "encryptedCalendarAsString",
           strongEncryptor);
     } else {
-      encryptorRegistry.registerPBEStringEncryptor("encryptedString", strongEncryptor);
-      encryptorRegistry.registerPBEStringEncryptor("encryptedCalendarAsString", strongEncryptor);
+      encryptorRegistry.registerPBEStringEncryptor(AttributeEncryptionProvider.STRING_ENCRYPTER_NAME, strongEncryptor);
+      encryptorRegistry.registerPBEStringEncryptor(AttributeEncryptionProvider.CALENDER_ENCRYPTER_NAME, strongEncryptor);
     }
   }
 
@@ -160,7 +162,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       encryptorRegistry.registerPBEBigIntegerEncryptor(tenantId, "encryptedBigInteger",
           strongEncryptor);
     } else {
-      encryptorRegistry.registerPBEBigIntegerEncryptor("encryptedBigInteger",
+      encryptorRegistry.registerPBEBigIntegerEncryptor(AttributeEncryptionProvider.BIG_INTEGER_ENCRYPTER_NAME,
           strongEncryptor);
     }
   }
@@ -177,7 +179,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       encryptorRegistry.registerPBEBigDecimalEncryptor(tenantId, "encryptedBigDecimal",
           strongEncryptor);
     } else {
-      encryptorRegistry.registerPBEBigDecimalEncryptor("encryptedBigDecimal",
+      encryptorRegistry.registerPBEBigDecimalEncryptor(AttributeEncryptionProvider.BIG_DECIMAL_ENCRYPTER_NAME,
           strongEncryptor);
     }
   }
@@ -192,7 +194,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     if (Objects.nonNull(tenantId)) {
       encryptorRegistry.registerPBEByteEncryptor(tenantId, "encryptedBinary", strongEncryptor);
     } else {
-      encryptorRegistry.registerPBEByteEncryptor("encryptedBinary", strongEncryptor);
+      encryptorRegistry.registerPBEByteEncryptor(AttributeEncryptionProvider.BYTE_ENCRYPTER_NAME, strongEncryptor);
     }
   }
 

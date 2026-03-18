@@ -2,6 +2,12 @@ package io.appform.dropwizard.sharding.observers.entity;
 
 import io.appform.dropwizard.sharding.sharding.BucketKey;
 import io.appform.dropwizard.sharding.sharding.ShardingKey;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -9,12 +15,7 @@ import lombok.ToString;
 import lombok.experimental.FieldNameConstants;
 import org.hibernate.proxy.HibernateProxy;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
+
 import java.util.Objects;
 
 /**

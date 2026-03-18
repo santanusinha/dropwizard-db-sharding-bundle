@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -71,7 +72,8 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
                                                        final Map<String, String> properties) {
         final DatasourceConnectionProviderImpl connectionProvider = new DatasourceConnectionProviderImpl();
         connectionProvider.setDataSource(dataSource);
-        connectionProvider.configure(properties);
+        Map<String, Object> newProperties = properties.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        connectionProvider.configure(newProperties);
         return connectionProvider;
     }
 
@@ -86,11 +88,8 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
         configuration.setProperty(AvailableSettings.USE_SQL_COMMENTS, Boolean.toString(dbConfig.isAutoCommentsEnabled()));
         configuration.setProperty(AvailableSettings.USE_GET_GENERATED_KEYS, "true");
         configuration.setProperty(AvailableSettings.GENERATE_STATISTICS, "true");
-        configuration.setProperty(AvailableSettings.USE_REFLECTION_OPTIMIZER, "true");
         configuration.setProperty(AvailableSettings.ORDER_UPDATES, "true");
         configuration.setProperty(AvailableSettings.ORDER_INSERTS, "true");
-        configuration.setProperty(AvailableSettings.USE_NEW_ID_GENERATOR_MAPPINGS, "true");
-        configuration.setProperty("jadira.usertype.autoRegisterUserTypes", "true");
         for (Map.Entry<String, String> property : properties.entrySet()) {
             configuration.setProperty(property.getKey(), property.getValue());
         }
