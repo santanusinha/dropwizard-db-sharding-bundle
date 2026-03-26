@@ -37,3 +37,4 @@ recipeList:
   - org.openrewrite.java.ChangeType:
       oldFullyQualifiedTypeName: io.dropwizard.ConfiguredBundle
       newFullyQualifiedTypeName: io.dropwizard.core.ConfiguredBundle
+  - org.openrewrite.java.migrate.jakarta.JavaxValidationMigrationToJakartaValidation
