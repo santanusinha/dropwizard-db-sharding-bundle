@@ -340,6 +340,39 @@
                     <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>rewrite-maven-plugin</artifactId>
+                <version>6.13.0</version>
+                <configuration>
+                    <activeRecipes>
+                        <recipe>org.example.Dropwizard2to5Migration</recipe>
+                    </activeRecipes>
+                    <configLocation>${maven.multiModuleProjectDirectory}/dropwizard-5x-migration.yml</configLocation>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-java</artifactId>
+                        <version>8.58.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-java-17</artifactId>
+                        <version>8.58.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-maven</artifactId>
+                        <version>8.58.0</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.openrewrite.recipe</groupId>
+                        <artifactId>rewrite-migrate-java</artifactId>
+                        <version>3.13.0</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
         </plugins>
     </build>
     <repositories>
