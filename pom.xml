@@ -79,18 +79,18 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <dropwizard.version>5.0.0</dropwizard.version>
+        <dropwizard.version>5.0.1</dropwizard.version>
 
         <hibernate.version>6.6.0.Final</hibernate.version>
         <hibernate-validator.version>6.2.5.Final</hibernate-validator.version>
-        <jackson-datatype-hibernate6.version>2.16.1</jackson-datatype-hibernate6.version>
+        <jackson-datatype-hibernate6.version>2.21.2</jackson-datatype-hibernate6.version>
         <jasypt-hibernate6.version>1.9.6</jasypt-hibernate6.version>
 
-        <lombok.version>1.18.42</lombok.version>
+        <lombok.version>1.18.44</lombok.version>
         <cglib.version>3.3.0</cglib.version>
         <caffeine.version>2.9.3</caffeine.version>
         <junit.jupiter.version>5.9.3</junit.jupiter.version>
-        <h2.version>2.2.224</h2.version>
+        <h2.version>2.4.240</h2.version>
         <mockito.version>4.3.1</mockito.version>
     </properties>
 
