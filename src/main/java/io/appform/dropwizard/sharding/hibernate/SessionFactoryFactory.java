@@ -1,10 +1,10 @@
 package io.appform.dropwizard.sharding.hibernate;
 
 import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
+import io.dropwizard.core.setup.Environment;
 import io.dropwizard.db.DatabaseConfiguration;
 import io.dropwizard.db.ManagedDataSource;
 import io.dropwizard.db.PooledDataSourceFactory;
-import io.dropwizard.setup.Environment;
 import io.dropwizard.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
