@@ -1,5 +1,5 @@
 type: specs.openrewrite.org/v1beta/recipe
-name: org.example.Dropwizard2to5Migration
+name: io.appform.dropwizard.sharding.Dropwizard2to5Migration
 displayName: Dropwizard 2.x to 5.x Migration
 description: Migrates a Dropwizard application from version 2.x to 5.x.
 tags:

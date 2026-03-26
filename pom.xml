@@ -79,7 +79,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <dropwizard.version>2.1.12</dropwizard.version>
+        <dropwizard.version>5.0.0</dropwizard.version>
 
         <hibernate.version>6.6.0.Final</hibernate.version>
         <hibernate-validator.version>6.2.5.Final</hibernate-validator.version>
@@ -346,7 +346,7 @@
                 <version>6.13.0</version>
                 <configuration>
                     <activeRecipes>
-                        <recipe>org.example.Dropwizard2to5Migration</recipe>
+                        <recipe>io.appform.dropwizard.sharding.Dropwizard2to5Migration</recipe>
                     </activeRecipes>
                     <configLocation>${maven.multiModuleProjectDirectory}/dropwizard-5x-migration.yml</configLocation>
                 </configuration>
