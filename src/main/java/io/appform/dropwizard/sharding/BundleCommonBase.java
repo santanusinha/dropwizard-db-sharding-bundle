@@ -7,11 +7,15 @@ import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BucketKey;
+import io.appform.dropwizard.sharding.sharding.BucketInfo;
+import io.appform.dropwizard.sharding.sharding.BucketResolver;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardingKey;
+import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import java.lang.annotation.Annotation;
@@ -28,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +58,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   private volatile boolean bundleInitialised = false;
 
   protected TransactionObserver rootObserver;
+  protected BucketResolver<String> bucketResolver;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
     initialiseEntities(ImmutableList.<Class<?>>builder()
@@ -105,6 +111,30 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
       throw new IllegalStateException("DB sharding bundle is not initialised !");
     }
     return Collections.unmodifiableList(this.initialisedEntities);
+  }
+
+  public Map<String, EntityMeta> getInitialisedEntitiesMeta() {
+    if (!this.bundleInitialised) {
+      throw new IllegalStateException("DB sharding bundle is not initialised !");
+    }
+    return Collections.unmodifiableMap(this.initialisedEntitiesMeta);
+  }
+
+  public BucketResolver<String> getBucketResolver() {
+    if (!this.bundleInitialised) {
+      throw new IllegalStateException("DB sharding bundle is not initialised !");
+    }
+    return this.bucketResolver;
+  }
+
+  protected void registerBucketIdExtractor(final Map<String, ShardManager> shardManagers) {
+    this.bucketResolver = new BucketResolver<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
+  }
+
+  protected <U> BucketInfo getBucketInfo(final String tenantId,
+                                         final String shardingKey,
+                                         final Class<U> clazz) {
+    return getBucketResolver().getBucketInfo(tenantId, shardingKey, clazz);
   }
 
   public final void registerObserver(final TransactionObserver observer) {
@@ -205,15 +235,15 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
         }
         final var lookupKeyFieldEntry = fetchAndValidateAnnotateField(clazz, LookupKey.class, String.class);
         final var shardingKeyFieldEntry = fetchAndValidateAnnotateField(clazz, ShardingKey.class, String.class);
-        final var shardingKeyField = shardingKeyFieldEntry.map(Map.Entry::getKey);
-        final var lookupKeyField = lookupKeyFieldEntry.map(Map.Entry::getKey);
+        final var shardingKeyFieldOptional = shardingKeyFieldEntry.map(Map.Entry::getKey);
+        final var lookupKeyFieldOptional = lookupKeyFieldEntry.map(Map.Entry::getKey);
 
-        if (shardingKeyField.isEmpty() && lookupKeyField.isEmpty()) {
+        if (shardingKeyFieldOptional.isEmpty() && lookupKeyFieldOptional.isEmpty()) {
           throw new RuntimeException(String.format("Entity %s: ShardingKey or LookupKey must be present if BucketKey " +
                   "is present", clazz.getName()));
         }
 
-        if (shardingKeyField.isPresent() && lookupKeyField.isPresent()) {
+        if (shardingKeyFieldOptional.isPresent() && lookupKeyFieldOptional.isPresent()) {
           throw new RuntimeException(String.format("Entity %s: Both ShardingKey and LookupKey cannot be present at the " +
                   "same time", clazz.getName()));
         }
@@ -222,24 +252,31 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
                 MethodHandles.privateLookupIn(bucketKeyFieldEntry.get().getValue(), MethodHandles.lookup());
         final var bucketKeyField = bucketKeyFieldEntry.get().getKey();
         final var bucketKeySetter = bucketKeyFieldDeclaringClassLookup.unreflectSetter(bucketKeyField);
+        final var bucketKeyColumnName = getColumnName(bucketKeyField);
 
         MethodHandle shardingKeyGetter;
-        if (shardingKeyField.isPresent()) {
+        String shardingKeyColumnName;
+        if (shardingKeyFieldOptional.isPresent()) {
           final var shardingKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(shardingKeyFieldEntry.get().getValue(), MethodHandles.lookup());
-          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyField.get());
+          final var shardingKeyField = shardingKeyFieldOptional.get();
+          shardingKeyGetter = shardingKeyFieldDeclaringClassLookup.unreflectGetter(shardingKeyField);
+          shardingKeyColumnName = getColumnName(shardingKeyField);
         } else {
           final var lookupKeyFieldDeclaringClassLookup =
                   MethodHandles.privateLookupIn(lookupKeyFieldEntry.get().getValue(), MethodHandles.lookup());
-          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyField.get());
+          final var lookupKeyField = lookupKeyFieldOptional.get();
+          shardingKeyGetter = lookupKeyFieldDeclaringClassLookup.unreflectGetter(lookupKeyField);
+          shardingKeyColumnName = getColumnName(lookupKeyField);
         }
 
         final var entityMeta = EntityMeta.builder()
                 .bucketKeySetter(bucketKeySetter)
                 .shardingKeyGetter(shardingKeyGetter)
+                .bucketKeyColumnName(bucketKeyColumnName)
+                .shardingKeyColumnName(shardingKeyColumnName)
                 .build();
         initialisedEntitiesMeta.put(clazz.getName(), entityMeta);
-
       } catch (Exception e) {
         log.error("Error validating/resolving entity meta for class: {}", clazz.getName(), e);
         throw new RuntimeException("Failed to validate/resolve entity meta for " + clazz.getName(), e);
@@ -284,5 +321,19 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     final var errorMessage = String.format("Field annotated with @%s (%s) must be of acceptable Type: %s, but found %s",
             annotationName, field.getName(), acceptableClass.getSimpleName(), field.getType().getSimpleName());
     Preconditions.checkArgument(ClassUtils.isAssignable(field.getType(), acceptableClass), errorMessage);
+  }
+
+  public static String getColumnName(final Field field) {
+    Column column = field.getAnnotation(Column.class);
+
+    if (column == null) {
+      throw new IllegalStateException("@Column annotation missing for field: " + field.getName());
+    }
+
+    if (!column.name().isEmpty()) {
+      return column.name();
+    }
+
+    return field.getName().replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase();
   }
 }

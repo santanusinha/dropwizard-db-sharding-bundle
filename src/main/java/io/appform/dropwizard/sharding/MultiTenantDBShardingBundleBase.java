@@ -184,6 +184,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
       }
     });
+    registerBucketIdExtractor(this.shardManagers);
   }
 
   @Override
