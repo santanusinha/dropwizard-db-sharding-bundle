@@ -47,9 +47,8 @@ public class LegacyShardManager extends ShardManager {
     public LegacyShardManager(int numShards, ShardBlacklistingStore shardBlacklistingStore) {
         super(shardBlacklistingStore);
         Preconditions.checkArgument(
-                numShards > 1 && ((numShards & (numShards - 1)) == 0),
-                "Shard manager only support 2^n shards." +
-                        " Also it is senseless to use anything other than 2^n shards for scale out.");
+                numShards >= 1 && ((numShards & (numShards - 1)) == 0),
+                "Shard manager supports 2^n shards (n >= 0). Use 1 shard for single-db mode.");
         this.numShards = numShards;
         final RangeMap<Integer, Integer> assignedBuckets = TreeRangeMap.create();
         int interval = MAX_BUCKET / numShards;
