@@ -2,7 +2,7 @@ package io.appform.dropwizard.sharding.dao.testdata.pending;
 
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 
-import jakarta.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotEmpty;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
