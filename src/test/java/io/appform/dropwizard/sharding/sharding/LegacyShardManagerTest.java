@@ -26,6 +26,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class LegacyShardManagerTest {
 
     @Test
+    public void testSingleShard() {
+        LegacyShardManager shardManager = new LegacyShardManager(1);
+        assertEquals(1, shardManager.numShards());
+        assertEquals(1000, shardManager.numBuckets());
+    }
+
+    @Test
+    public void testSingleShardAllBucketsMapToZero() {
+        LegacyShardManager shardManager = new LegacyShardManager(1);
+        for (int bucketId = 0; bucketId < 1000; bucketId++) {
+            assertEquals(0, shardManager.shardForBucket(bucketId),
+                    "Bucket " + bucketId + " should map to shard 0");
+        }
+    }
+
+    @Test
     public void testShardForOddBucket() {
         assertThrows(IllegalArgumentException.class,
                 () -> new LegacyShardManager(9));
