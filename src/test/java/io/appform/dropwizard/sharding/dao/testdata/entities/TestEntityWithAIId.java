@@ -32,7 +32,7 @@ import lombok.Setter;
 import org.hibernate.Hibernate;
 
 
-import javax.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.Objects;
 
 @Entity
