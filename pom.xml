@@ -6,7 +6,7 @@
 
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>5.0.0-RC0</version>
+    <version>5.0.1-RC0</version>
     <name>Dropwizard Database Sharding Bundle</name>
     <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>
     <description>Application layer database sharding over SQL dbs</description>
