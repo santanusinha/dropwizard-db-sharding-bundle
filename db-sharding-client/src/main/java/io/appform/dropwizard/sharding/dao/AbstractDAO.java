@@ -1,6 +1,5 @@
 package io.appform.dropwizard.sharding.dao;
 
-import io.dropwizard.util.Generics;
 import org.hibernate.Criteria;
 import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
@@ -11,6 +10,9 @@ import org.hibernate.query.internal.AbstractProducedQuery;
 
 import javax.persistence.criteria.CriteriaQuery;
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -31,7 +33,7 @@ public class AbstractDAO<E> {
      */
     public AbstractDAO(SessionFactory sessionFactory) {
         this.sessionFactory = requireNonNull(sessionFactory);
-        this.entityClass = Generics.getTypeParameter(getClass());
+        this.entityClass = resolveEntityClass(getClass());
     }
 
     /**
@@ -230,5 +232,38 @@ public class AbstractDAO<E> {
             Hibernate.initialize(proxy);
         }
         return proxy;
+    }
+
+    /**
+     * Resolves the entity class for this DAO by walking up the generic type hierarchy.
+     */
+    private static Class<?> resolveEntityClass(Class<?> clazz) {
+        Type type = clazz;
+        while (type instanceof Class) {
+            type = ((Class<?>) type).getGenericSuperclass();
+        }
+        if (type instanceof ParameterizedType) {
+            for (Type arg : ((ParameterizedType) type).getActualTypeArguments()) {
+                if (arg instanceof Class) {
+                    return (Class<?>) arg;
+                }
+                if (arg instanceof TypeVariable) {
+                    final Type[] bounds = ((TypeVariable<?>) arg).getBounds();
+                    for (Type bound : bounds) {
+                        if (bound instanceof Class && !Object.class.equals(bound)) {
+                            return (Class<?>) bound;
+                        }
+                    }
+                }
+                if (arg instanceof ParameterizedType) {
+                    final Type rawType = ((ParameterizedType) arg).getRawType();
+                    if (rawType instanceof Class) {
+                        return (Class<?>) rawType;
+                    }
+                }
+            }
+        }
+        // Fallback
+        return Object.class;
     }
 }

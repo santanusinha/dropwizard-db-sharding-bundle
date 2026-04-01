@@ -1,0 +1,18 @@
+tenantShards:
+  default:
+    - url: "jdbc:h2:mem:shard0;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS PUBLIC"
+      driverClass: "org.h2.Driver"
+      dialect: "org.hibernate.dialect.H2Dialect"
+      username: "sa"
+      password: ""
+      hbm2ddl: "create"
+    - url: "jdbc:h2:mem:shard1;DB_CLOSE_DELAY=-1;INIT=CREATE SCHEMA IF NOT EXISTS PUBLIC"
+      driverClass: "org.h2.Driver"
+      dialect: "org.hibernate.dialect.H2Dialect"
+      username: "sa"
+      password: ""
+      hbm2ddl: "create"
+shardType: BALANCED
+shardingOptions:
+  skipReadOnlyTransaction: false
+
