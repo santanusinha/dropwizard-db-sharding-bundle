@@ -33,6 +33,7 @@ import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BucketInfo;
+import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -136,6 +137,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     public List<Class<?>> getInitialisedEntities() {
         return delegate.getInitialisedEntities();
+    }
+
+    public Map<String, EntityMeta> getInitialisedEntitiesMeta() {
+        return delegate.getInitialisedEntitiesMeta();
     }
 
     public <U> BucketInfo getBucketInfo(final String shardingKey,
