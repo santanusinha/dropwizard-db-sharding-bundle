@@ -327,7 +327,7 @@ public class MultiTenantRelationalDaoTest {
   }
 
   @Test
-  public void testScrollingWithQuerySpec() {
+  void testScrollingWithQuerySpec() {
     val ids = new HashSet<String>();
     IntStream.range(1, 1_000)
         .forEach(i -> {
