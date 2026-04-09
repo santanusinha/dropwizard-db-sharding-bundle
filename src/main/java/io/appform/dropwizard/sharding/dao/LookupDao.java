@@ -387,6 +387,33 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     /**
+     * Scroll down using JPA CriteriaQuery spec.
+     *
+     * @see MultiTenantLookupDao#scrollDown(String, QuerySpec, ScrollPointer, int, String)
+     */
+    public ScrollResult<T> scrollDown(
+            final QuerySpec<T, T> inQuerySpec,
+            final ScrollPointer inPointer,
+            final int pageSize,
+            @NonNull final String sortFieldName) {
+        return delegate.scrollDown(dbNamespace, inQuerySpec, inPointer, pageSize, sortFieldName);
+    }
+
+    /**
+     * Scroll up using JPA CriteriaQuery spec.
+     *
+     * @see MultiTenantLookupDao#scrollUp(String, QuerySpec, ScrollPointer, int, String)
+     */
+    @SneakyThrows
+    public ScrollResult<T> scrollUp(
+            final QuerySpec<T, T> inQuerySpec,
+            final ScrollPointer inPointer,
+            final int pageSize,
+            @NonNull final String sortFieldName) {
+        return delegate.scrollUp(dbNamespace, inQuerySpec, inPointer, pageSize, sortFieldName);
+    }
+
+    /**
      * Counts the number of entities that match the specified criteria on each database shard.
      *
      * <p>This method executes a count operation on all available database shards serially,
