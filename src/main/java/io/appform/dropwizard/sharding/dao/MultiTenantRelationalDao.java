@@ -742,62 +742,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 "scrollUp");
     }
 
-    /**
-     * Provides a scroll api for records across shards using JPA CriteriaQuery.
-     * This api will scroll down in ascending order of the 'sortFieldName' field.
-     * <p>
-     * NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
-     * ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
-     * No cloning is needed since QuerySpec lambdas are stateless and composable.
-     *
-     * @param tenantId      The tenant ID associated with the entity.
-     * @param inQuerySpec   The QuerySpec defining query criteria
-     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
-     *                      session
-     * @param pageSize      Count of records per shard
-     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
-     *                      ever-increasing one
-     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
-     * results with max N * pageSize elements
-     */
-    public ScrollResult<T> scrollDown(String tenantId,
-                                      final QuerySpec<T, T> inQuerySpec,
-                                      final ScrollPointer inPointer,
-                                      final int pageSize,
-                                      @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        log.debug("SCROLL POINTER: {}", inPointer);
-        return buildScrollExecutor(tenantId).scrollDown(inQuerySpec, inPointer, pageSize, sortFieldName);
-    }
-
-    /**
-     * Provides a scroll api for records across shards using JPA CriteriaQuery.
-     * This api will scroll up in descending order of the 'sortFieldName' field.
-     * <p>
-     * NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
-     * ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
-     * No cloning is needed since QuerySpec lambdas are stateless and composable.
-     *
-     * @param tenantId      The tenant ID associated with the entity.
-     * @param inQuerySpec   The QuerySpec defining query criteria
-     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
-     *                      session
-     * @param pageSize      Count of records per shard
-     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
-     *                      ever-increasing one
-     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
-     * results with max N * pageSize elements
-     */
-    @SneakyThrows
-    public ScrollResult<T> scrollUp(String tenantId,
-                                    final QuerySpec<T, T> inQuerySpec,
-                                    final ScrollPointer inPointer,
-                                    final int pageSize,
-                                    @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return buildScrollExecutor(tenantId).scrollUp(inQuerySpec, inPointer, pageSize, sortFieldName);
-    }
-
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
                        DetachedCriteria criteria,
                        int first, int numResults) {
@@ -1549,6 +1493,17 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return new ScrollResult<>(pointer, outputBuilder.build());
     }
 
+    private Query<T> createQuery(
+            final Session session,
+            final Class<T> entityClass,
+            final QuerySpec<T, T> querySpec) {
+        CriteriaBuilder builder = session.getCriteriaBuilder();
+        CriteriaQuery<T> criteria = builder.createQuery(entityClass);
+        Root<T> root = criteria.from(entityClass);
+        querySpec.apply(root, criteria, builder);
+        return session.createQuery(criteria);
+    }
+
     private ScrollExecutor<T> buildScrollExecutor(String tenantId) {
         val daoList = daos.get(tenantId);
         return new ScrollExecutor<>(
@@ -1560,15 +1515,60 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 entityClass);
     }
 
-    private Query<T> createQuery(
-            final Session session,
-            final Class<T> entityClass,
-            final QuerySpec<T, T> querySpec) {
-        CriteriaBuilder builder = session.getCriteriaBuilder();
-        CriteriaQuery<T> criteria = builder.createQuery(entityClass);
-        Root<T> root = criteria.from(entityClass);
-        querySpec.apply(root, criteria, builder);
-        return session.createQuery(criteria);
+    /**
+     * Provides a scroll api for records across shards using JPA CriteriaQuery.
+     * This api will scroll down in ascending order of the 'sortFieldName' field.
+     * <p>
+     * NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
+     * ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
+     * No cloning is needed since QuerySpec lambdas are stateless and composable.
+     *
+     * @param tenantId      The tenant ID associated with the entity.
+     * @param inQuerySpec   The QuerySpec defining query criteria
+     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
+     *                      session
+     * @param pageSize      Count of records per shard
+     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
+     *                      ever-increasing one
+     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
+     * results with max N * pageSize elements
+     */
+    public ScrollResult<T> scrollDown(String tenantId,
+                                      final QuerySpec<T, T> inQuerySpec,
+                                      final ScrollPointer inPointer,
+                                      final int pageSize,
+                                      @NonNull final String sortFieldName) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        log.debug("SCROLL POINTER: {}", inPointer);
+        return buildScrollExecutor(tenantId).scrollDown(inQuerySpec, inPointer, pageSize, sortFieldName);
+    }
+
+    /**
+     * Provides a scroll api for records across shards using JPA CriteriaQuery.
+     * This api will scroll up in descending order of the 'sortFieldName' field.
+     * <p>
+     * NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
+     * ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
+     * No cloning is needed since QuerySpec lambdas are stateless and composable.
+     *
+     * @param tenantId      The tenant ID associated with the entity.
+     * @param inQuerySpec   The QuerySpec defining query criteria
+     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll
+     *                      session
+     * @param pageSize      Count of records per shard
+     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an
+     *                      ever-increasing one
+     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
+     * results with max N * pageSize elements
+     */
+    @SneakyThrows
+    public ScrollResult<T> scrollUp(String tenantId,
+                                    final QuerySpec<T, T> inQuerySpec,
+                                    final ScrollPointer inPointer,
+                                    final int pageSize,
+                                    @NonNull final String sortFieldName) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        return buildScrollExecutor(tenantId).scrollUp(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
 
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
