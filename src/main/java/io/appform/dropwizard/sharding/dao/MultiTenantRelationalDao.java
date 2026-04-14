@@ -48,6 +48,7 @@ import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.FieldComparator;
+import io.appform.dropwizard.sharding.scroll.ScrollExecutor;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.scroll.ScrollResultItem;
@@ -90,7 +91,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -767,19 +767,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                                       @NonNull final String sortFieldName) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         log.debug("SCROLL POINTER: {}", inPointer);
-        val pointer = inPointer == null ? new ScrollPointer(ScrollPointer.Direction.DOWN) : inPointer;
-        Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.DOWN),
-                "A down scroll pointer needs to be passed to this method");
-        // Differs from hibernate6: uses BiFunction<Root, CriteriaBuilder, Order> to compose ordering
-        // into QuerySpec, instead of UnaryOperator<QuerySpec> with criteria.addOrder() which doesn't
-        // compile (QuerySpec has no addOrder method)
-        return scrollImplWithQuerySpec(tenantId, inQuerySpec,
-                pointer,
-                pageSize,
-                (root, cb) -> cb.asc(root.get(sortFieldName)),
-                new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
-                        .thenComparing(ScrollResultItem::getShardIdx),
-                "scrollDown");
+        return buildScrollExecutor(tenantId).scrollDown(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
 
     /**
@@ -807,20 +795,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                                     final int pageSize,
                                     @NonNull final String sortFieldName) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val pointer = null == inPointer ? new ScrollPointer(ScrollPointer.Direction.UP) : inPointer;
-        Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.UP),
-                "An up scroll pointer needs to be passed to this method");
-        // Differs from hibernate6: uses BiFunction<Root, CriteriaBuilder, Order> to compose ordering
-        // into QuerySpec, instead of UnaryOperator<QuerySpec> with criteria.addOrder() which doesn't
-        // compile (QuerySpec has no addOrder method)
-        return scrollImplWithQuerySpec(tenantId, inQuerySpec,
-                pointer,
-                pageSize,
-                (root, cb) -> cb.desc(root.get(sortFieldName)),
-                new FieldComparator<T>(FieldUtils.getField(this.entityClass, sortFieldName, true))
-                        .reversed()
-                        .thenComparing(ScrollResultItem::getShardIdx),
-                "scrollUp");
+        return buildScrollExecutor(tenantId).scrollUp(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
 
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
@@ -1574,62 +1549,15 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return new ScrollResult<>(pointer, outputBuilder.build());
     }
 
-    /**
-     * QuerySpec-based scroll implementation. Differs from {@link #scrollImpl} which uses
-     * DetachedCriteria + InternalUtils.cloneObject() for per-shard isolation.
-     * <p>
-     * Since QuerySpec is a @FunctionalInterface (not Serializable), it cannot be cloned via
-     * InternalUtils.cloneObject(). Instead, we compose a new QuerySpec per shard that wraps the
-     * original and appends ordering via CriteriaQuery.orderBy(). This is the idiomatic JPA
-     * Criteria approach and avoids the need for cloning entirely.
-     *
-     * @param orderFactory produces the JPA Order (asc/desc) given a Root and CriteriaBuilder
-     */
-    @SneakyThrows
-    private ScrollResult<T> scrollImplWithQuerySpec(
-            String tenantId,
-            final QuerySpec<T, T> inQuerySpec,
-            final ScrollPointer pointer,
-            final int pageSize,
-            final BiFunction<Root<T>, CriteriaBuilder, javax.persistence.criteria.Order> orderFactory,
-            final Comparator<ScrollResultItem<T>> comparator,
-            String methodName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val daoIndex = new AtomicInteger();
-        val results = daos.get(tenantId).stream()
-                .flatMap(dao -> {
-                    val currIdx = daoIndex.getAndIncrement();
-                    // Differs from hibernate6: composes ordering into a new QuerySpec lambda
-                    // instead of using criteriaMutator.apply(InternalUtils.cloneObject(inCriteria))
-                    // since QuerySpec cannot be cloned (not Serializable)
-                    final QuerySpec<T, T> orderedSpec = (root, query, cb) -> {
-                        inQuerySpec.apply(root, query, cb);
-                        query.orderBy(orderFactory.apply(root, cb));
-                    };
-                    val opContext = Select.<T, List<T>>builder()
-                            .getter(dao::select)
-                            .selectParam(SelectParam.<T>builder()
-                                    .querySpec(orderedSpec)
-                                    .start(pointer.getCurrOffset(currIdx))
-                                    .numRows(pageSize)
-                                    .build())
-                            .build();
-                    return transactionExecutor.get(tenantId)
-                            .execute(dao.sessionFactory, true,
-                                    methodName, opContext, currIdx)
-                            .stream()
-                            .map(item -> new ScrollResultItem<>(item, currIdx));
-                })
-                .sorted(comparator)
-                .limit(pageSize)
-                .collect(Collectors.toList());
-        //This list will be of _pageSize_ long but max fetched might be _pageSize_ * numShards long
-        val outputBuilder = ImmutableList.<T>builder();
-        results.forEach(result -> {
-            outputBuilder.add(result.getData());
-            pointer.advance(result.getShardIdx(), 1);// will get advanced
-        });
-        return new ScrollResult<>(pointer, outputBuilder.build());
+    private ScrollExecutor<T> buildScrollExecutor(String tenantId) {
+        val daoList = daos.get(tenantId);
+        return new ScrollExecutor<>(
+                daoList.stream().map(dao -> dao.sessionFactory).collect(Collectors.toList()),
+                daoList.stream()
+                        .map(dao -> (Function<SelectParam, List<T>>) dao::select)
+                        .collect(Collectors.toList()),
+                transactionExecutor.get(tenantId),
+                entityClass);
     }
 
     private Query<T> createQuery(
