@@ -1518,10 +1518,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     /**
      * Provides a scroll api for records across shards using JPA CriteriaQuery.
      * This api will scroll down in ascending order of the 'sortFieldName' field.
-     * <p>
-     * NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
-     * ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
-     * No cloning is needed since QuerySpec lambdas are stateless and composable.
      *
      * @param tenantId      The tenant ID associated with the entity.
      * @param inQuerySpec   The QuerySpec defining query criteria
@@ -1533,6 +1529,9 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of
      * results with max N * pageSize elements
      */
+    // NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
+    // ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
+    // No cloning is needed since QuerySpec lambdas are stateless and composable.
     public ScrollResult<T> scrollDown(String tenantId,
                                       final QuerySpec<T, T> inQuerySpec,
                                       final ScrollPointer inPointer,
@@ -1546,10 +1545,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     /**
      * Provides a scroll api for records across shards using JPA CriteriaQuery.
      * This api will scroll up in descending order of the 'sortFieldName' field.
-     * <p>
-     * NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
-     * ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
-     * No cloning is needed since QuerySpec lambdas are stateless and composable.
      *
      * @param tenantId      The tenant ID associated with the entity.
      * @param inQuerySpec   The QuerySpec defining query criteria
@@ -1562,6 +1557,9 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * results with max N * pageSize elements
      */
     @SneakyThrows
+    // NOTE: Unlike the DetachedCriteria variant, this uses QuerySpec which composes
+    // ordering via CriteriaQuery.orderBy() instead of DetachedCriteria.addOrder().
+    // No cloning is needed since QuerySpec lambdas are stateless and composable.
     public ScrollResult<T> scrollUp(String tenantId,
                                     final QuerySpec<T, T> inQuerySpec,
                                     final ScrollPointer inPointer,
