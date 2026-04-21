@@ -1,12 +1,13 @@
 package io.appform.dropwizard.sharding.dao.operations;
 
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NonNull;
 import org.hibernate.Session;
 import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Run a query with given criteria inside this shard and returns resulting list.
@@ -17,14 +18,19 @@ import java.util.function.Function;
 @Builder
 public class RunWithCriteria<T> extends OpContext<T> {
 
-  @NonNull
   private Function<DetachedCriteria, T> handler;
-  @NonNull
   private DetachedCriteria detachedCriteria;
+  private QuerySpec<?, ?> querySpec;
+  private Supplier<T> querySpecHandler;
 
   @Override
   public T apply(Session session) {
-    return handler.apply(detachedCriteria);
+    if (detachedCriteria != null) {
+      return handler.apply(detachedCriteria);
+    } else if (querySpec != null && querySpecHandler != null) {
+      return querySpecHandler.get();
+    }
+    throw new IllegalStateException("Either detachedCriteria or querySpec must be provided");
   }
 
   @Override

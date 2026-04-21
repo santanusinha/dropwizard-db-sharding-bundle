@@ -142,6 +142,26 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.createOrUpdate(tenantId, parentKey, selectionCriteria, updater, entityGenerator);
     }
 
+    /**
+     * Creates or updates an entity based on the provided query specification.
+     * This method allows you to create or update an entity associated with a parent key using QuerySpec.
+     * If an entity matching the query is found, it will be updated using the updater function.
+     * If no entity is found, a new entity will be generated using the entityGenerator and saved.
+     *
+     * @param parentKey A string representing the parent key that determines the shard for the operation.
+     * @param querySpec The QuerySpec object specifying the criteria for selecting the entity.
+     * @param updater A function that takes the current entity and returns the updated entity.
+     * @param entityGenerator A supplier function for generating a new entity if none exists.
+     * @return true if the create or update operation was successful, false otherwise.
+     */
+    public boolean createOrUpdate(
+            final String parentKey,
+            final QuerySpec<T, T> querySpec,
+            final UnaryOperator<T> updater,
+            final Supplier<T> entityGenerator) {
+        return delegate.createOrUpdate(tenantId, parentKey, querySpec, updater, entityGenerator);
+    }
+
     public <U> void save(LockedContext<U> context, T entity) {
         delegate.save(context, entity);
     }
@@ -360,6 +380,30 @@ public class RelationalDao<T> implements ShardedDao<T> {
     @SuppressWarnings("rawtypes")
     public <U> U run(DetachedCriteria criteria, Function<Map<Integer, List>, U> translator) {
         return delegate.run(tenantId, criteria, translator);
+    }
+
+    /**
+     * Run arbitrary read-only queries on all shards using QuerySpec and return results.
+     *
+     * @param querySpec The QuerySpec defining query criteria. Typically, a grouping or counting query
+     * @return A map of shard vs result-list
+     */
+    @SuppressWarnings("rawtypes")
+    public Map<Integer, List> run(QuerySpec<T, T> querySpec) {
+        return delegate.run(tenantId, querySpec);
+    }
+
+    /**
+     * Run read-only queries on all shards using QuerySpec and transform them into required types
+     *
+     * @param querySpec  The QuerySpec defining query criteria. Typically, a grouping or counting query
+     * @param translator A method to transform results to required type
+     * @param <U>        Return type
+     * @return Translated result
+     */
+    @SuppressWarnings("rawtypes")
+    public <U> U run(QuerySpec<T, T> querySpec, Function<Map<Integer, List>, U> translator) {
+        return delegate.run(tenantId, querySpec, translator);
     }
 
     public <U> U runInSession(String id, Function<Session, U> handler) {
