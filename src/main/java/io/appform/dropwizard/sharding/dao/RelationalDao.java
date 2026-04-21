@@ -152,9 +152,9 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param querySpec The QuerySpec object specifying the criteria for selecting the entity.
      * @param updater A function that takes the current entity and returns the updated entity.
      * @param entityGenerator A supplier function for generating a new entity if none exists.
-     * @return true if the create or update operation was successful, false otherwise.
+     * @return An Optional containing the created or updated entity if the operation was successful.
      */
-    public boolean createOrUpdate(
+    public Optional<T> createOrUpdate(
             final String parentKey,
             final QuerySpec<T, T> querySpec,
             final UnaryOperator<T> updater,

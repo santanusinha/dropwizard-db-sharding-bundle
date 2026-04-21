@@ -7,6 +7,7 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLoo
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import lombok.Data;
@@ -66,6 +67,8 @@ public abstract class OpContext<T> implements Function<Session, T> {
     <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
 
     <T> P visit(CreateOrUpdate<T> opContext);
+
+    <T> P visit(CreateOrUpdateByQuerySpec<T> opContext);
 
     <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
