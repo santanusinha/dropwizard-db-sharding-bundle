@@ -41,6 +41,7 @@ import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
+import io.appform.dropwizard.sharding.query.QuerySpecFactory;
 import io.appform.dropwizard.sharding.scroll.FieldComparator;
 import io.appform.dropwizard.sharding.scroll.ScrollExecutor;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
@@ -73,6 +74,7 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.Root;
 import java.lang.reflect.Field;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -1297,6 +1299,133 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             return apply(parent -> {
                 if (filter.test(parent)) {
                     try {
+                        consumer.accept(parent,
+                                relationalDao.select(this, querySpec, first, numResults));
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * entity.
+         *
+         * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
+         * the parent entity has been fetched from the database. The factory receives the parent entity
+         * and can use its fields (e.g. partitionId) to build a more targeted query.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity at
+         *                         execution time.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readOneAugmentParent(
+                MultiTenantRelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                BiConsumer<T, List<U>> consumer) {
+            return readAugmentParent(relationalDao, querySpecFactory, 0, 1, consumer, p -> true);
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * entity and applying a filter.
+         *
+         * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
+         * the parent entity has been fetched from the database. The factory receives the parent entity
+         * and can use its fields (e.g. partitionId) to build a more targeted query.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity at
+         *                         execution time.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @param filter           A predicate function to filter the parent entity on which the
+         *                         consumer function is applied.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readOneAugmentParent(
+                MultiTenantRelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                BiConsumer<T, List<U>> consumer,
+                Predicate<T> filter) {
+            return readAugmentParent(relationalDao, querySpecFactory, 0, 1, consumer, filter);
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination support.
+         *
+         * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
+         * the parent entity has been fetched from the database. The factory receives the parent entity
+         * and can use its fields (e.g. partitionId) to build a more targeted query.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity at
+         *                         execution time.
+         * @param first            The index of the first child entity to retrieve.
+         * @param numResults       The maximum number of child entities to retrieve.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readAugmentParent(
+                MultiTenantRelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                int first,
+                int numResults,
+                BiConsumer<T, List<U>> consumer) {
+            return readAugmentParent(relationalDao, querySpecFactory, first, numResults, consumer,
+                    p -> true);
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination and filter
+         * support.
+         *
+         * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
+         * the parent entity has been fetched from the database. The factory receives the parent entity
+         * and can use its fields (e.g. partitionId) to build a more targeted query. This is the
+         * terminal overload to which all other {@code QuerySpecFactory}-based methods delegate.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity at
+         *                         execution time.
+         * @param first            The index of the first child entity to retrieve.
+         * @param numResults       The maximum number of child entities to retrieve.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @param filter           A predicate function to filter the parent entity on which the
+         *                         consumer function is applied.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readAugmentParent(
+                MultiTenantRelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                int first,
+                int numResults,
+                BiConsumer<T, List<U>> consumer,
+                Predicate<T> filter) {
+            return apply(parent -> {
+                if (filter.test(parent)) {
+                    try {
+                        val querySpec = Objects.requireNonNull(
+                                querySpecFactory.create(parent),
+                                "QuerySpecFactory.create() must not return null");
                         consumer.accept(parent,
                                 relationalDao.select(this, querySpec, first, numResults));
                     } catch (Exception e) {
