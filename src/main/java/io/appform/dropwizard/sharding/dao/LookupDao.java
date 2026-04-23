@@ -18,6 +18,7 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.appform.dropwizard.sharding.query.QuerySpec;
+import io.appform.dropwizard.sharding.query.QuerySpecFactory;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
@@ -758,6 +759,120 @@ public class LookupDao<T> implements ShardedDao<T> {
                 BiConsumer<T, List<U>> consumer,
                 Predicate<T> filter) {
             delegate.readAugmentParent(relationalDao.getDelegate(), querySpec, first, numResults, consumer, filter);
+            return this;
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * entity.
+         *
+         * <p>The factory receives the parent entity at execution time, allowing query criteria to
+         * depend on parent fields (e.g. partitionId) that are only available after the parent has been
+         * fetched.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readOneAugmentParent(
+                RelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                BiConsumer<T, List<U>> consumer) {
+            delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpecFactory, consumer);
+            return this;
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * entity and applying a filter.
+         *
+         * <p>The factory receives the parent entity at execution time, allowing query criteria to
+         * depend on parent fields (e.g. partitionId) that are only available after the parent has been
+         * fetched.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @param filter           A predicate function to filter the parent entity on which the
+         *                         consumer function is applied.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readOneAugmentParent(
+                RelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                BiConsumer<T, List<U>> consumer,
+                Predicate<T> filter) {
+            delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpecFactory, consumer, filter);
+            return this;
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination support.
+         *
+         * <p>The factory receives the parent entity at execution time, allowing query criteria to
+         * depend on parent fields (e.g. partitionId) that are only available after the parent has been
+         * fetched.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity.
+         * @param first            The index of the first child entity to retrieve.
+         * @param numResults       The maximum number of child entities to retrieve.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readAugmentParent(
+                RelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                int first,
+                int numResults,
+                BiConsumer<T, List<U>> consumer) {
+            delegate.readAugmentParent(relationalDao.getDelegate(), querySpecFactory, first, numResults, consumer);
+            return this;
+        }
+
+        /**
+         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination and filter
+         * support.
+         *
+         * <p>The factory receives the parent entity at execution time, allowing query criteria to
+         * depend on parent fields (e.g. partitionId) that are only available after the parent has been
+         * fetched. This is the terminal overload to which all other {@code QuerySpecFactory}-based
+         * methods delegate.</p>
+         *
+         * @param <U>              The type of child entities.
+         * @param relationalDao    The relational data access object used to retrieve child entities.
+         * @param querySpecFactory A factory that creates a {@link QuerySpec} from the parent entity.
+         * @param first            The index of the first child entity to retrieve.
+         * @param numResults       The maximum number of child entities to retrieve.
+         * @param consumer         A function that applies the child entity augmentation to the parent
+         *                         entity.
+         * @param filter           A predicate function to filter the parent entity on which the
+         *                         consumer function is applied.
+         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
+         * @throws RuntimeException if an error occurs during the read operation or when applying the
+         *                          consumer function.
+         */
+        public <U> ReadOnlyContext<T> readAugmentParent(
+                RelationalDao<U> relationalDao,
+                QuerySpecFactory<T, U, U> querySpecFactory,
+                int first,
+                int numResults,
+                BiConsumer<T, List<U>> consumer,
+                Predicate<T> filter) {
+            delegate.readAugmentParent(relationalDao.getDelegate(), querySpecFactory, first, numResults, consumer, filter);
             return this;
         }
 
