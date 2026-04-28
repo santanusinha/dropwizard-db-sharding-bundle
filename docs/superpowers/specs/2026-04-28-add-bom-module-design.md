@@ -14,32 +14,46 @@ The fix must be owned by the bundle, not pushed onto each consumer.
 
 ## Approach
 
-Convert the project to a multi-module Maven structure. The existing artifact keeps its
-coordinates unchanged. A new sibling BOM module pins the full Hibernate 6 dependency
-stack, including the conflict-resolving JAXB 4.x entries, so consumers get a consistent
-classpath by importing one BOM.
+Convert the project to a multi-module Maven structure following the zeus project pattern.
+The existing artifact keeps its coordinates unchanged. A new `db-sharding-bundle-parent`
+module owns all shared dependency management. A new sibling `db-sharding-bundle-dependencies`
+BOM module pins the full Hibernate 6 dependency stack, including the conflict-resolving
+JAXB 4.x entries. Consumers get a consistent classpath by importing one BOM.
 
 ## Multi-Module Structure
 
 ```
 dropwizard-db-sharding-bundle/          ← repo root
-├── pom.xml                             ← parent: db-sharding-bundle-parent (packaging=pom)
-├── db-sharding-bundle/                 ← existing code (same groupId + artifactId)
+├── pom.xml                             ← ROOT: db-sharding-bundle-root (minimal aggregator)
+├── db-sharding-bundle-parent/          ← new: all dependencyManagement + plugin management
+│   └── pom.xml
+├── db-sharding-bundle/                 ← existing code (same groupId + artifactId, unchanged)
 │   ├── pom.xml
 │   └── src/
-└── db-sharding-bundle-dependencies/             ← new BOM module
-    └── pom.xml                         ← packaging=pom
+└── db-sharding-bundle-dependencies/    ← new BOM module
+    └── pom.xml
 ```
 
-### Parent POM (`db-sharding-bundle-parent`)
+### Root POM (`db-sharding-bundle-root`)
+
+- `groupId`: `io.appform.dropwizard.sharding`
+- `artifactId`: `db-sharding-bundle-root`
+- `packaging`: `pom`
+- Owns: `<properties>` (version variables), `<scm>`, `<licenses>`, `<developers>`,
+  `<distributionManagement>`, `<repositories>`, release profile, `<modules>`
+- **No `<dependencyManagement>`** — intentionally empty so that child modules which
+  inherit from root (i.e. `db-sharding-bundle-dependencies`) do not pick up any
+  transitive BOM pins
+
+### `db-sharding-bundle-parent`
 
 - `groupId`: `io.appform.dropwizard.sharding`
 - `artifactId`: `db-sharding-bundle-parent`
 - `packaging`: `pom`
-- Owns: all `<properties>` (version variables), `<dependencyManagement>` BOM imports
-  (`dropwizard-bom`, `junit-bom`), `<build><pluginManagement>`, `<scm>`, `<licenses>`,
-  `<developers>`, `<distributionManagement>`, release profile
-- Lists both child modules
+- `<parent>`: `db-sharding-bundle-root`
+- Owns: `<dependencyManagement>` BOM imports (`dropwizard-bom`, `junit-bom`),
+  `<build><pluginManagement>` (compiler with lombok, versions plugin),
+  `<build><plugins>` (enforcer, nexus-staging)
 
 ### `db-sharding-bundle` child
 
@@ -47,7 +61,8 @@ dropwizard-db-sharding-bundle/          ← repo root
 - `artifactId`: `db-sharding-bundle` (unchanged)
 - `packaging`: `jar`
 - `<parent>`: `db-sharding-bundle-parent`
-- Owns: only its `<dependencies>` and any module-specific `<build>` config
+- Owns: only its `<dependencies>` and module-specific `<build>` plugins
+  (surefire, jacoco, source, javadoc)
 - **No client changes required** — Maven coordinates are identical to the pre-refactor artifact
 
 ### `db-sharding-bundle-dependencies`
@@ -55,12 +70,11 @@ dropwizard-db-sharding-bundle/          ← repo root
 - `groupId`: `io.appform.dropwizard.sharding`
 - `artifactId`: `db-sharding-bundle-dependencies`
 - `packaging`: `pom`
-- **No `<parent>`** — self-contained so consumers who import it receive only its own
-  explicit `<dependencyManagement>` entries. If it inherited from `db-sharding-bundle-parent`,
-  Maven would merge the parent's `dropwizard-bom` import into the consumer's effective
-  dependency management (BOM hell). The root POM lists it as a `<module>` for the
-  build reactor only.
-- All versions hardcoded (no `${property}` references from parent)
+- `<parent>`: `db-sharding-bundle-root` — safe because root has **no** `<dependencyManagement>`,
+  so consumers importing this BOM receive only its own explicit entries with no transitive
+  BOM pins (no BOM hell). If it inherited from `db-sharding-bundle-parent`, Maven would
+  merge `dropwizard-bom` into every consumer's effective dependency management.
+- All versions hardcoded (no `${property}` references needed)
 - Contains only `<dependencyManagement>` — no `<dependencies>`, no source
 
 ## BOM Dependency Management Contents
