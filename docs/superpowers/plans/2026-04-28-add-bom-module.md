@@ -535,8 +535,15 @@ Replace the full content of `pom.xml` with:
 **Files:**
 - Create: `db-sharding-bundle-dependencies/pom.xml`
 
-The BOM has no source, no `<dependencies>` — only `<dependencyManagement>`. Version
-properties (`${hibernate.version}` etc.) are inherited from the parent POM.
+The BOM has no source, no `<dependencies>`, and **no `<parent>`**. It is self-contained
+so that consumers who import it get exactly and only its own `<dependencyManagement>`
+entries — no transitive BOM pins from the parent POM's `dropwizard-bom` import.
+All versions are hardcoded (no property variables). The root POM lists it as a
+`<module>` for the build reactor, but it does not declare `db-sharding-bundle-parent`
+as its Maven parent.
+
+For version bumps across all modules run:
+`mvn versions:set -DnewVersion=<ver> -DprocessAllModules=true` from the repo root.
 
 - [ ] **Step 1: Create the BOM POM**
 
@@ -549,16 +556,14 @@ Create `db-sharding-bundle-dependencies/pom.xml` with this exact content:
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>io.appform.dropwizard.sharding</groupId>
-        <artifactId>db-sharding-bundle-parent</artifactId>
-        <version>2.1.12-HIBERNATE6-RC2</version>
-    </parent>
-
+    <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle-dependencies</artifactId>
+    <version>2.1.12-HIBERNATE6-RC2</version>
     <packaging>pom</packaging>
-    <name>Dropwizard Database Sharding Bundle BOM</name>
-    <description>Bill of Materials for Dropwizard DB Sharding Bundle — Hibernate 6 edition</description>
+    <name>Dropwizard Database Sharding Bundle Dependencies</name>
+    <description>Dependency management for Dropwizard DB Sharding Bundle — Hibernate 6 edition.
+        Self-contained: no parent inheritance, no transitive BOM imports.
+        Import this BEFORE dropwizard-bom so Hibernate 6 versions win.</description>
 
     <dependencyManagement>
         <dependencies>
@@ -567,27 +572,27 @@ Create `db-sharding-bundle-dependencies/pom.xml` with this exact content:
             <dependency>
                 <groupId>org.hibernate.orm</groupId>
                 <artifactId>hibernate-core</artifactId>
-                <version>${hibernate.version}</version>
+                <version>6.6.0.Final</version>
             </dependency>
             <dependency>
                 <groupId>org.hibernate.orm</groupId>
                 <artifactId>hibernate-envers</artifactId>
-                <version>${hibernate.version}</version>
+                <version>6.6.0.Final</version>
             </dependency>
             <dependency>
                 <groupId>org.hibernate.validator</groupId>
                 <artifactId>hibernate-validator</artifactId>
-                <version>${hibernate-validator.version}</version>
+                <version>6.2.5.Final</version>
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.datatype</groupId>
                 <artifactId>jackson-datatype-hibernate6</artifactId>
-                <version>${jackson-datatype-hibernate6.version}</version>
+                <version>2.16.1</version>
             </dependency>
             <dependency>
                 <groupId>com.github.phaneesh</groupId>
                 <artifactId>jasypt-hibernate6</artifactId>
-                <version>${jasypt-hibernate6.version}</version>
+                <version>1.9.6</version>
             </dependency>
 
             <!-- ===== JAXB 4.x stack =====

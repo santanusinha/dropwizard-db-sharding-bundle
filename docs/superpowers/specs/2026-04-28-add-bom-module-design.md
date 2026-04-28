@@ -50,12 +50,17 @@ dropwizard-db-sharding-bundle/          ← repo root
 - Owns: only its `<dependencies>` and any module-specific `<build>` config
 - **No client changes required** — Maven coordinates are identical to the pre-refactor artifact
 
-### `db-sharding-bundle-dependencies` child
+### `db-sharding-bundle-dependencies`
 
 - `groupId`: `io.appform.dropwizard.sharding`
 - `artifactId`: `db-sharding-bundle-dependencies`
 - `packaging`: `pom`
-- `<parent>`: `db-sharding-bundle-parent`
+- **No `<parent>`** — self-contained so consumers who import it receive only its own
+  explicit `<dependencyManagement>` entries. If it inherited from `db-sharding-bundle-parent`,
+  Maven would merge the parent's `dropwizard-bom` import into the consumer's effective
+  dependency management (BOM hell). The root POM lists it as a `<module>` for the
+  build reactor only.
+- All versions hardcoded (no `${property}` references from parent)
 - Contains only `<dependencyManagement>` — no `<dependencies>`, no source
 
 ## BOM Dependency Management Contents
