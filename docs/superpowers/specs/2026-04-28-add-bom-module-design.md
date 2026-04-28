@@ -27,7 +27,7 @@ dropwizard-db-sharding-bundle/          ← repo root
 ├── db-sharding-bundle/                 ← existing code (same groupId + artifactId)
 │   ├── pom.xml
 │   └── src/
-└── db-sharding-bundle-bom/             ← new BOM module
+└── db-sharding-bundle-dependencies/             ← new BOM module
     └── pom.xml                         ← packaging=pom
 ```
 
@@ -50,10 +50,10 @@ dropwizard-db-sharding-bundle/          ← repo root
 - Owns: only its `<dependencies>` and any module-specific `<build>` config
 - **No client changes required** — Maven coordinates are identical to the pre-refactor artifact
 
-### `db-sharding-bundle-bom` child
+### `db-sharding-bundle-dependencies` child
 
 - `groupId`: `io.appform.dropwizard.sharding`
-- `artifactId`: `db-sharding-bundle-bom`
+- `artifactId`: `db-sharding-bundle-dependencies`
 - `packaging`: `pom`
 - `<parent>`: `db-sharding-bundle-parent`
 - Contains only `<dependencyManagement>` — no `<dependencies>`, no source
@@ -103,7 +103,7 @@ order (first entry wins for any given artifact):
         <!-- Import BEFORE dropwizard-bom so Hibernate 6 versions win -->
         <dependency>
             <groupId>io.appform.dropwizard.sharding</groupId>
-            <artifactId>db-sharding-bundle-bom</artifactId>
+            <artifactId>db-sharding-bundle-dependencies</artifactId>
             <version>2.1.12-HIBERNATE6-RC2</version>
             <type>pom</type>
             <scope>import</scope>
