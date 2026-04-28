@@ -88,6 +88,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <dropwizard.version>2.1.12</dropwizard.version>
 
+        <!-- IMPORTANT: these version values are also hardcoded in
+             db-sharding-bundle-dependencies/pom.xml (the BOM).
+             When bumping any of these versions, update BOTH this file AND the BOM. -->
         <hibernate.version>6.6.0.Final</hibernate.version>
         <hibernate-validator.version>6.2.5.Final</hibernate-validator.version>
         <jackson-datatype-hibernate6.version>2.16.1</jackson-datatype-hibernate6.version>
@@ -110,6 +113,11 @@
 
     <build>
         <plugins>
+            <!-- nexus-staging is intentionally on the ROOT pom (not db-sharding-bundle-parent)
+                 because db-sharding-bundle-dependencies inherits from root, not parent.
+                 If moved to parent, the BOM module would be deployed via default Maven deploy
+                 (rsync-style) instead of Sonatype Central staging, and would be absent from
+                 Maven Central after a release. Do not move this to the release profile or parent. -->
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
@@ -138,7 +146,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
+                        <version>3.2.4</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
@@ -146,10 +154,6 @@
                                 <goals>
                                     <goal>sign</goal>
                                 </goals>
-                                <configuration>
-                                    <useAgent>true</useAgent>
-                                    <executable>gpg2</executable>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
