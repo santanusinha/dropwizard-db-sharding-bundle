@@ -30,6 +30,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntityWithAIId;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.query.QuerySpecFactory;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.val;
@@ -48,11 +49,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MultiTenantLookupDaoTest {
@@ -480,5 +483,220 @@ public class MultiTenantLookupDaoTest {
         1L,
         (long) lookupDao.count("TENANT1", criteria).stream().reduce(0L, Long::sum)
     );
+  }
+
+  @Test
+  public void testReadAugmentParentWithQuerySpecFactory() throws Exception {
+    final String phoneNumber = "9830968020";
+
+    Phone phone = Phone.builder()
+        .phone(phoneNumber)
+        .build();
+
+    Phone savedPhone = phoneDao.save("TENANT1", phone).get();
+
+    Transaction tx1 = Transaction.builder()
+        .transactionId("txn1")
+        .to("9830703153")
+        .amount(100)
+        .phone(savedPhone)
+        .build();
+    Transaction tx2 = Transaction.builder()
+        .transactionId("txn2")
+        .to("9830703154")
+        .amount(200)
+        .phone(savedPhone)
+        .build();
+    transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
+    transactionDao.save("TENANT1", savedPhone.getPhone(), tx2);
+
+    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+        parent -> (queryRoot, query, criteriaBuilder) -> {
+          query.where(
+              criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
+          );
+          query.orderBy(criteriaBuilder.asc(queryRoot.get("transactionId")));
+        };
+
+    val testExecuted = new AtomicBoolean();
+    val res = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+        .readAugmentParent(transactionDao, querySpecFactory, 0, Integer.MAX_VALUE,
+            (parent, children) -> {
+              assertEquals(2, children.size());
+              assertEquals("txn1", children.get(0).getTransactionId());
+              assertEquals("txn2", children.get(1).getTransactionId());
+              testExecuted.set(true);
+              parent.setTransactions(children);
+            })
+        .execute();
+
+    assertTrue(res.isPresent());
+    assertEquals(2, res.get().getTransactions().size());
+    assertTrue(testExecuted.get());
+  }
+
+  @Test
+  public void testReadAugmentParentWithQuerySpecFactoryAndFilter() throws Exception {
+    final String phoneNumber = "9830968021";
+
+    Phone phone = Phone.builder()
+        .phone(phoneNumber)
+        .build();
+
+    Phone savedPhone = phoneDao.save("TENANT1", phone).get();
+
+    Transaction tx1 = Transaction.builder()
+        .transactionId("txnA")
+        .to("9830703153")
+        .amount(100)
+        .phone(savedPhone)
+        .build();
+    transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
+
+    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+        parent -> (queryRoot, query, criteriaBuilder) -> {
+          query.where(
+              criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
+          );
+        };
+
+    // Filter passes
+    val testExecuted = new AtomicBoolean();
+    val res = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+        .readAugmentParent(transactionDao, querySpecFactory, 0, Integer.MAX_VALUE,
+            (parent, children) -> {
+              assertEquals(1, children.size());
+              testExecuted.set(true);
+            }, p -> true)
+        .execute();
+
+    assertTrue(res.isPresent());
+    assertTrue(testExecuted.get());
+
+    // Filter fails — consumer should NOT be invoked
+    testExecuted.set(false);
+    val res2 = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+        .readAugmentParent(transactionDao, querySpecFactory, 0, Integer.MAX_VALUE,
+            (parent, children) -> {
+              testExecuted.set(true);
+            }, p -> false)
+        .execute();
+
+    assertTrue(res2.isPresent());
+    assertFalse(testExecuted.get());
+  }
+
+  @Test
+  public void testReadOneAugmentParentWithQuerySpecFactory() throws Exception {
+    final String phoneNumber = "9830968022";
+
+    Phone phone = Phone.builder()
+        .phone(phoneNumber)
+        .build();
+
+    Phone savedPhone = phoneDao.save("TENANT1", phone).get();
+
+    Transaction tx1 = Transaction.builder()
+        .transactionId("txnX")
+        .to("9830703153")
+        .amount(100)
+        .phone(savedPhone)
+        .build();
+    Transaction tx2 = Transaction.builder()
+        .transactionId("txnY")
+        .to("9830703154")
+        .amount(200)
+        .phone(savedPhone)
+        .build();
+    transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
+    transactionDao.save("TENANT1", savedPhone.getPhone(), tx2);
+
+    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+        parent -> (queryRoot, query, criteriaBuilder) -> {
+          query.where(
+              criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
+          );
+          query.orderBy(criteriaBuilder.asc(queryRoot.get("transactionId")));
+        };
+
+    val testExecuted = new AtomicBoolean();
+    val res = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+        .readOneAugmentParent(transactionDao, querySpecFactory, (parent, children) -> {
+          assertEquals(1, children.size());
+          assertEquals("txnX", children.get(0).getTransactionId());
+          testExecuted.set(true);
+        })
+        .execute();
+
+    assertTrue(res.isPresent());
+    assertTrue(testExecuted.get());
+  }
+
+  @Test
+  public void testReadOneAugmentParentWithQuerySpecFactoryAndFilter() throws Exception {
+    final String phoneNumber = "9830968023";
+
+    Phone phone = Phone.builder()
+        .phone(phoneNumber)
+        .build();
+
+    Phone savedPhone = phoneDao.save("TENANT1", phone).get();
+
+    Transaction tx1 = Transaction.builder()
+        .transactionId("txnZ")
+        .to("9830703153")
+        .amount(100)
+        .phone(savedPhone)
+        .build();
+    transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
+
+    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+        parent -> (queryRoot, query, criteriaBuilder) -> {
+          query.where(
+              criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
+          );
+        };
+
+    // Filter passes
+    val testExecuted = new AtomicBoolean();
+    val res = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+        .readOneAugmentParent(transactionDao, querySpecFactory, (parent, children) -> {
+          assertEquals(1, children.size());
+          testExecuted.set(true);
+        }, p -> true)
+        .execute();
+
+    assertTrue(res.isPresent());
+    assertTrue(testExecuted.get());
+
+    // Filter fails
+    testExecuted.set(false);
+    val res2 = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+        .readOneAugmentParent(transactionDao, querySpecFactory, (parent, children) -> {
+          testExecuted.set(true);
+        }, p -> false)
+        .execute();
+
+    assertTrue(res2.isPresent());
+    assertFalse(testExecuted.get());
+  }
+
+  @Test
+  public void testReadAugmentParentWithQuerySpecFactoryNullReturnsException() throws Exception {
+    final String phoneNumber = "9830968024";
+
+    Phone phone = Phone.builder()
+        .phone(phoneNumber)
+        .build();
+
+    phoneDao.save("TENANT1", phone);
+
+    final QuerySpecFactory<Phone, Transaction, Transaction> nullFactory = parent -> null;
+
+    assertThrows(RuntimeException.class, () ->
+        phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+            .readAugmentParent(transactionDao, nullFactory, 0, Integer.MAX_VALUE,
+                (parent, children) -> {})
+            .execute());
   }
 }

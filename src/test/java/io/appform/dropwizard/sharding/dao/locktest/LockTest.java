@@ -32,6 +32,7 @@ import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
+import io.appform.dropwizard.sharding.query.QuerySpecFactory;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.SneakyThrows;
@@ -1137,6 +1138,206 @@ public class LockTest {
 
         assertTrue(res2.isPresent());
         assertFalse(testExecuted.get());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testReadMultiChildRetrieveWithQuerySpecFactory() {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+
+        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+                parent -> (queryRoot, query, criteriaBuilder) -> {
+                    query.where(
+                            criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
+                    );
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get("id")));
+                };
+
+        assertFalse(lookupDao.readOnlyExecutor(p1.getMyId()).execute().isPresent());
+
+        val testExecuted = new AtomicBoolean();
+        val res = lookupDao.readOnlyExecutor(p1.getMyId(),
+                        () -> saveEntity(lookupDao.saveAndGetExecutor(p1)))
+                .readAugmentParent(relationDao, querySpecFactory, 0, Integer.MAX_VALUE, (parent, children) -> {
+                    assertNull(parent.getChildren());
+                    assertEquals(6, children.size());
+                    assertNotNull(parent);
+                    testExecuted.set(true);
+                    parent.setChildren(children);
+                })
+                .execute();
+
+        assertTrue(res.isPresent());
+        assertEquals(6, res.get().getChildren().size());
+        assertTrue(testExecuted.get());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testReadMultiChildRetrieveNoPopulateWithQuerySpecFactory() {
+        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+                parent -> (queryRoot, query, criteriaBuilder) -> {
+                    query.where(
+                            criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
+                    );
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get("id")));
+                };
+
+        assertFalse(lookupDao.readOnlyExecutor("0").execute().isPresent());
+        assertFalse(lookupDao.readOnlyExecutor("0", () -> false)
+                .readAugmentParent(relationDao,
+                        querySpecFactory,
+                        0,
+                        Integer.MAX_VALUE,
+                        (parent, children) -> {
+                        })
+                .execute()
+                .isPresent());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testReadMultiChildConditionalWithQuerySpecFactory() {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p1));
+        SomeLookupObject p2 = SomeLookupObject.builder()
+                .myId("1")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p2));
+
+        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+                parent -> (queryRoot, query, criteriaBuilder) -> {
+                    query.where(
+                            criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
+                    );
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get("id")));
+                };
+
+        val testExecuted = new AtomicBoolean();
+        val res = lookupDao.readOnlyExecutor(p1.getMyId())
+                .readAugmentParent(relationDao, querySpecFactory, 0, Integer.MAX_VALUE, (parent, children) -> {
+                    assertNull(parent.getChildren());
+                    assertEquals(6, children.size());
+                    assertNotNull(parent);
+                    testExecuted.set(true);
+                    parent.setChildren(children);
+                })
+                .execute();
+
+        assertTrue(res.isPresent());
+        assertEquals(6, res.get().getChildren().size());
+        assertTrue(testExecuted.get());
+
+        testExecuted.set(false);
+        val res2 = lookupDao.readOnlyExecutor(p2.getMyId())
+                .readAugmentParent(relationDao, querySpecFactory, 0, Integer.MAX_VALUE, (parent, children) -> {
+                            testExecuted.set(true);
+                        },
+                        p -> !p.getMyId().equals("1"))
+                .execute();
+
+        assertTrue(res2.isPresent());
+        assertFalse(testExecuted.get());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testReadOneAugmentParentWithQuerySpecFactory() {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p1));
+
+        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+                parent -> (queryRoot, query, criteriaBuilder) -> {
+                    query.where(
+                            criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
+                    );
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get("id")));
+                };
+
+        val testExecuted = new AtomicBoolean();
+        val res = lookupDao.readOnlyExecutor(p1.getMyId())
+                .readOneAugmentParent(relationDao, querySpecFactory, (parent, children) -> {
+                    assertEquals(1, children.size());
+                    testExecuted.set(true);
+                    parent.setChildren(children);
+                })
+                .execute();
+
+        assertTrue(res.isPresent());
+        assertEquals(1, res.get().getChildren().size());
+        assertTrue(testExecuted.get());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testReadOneAugmentParentWithQuerySpecFactoryAndFilter() {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p1));
+
+        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+                parent -> (queryRoot, query, criteriaBuilder) -> {
+                    query.where(
+                            criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
+                    );
+                    query.orderBy(criteriaBuilder.asc(queryRoot.get("id")));
+                };
+
+        // Filter passes — child should be fetched
+        val testExecuted = new AtomicBoolean();
+        val res = lookupDao.readOnlyExecutor(p1.getMyId())
+                .readOneAugmentParent(relationDao, querySpecFactory, (parent, children) -> {
+                    assertEquals(1, children.size());
+                    testExecuted.set(true);
+                    parent.setChildren(children);
+                }, p -> true)
+                .execute();
+
+        assertTrue(res.isPresent());
+        assertEquals(1, res.get().getChildren().size());
+        assertTrue(testExecuted.get());
+
+        // Filter fails — consumer should NOT be invoked
+        testExecuted.set(false);
+        val res2 = lookupDao.readOnlyExecutor(p1.getMyId())
+                .readOneAugmentParent(relationDao, querySpecFactory, (parent, children) -> {
+                    testExecuted.set(true);
+                }, p -> false)
+                .execute();
+
+        assertTrue(res2.isPresent());
+        assertFalse(testExecuted.get());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testReadAugmentParentWithQuerySpecFactoryNullReturnsException() {
+        SomeLookupObject p1 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent 1")
+                .build();
+        saveEntity(lookupDao.saveAndGetExecutor(p1));
+
+        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> nullFactory =
+                parent -> null;
+
+        assertThrows(RuntimeException.class, () ->
+                lookupDao.readOnlyExecutor(p1.getMyId())
+                        .readAugmentParent(relationDao, nullFactory, 0, Integer.MAX_VALUE,
+                                (parent, children) -> {})
+                        .execute());
     }
 
     @Test
