@@ -143,15 +143,52 @@ Please refer test classes to understand sample usage of daos.
 
 ## Usage
 
-The project dependencies are:
+### Hibernate 6 (current)
 
-```
+Add the bundle dependency:
+
+```xml
 <dependency>
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>2.1.10-11</version>
+    <version>2.1.12-HIBERNATE6-RC2</version>
 </dependency>
 ```
+
+To get a consistent Hibernate 6 dependency stack (and fix the `jakarta.xml.bind-api`
+version conflict with `dropwizard-bom`), also import the BOM. It **must come before
+`dropwizard-bom`** in your `dependencyManagement` — Maven resolves BOM imports in
+declaration order and the first entry for any given artifact wins:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <!-- BEFORE dropwizard-bom so Hibernate 6 versions win -->
+        <dependency>
+            <groupId>io.appform.dropwizard.sharding</groupId>
+            <artifactId>db-sharding-bundle-dependencies</artifactId>
+            <version>2.1.12-HIBERNATE6-RC2</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.dropwizard</groupId>
+            <artifactId>dropwizard-bom</artifactId>
+            <version>2.1.12</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+The BOM pins:
+- `org.hibernate.orm:hibernate-core` + `hibernate-envers` — `6.6.0.Final`
+- `org.hibernate.validator:hibernate-validator` — `6.2.5.Final`
+- `com.fasterxml.jackson.datatype:jackson-datatype-hibernate6` — `2.16.1`
+- `jakarta.xml.bind:jakarta.xml.bind-api` — `4.0.2` *(overrides dropwizard-bom's `2.3.3`)*
+- `org.glassfish.jaxb:jaxb-runtime` — `4.0.2`
+- `jakarta.activation:jakarta.activation-api` — `2.1.3`
 
 Set the Number of Shards property by setting Java property while starting the application.
 
