@@ -16,6 +16,14 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Import our own BOM first so Hibernate 6 + JAXB 4.x versions win over dropwizard-bom -->
+            <dependency>
+                <groupId>io.appform.dropwizard.sharding</groupId>
+                <artifactId>db-sharding-bundle-dependencies</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>io.dropwizard</groupId>
                 <artifactId>dropwizard-bom</artifactId>

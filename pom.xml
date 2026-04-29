@@ -14,9 +14,9 @@
     <inceptionYear>2016</inceptionYear>
 
     <modules>
+        <module>db-sharding-bundle-dependencies</module>
         <module>db-sharding-bundle-parent</module>
         <module>db-sharding-bundle</module>
-        <module>db-sharding-bundle-dependencies</module>
     </modules>
 
     <scm>
