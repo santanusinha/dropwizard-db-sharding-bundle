@@ -198,7 +198,7 @@ public class ScrollTest {
     }
 
     @Test
-    void testScrollDownWithQuerySpec() {
+    public void testScrollDownWithQuerySpec() {
         val numEntities = 400;
         val pageSize = 10;
         val ids = new HashSet<Integer>();
@@ -208,7 +208,7 @@ public class ScrollTest {
 
         // QuerySpec equivalent of DetachedCriteria.forClass(ScrollTestEntity.class) -- select all
         final QuerySpec<ScrollTestEntity, ScrollTestEntity> querySpec =
-                (root, query, cb) -> { };
+                (root, query, cb) -> {};
 
         var result = (ScrollResult<ScrollTestEntity>) null;
         var pointer = (ScrollPointer) null;
@@ -227,7 +227,7 @@ public class ScrollTest {
     }
 
     @Test
-    void testScrollUpWithQuerySpec() {
+    public void testScrollUpWithQuerySpec() {
         val numEntities = 400;
         val pageSize = 10;
         val ids = new HashSet<Integer>();
@@ -237,7 +237,7 @@ public class ScrollTest {
 
         // QuerySpec equivalent of DetachedCriteria.forClass(ScrollTestEntity.class) -- select all
         final QuerySpec<ScrollTestEntity, ScrollTestEntity> querySpec =
-                (root, query, cb) -> { };
+                (root, query, cb) -> {};
 
         var result = (ScrollResult<ScrollTestEntity>) null;
         var pointer = (ScrollPointer) null;

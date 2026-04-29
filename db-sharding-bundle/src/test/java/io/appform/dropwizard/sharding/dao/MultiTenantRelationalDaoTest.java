@@ -328,7 +328,7 @@ public class MultiTenantRelationalDaoTest {
   }
 
   @Test
-  void testScrollingWithQuerySpec() {
+  public void testScrollingWithQuerySpec() {
     val ids = new HashSet<String>();
     IntStream.range(1, 1_000)
         .forEach(i -> {
@@ -347,7 +347,7 @@ public class MultiTenantRelationalDaoTest {
 
     // QuerySpec equivalent of DetachedCriteria.forClass(RelationalEntity.class) -- select all
     final QuerySpec<RelationalEntity, RelationalEntity> querySpec =
-        (root, query, cb) -> { };
+        (root, query, cb) -> {};
 
     {
       var nextPtr = (ScrollResult<RelationalEntity>) null;
