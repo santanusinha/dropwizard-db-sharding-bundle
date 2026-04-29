@@ -288,6 +288,10 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.scrollUp(tenantId, inQuerySpec, inPointer, pageSize, sortFieldName);
     }
 
+    <U> List<T> select(RelationalDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) {
+        return delegate.select(context.getDelegate(), criteria, first, numResults);
+    }
+
     <U> List<T> select(RelationalDao.ReadOnlyContext<U> context, QuerySpec<T, T> querySpec, int first, int numResults) {
         return delegate.select(context.getDelegate(), querySpec, first, numResults);
     }
