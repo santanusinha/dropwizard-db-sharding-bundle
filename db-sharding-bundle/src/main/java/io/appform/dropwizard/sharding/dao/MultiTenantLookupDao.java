@@ -1361,7 +1361,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
 
         }
 
-
         /**
          * Executes an update operation within the shard based on the provided
          * {@code UpdateOperationMeta} metadata. This method is used for performing batch updates or

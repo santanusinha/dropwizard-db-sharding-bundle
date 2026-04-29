@@ -86,7 +86,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(parentKey, key, t -> t));
     }
 
-
     public <U> U get(String parentKey, Object key, Function<T, U> function) {
         return delegate.get(tenantId, parentKey, key, function);
     }
@@ -112,7 +111,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public <U> U save(String parentKey, T entity, Function<T, U> handler) {
         return delegate.save(tenantId, parentKey, entity, handler);
     }
-
 
     /**
      * Saves a collection of entities associated to the database and returns a boolean indicating the success of the
@@ -174,7 +172,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         delegate.save(context, entity, handler);
     }
-
 
     /**
      * Updates an entity within a locked context using a specific ID and an updater function.
@@ -307,7 +304,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.run(tenantId, querySpec);
     }
 
-
     /**
      * Run read-only queries on all shards and transform them into required types
      *
@@ -344,7 +340,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
     public boolean update(String parentKey, QuerySpec<T, T> querySpec, Function<T, T> updater) {
         return delegate.update(tenantId, parentKey, querySpec, updater);
     }
-
 
     public int updateUsingQuery(String parentKey, UpdateOperationMeta updateOperationMeta) {
         return delegate.updateUsingQuery(tenantId, parentKey, updateOperationMeta);
