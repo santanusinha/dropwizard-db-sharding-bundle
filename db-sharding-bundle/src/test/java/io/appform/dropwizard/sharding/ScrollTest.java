@@ -198,7 +198,7 @@ public class ScrollTest {
     }
 
     @Test
-    public void testScrollDownWithQuerySpec() {
+    void testScrollDownWithQuerySpec() {
         val numEntities = 400;
         val pageSize = 10;
         val ids = new HashSet<Integer>();
@@ -227,7 +227,7 @@ public class ScrollTest {
     }
 
     @Test
-    public void testScrollUpWithQuerySpec() {
+    void testScrollUpWithQuerySpec() {
         val numEntities = 400;
         val pageSize = 10;
         val ids = new HashSet<Integer>();
