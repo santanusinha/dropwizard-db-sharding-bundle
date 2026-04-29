@@ -1201,28 +1201,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return new ScrollResult<>(pointer, outputBuilder.build());
     }
 
-    private Query<T> createQuery(
-            final Session session,
-            final Class<T> entityClass,
-            final QuerySpec<T, T> querySpec) {
-        CriteriaBuilder builder = session.getCriteriaBuilder();
-        CriteriaQuery<T> criteria = builder.createQuery(entityClass);
-        Root<T> root = criteria.from(entityClass);
-        querySpec.apply(root, criteria, builder);
-        return session.createQuery(criteria);
-    }
-
-    private ScrollExecutor<T> buildScrollExecutor(String tenantId) {
-        val daoList = daos.get(tenantId);
-        return new ScrollExecutor<>(
-                daoList.stream().map(dao -> dao.sessionFactory).collect(Collectors.toList()),
-                daoList.stream()
-                        .map(dao -> (Function<SelectParam, List<T>>) dao::select)
-                        .collect(Collectors.toList()),
-                transactionExecutor.get(tenantId),
-                entityClass);
-    }
-
     /**
      * Provides a scroll api for records across shards using JPA CriteriaQuery.
      * This api will scroll down in ascending order of the 'sortFieldName' field.
@@ -1602,5 +1580,27 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 throw new RuntimeException("Error while reading association parent value", e);
             }
         }
+    }
+
+    private Query<T> createQuery(
+            final Session session,
+            final Class<T> entityClass,
+            final QuerySpec<T, T> querySpec) {
+        CriteriaBuilder builder = session.getCriteriaBuilder();
+        CriteriaQuery<T> criteria = builder.createQuery(entityClass);
+        Root<T> root = criteria.from(entityClass);
+        querySpec.apply(root, criteria, builder);
+        return session.createQuery(criteria);
+    }
+
+    private ScrollExecutor<T> buildScrollExecutor(String tenantId) {
+        val daoList = daos.get(tenantId);
+        return new ScrollExecutor<>(
+                daoList.stream().map(dao -> dao.sessionFactory).collect(Collectors.toList()),
+                daoList.stream()
+                        .map(dao -> (Function<SelectParam, List<T>>) dao::select)
+                        .collect(Collectors.toList()),
+                transactionExecutor.get(tenantId),
+                entityClass);
     }
 }
