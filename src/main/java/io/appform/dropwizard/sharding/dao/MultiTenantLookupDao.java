@@ -41,7 +41,6 @@ import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.execution.TransactionExecutor;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
-import io.appform.dropwizard.sharding.query.QuerySpecFactory;
 import io.appform.dropwizard.sharding.scroll.FieldComparator;
 import io.appform.dropwizard.sharding.scroll.ScrollExecutor;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
@@ -1309,7 +1308,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>}, retrieving a single related
          * entity.
          *
          * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
@@ -1328,13 +1327,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readOneAugmentParent(
                 MultiTenantRelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 BiConsumer<T, List<U>> consumer) {
             return readAugmentParent(relationalDao, querySpecFactory, 0, 1, consumer, p -> true);
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>}, retrieving a single related
          * entity and applying a filter.
          *
          * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
@@ -1355,14 +1354,14 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readOneAugmentParent(
                 MultiTenantRelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 BiConsumer<T, List<U>> consumer,
                 Predicate<T> filter) {
             return readAugmentParent(relationalDao, querySpecFactory, 0, 1, consumer, filter);
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination support.
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>} with pagination support.
          *
          * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
          * the parent entity has been fetched from the database. The factory receives the parent entity
@@ -1382,7 +1381,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readAugmentParent(
                 MultiTenantRelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 int first,
                 int numResults,
                 BiConsumer<T, List<U>> consumer) {
@@ -1391,13 +1390,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination and filter
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>} with pagination and filter
          * support.
          *
          * <p>Unlike the {@link QuerySpec}-based variant, this method defers query construction until
          * the parent entity has been fetched from the database. The factory receives the parent entity
          * and can use its fields (e.g. partitionId) to build a more targeted query. This is the
-         * terminal overload to which all other {@code QuerySpecFactory}-based methods delegate.</p>
+         * terminal overload to which all other {@code Function<T, QuerySpec>}-based methods delegate.</p>
          *
          * @param <U>              The type of child entities.
          * @param relationalDao    The relational data access object used to retrieve child entities.
@@ -1415,7 +1414,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readAugmentParent(
                 MultiTenantRelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 int first,
                 int numResults,
                 BiConsumer<T, List<U>> consumer,
@@ -1424,8 +1423,8 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 if (filter.test(parent)) {
                     try {
                         val querySpec = Objects.requireNonNull(
-                                querySpecFactory.create(parent),
-                                "QuerySpecFactory.create() must not return null");
+                                querySpecFactory.apply(parent),
+                                "querySpecFactory must not return null");
                         consumer.accept(parent,
                                 relationalDao.select(this, querySpec, first, numResults));
                     } catch (Exception e) {

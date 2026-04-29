@@ -18,7 +18,6 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.appform.dropwizard.sharding.query.QuerySpec;
-import io.appform.dropwizard.sharding.query.QuerySpecFactory;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
@@ -763,7 +762,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>}, retrieving a single related
          * entity.
          *
          * <p>The factory receives the parent entity at execution time, allowing query criteria to
@@ -781,14 +780,14 @@ public class LookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readOneAugmentParent(
                 RelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 BiConsumer<T, List<U>> consumer) {
             delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpecFactory, consumer);
             return this;
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory}, retrieving a single related
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>}, retrieving a single related
          * entity and applying a filter.
          *
          * <p>The factory receives the parent entity at execution time, allowing query criteria to
@@ -808,7 +807,7 @@ public class LookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readOneAugmentParent(
                 RelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 BiConsumer<T, List<U>> consumer,
                 Predicate<T> filter) {
             delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpecFactory, consumer, filter);
@@ -816,7 +815,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination support.
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>} with pagination support.
          *
          * <p>The factory receives the parent entity at execution time, allowing query criteria to
          * depend on parent fields (e.g. partitionId) that are only available after the parent has been
@@ -835,7 +834,7 @@ public class LookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readAugmentParent(
                 RelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 int first,
                 int numResults,
                 BiConsumer<T, List<U>> consumer) {
@@ -844,12 +843,12 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity using a {@link QuerySpecFactory} with pagination and filter
+         * Read and augment parent entity using a {@code Function<T, QuerySpec>} with pagination and filter
          * support.
          *
          * <p>The factory receives the parent entity at execution time, allowing query criteria to
          * depend on parent fields (e.g. partitionId) that are only available after the parent has been
-         * fetched. This is the terminal overload to which all other {@code QuerySpecFactory}-based
+         * fetched. This is the terminal overload to which all other {@code Function<T, QuerySpec>}-based
          * methods delegate.</p>
          *
          * @param <U>              The type of child entities.
@@ -867,7 +866,7 @@ public class LookupDao<T> implements ShardedDao<T> {
          */
         public <U> ReadOnlyContext<T> readAugmentParent(
                 RelationalDao<U> relationalDao,
-                QuerySpecFactory<T, U, U> querySpecFactory,
+                Function<T, QuerySpec<U, U>> querySpecFactory,
                 int first,
                 int numResults,
                 BiConsumer<T, List<U>> consumer,

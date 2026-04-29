@@ -30,7 +30,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntityWithAIId;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
-import io.appform.dropwizard.sharding.query.QuerySpecFactory;
+import io.appform.dropwizard.sharding.query.QuerySpec;
+import java.util.function.Function;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.val;
@@ -510,7 +511,7 @@ public class MultiTenantLookupDaoTest {
     transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
     transactionDao.save("TENANT1", savedPhone.getPhone(), tx2);
 
-    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+    final Function<Phone, QuerySpec<Transaction, Transaction>> querySpecFactory =
         parent -> (queryRoot, query, criteriaBuilder) -> {
           query.where(
               criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
@@ -553,7 +554,7 @@ public class MultiTenantLookupDaoTest {
         .build();
     transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
 
-    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+    final Function<Phone, QuerySpec<Transaction, Transaction>> querySpecFactory =
         parent -> (queryRoot, query, criteriaBuilder) -> {
           query.where(
               criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
@@ -611,7 +612,7 @@ public class MultiTenantLookupDaoTest {
     transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
     transactionDao.save("TENANT1", savedPhone.getPhone(), tx2);
 
-    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+    final Function<Phone, QuerySpec<Transaction, Transaction>> querySpecFactory =
         parent -> (queryRoot, query, criteriaBuilder) -> {
           query.where(
               criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
@@ -650,7 +651,7 @@ public class MultiTenantLookupDaoTest {
         .build();
     transactionDao.save("TENANT1", savedPhone.getPhone(), tx1);
 
-    final QuerySpecFactory<Phone, Transaction, Transaction> querySpecFactory =
+    final Function<Phone, QuerySpec<Transaction, Transaction>> querySpecFactory =
         parent -> (queryRoot, query, criteriaBuilder) -> {
           query.where(
               criteriaBuilder.equal(queryRoot.get("phone").get("phone"), parent.getPhone())
@@ -691,7 +692,7 @@ public class MultiTenantLookupDaoTest {
 
     phoneDao.save("TENANT1", phone);
 
-    final QuerySpecFactory<Phone, Transaction, Transaction> nullFactory = parent -> null;
+    final Function<Phone, QuerySpec<Transaction, Transaction>> nullFactory = parent -> null;
 
     assertThrows(RuntimeException.class, () ->
         phoneDao.readOnlyExecutor("TENANT1", phoneNumber)

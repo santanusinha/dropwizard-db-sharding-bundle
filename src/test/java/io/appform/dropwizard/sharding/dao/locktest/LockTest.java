@@ -32,7 +32,7 @@ import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
-import io.appform.dropwizard.sharding.query.QuerySpecFactory;
+import java.util.function.Function;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.SneakyThrows;
@@ -1148,7 +1148,7 @@ public class LockTest {
                 .name("Parent 1")
                 .build();
 
-        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+        final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> querySpecFactory =
                 parent -> (queryRoot, query, criteriaBuilder) -> {
                     query.where(
                             criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
@@ -1178,7 +1178,7 @@ public class LockTest {
     @Test
     @SneakyThrows
     public void testReadMultiChildRetrieveNoPopulateWithQuerySpecFactory() {
-        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+        final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> querySpecFactory =
                 parent -> (queryRoot, query, criteriaBuilder) -> {
                     query.where(
                             criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
@@ -1212,7 +1212,7 @@ public class LockTest {
                 .build();
         saveEntity(lookupDao.saveAndGetExecutor(p2));
 
-        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+        final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> querySpecFactory =
                 parent -> (queryRoot, query, criteriaBuilder) -> {
                     query.where(
                             criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
@@ -1256,7 +1256,7 @@ public class LockTest {
                 .build();
         saveEntity(lookupDao.saveAndGetExecutor(p1));
 
-        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+        final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> querySpecFactory =
                 parent -> (queryRoot, query, criteriaBuilder) -> {
                     query.where(
                             criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
@@ -1287,7 +1287,7 @@ public class LockTest {
                 .build();
         saveEntity(lookupDao.saveAndGetExecutor(p1));
 
-        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> querySpecFactory =
+        final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> querySpecFactory =
                 parent -> (queryRoot, query, criteriaBuilder) -> {
                     query.where(
                             criteriaBuilder.equal(queryRoot.get("myId"), parent.getMyId())
@@ -1330,7 +1330,7 @@ public class LockTest {
                 .build();
         saveEntity(lookupDao.saveAndGetExecutor(p1));
 
-        final QuerySpecFactory<SomeLookupObject, SomeOtherObject, SomeOtherObject> nullFactory =
+        final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> nullFactory =
                 parent -> null;
 
         assertThrows(RuntimeException.class, () ->
