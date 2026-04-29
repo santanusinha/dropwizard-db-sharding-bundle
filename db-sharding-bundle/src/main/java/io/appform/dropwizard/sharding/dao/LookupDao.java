@@ -155,7 +155,6 @@ public class LookupDao<T> implements ShardedDao<T> {
         return delegate.createOrUpdate(dbNamespace, id, updater, entityGenerator);
     }
 
-
     /**
      * Updates an entity. For this update, first a lock is taken on database on selected row (using <i>for update</i>
      * semantics)
@@ -205,7 +204,6 @@ public class LookupDao<T> implements ShardedDao<T> {
     public int updateUsingQuery(String id, UpdateOperationMeta updateOperationMeta) {
         return delegate.updateUsingQuery(dbNamespace, id, updateOperationMeta);
     }
-
 
     /**
      * Creates and returns a locked context for executing write operations on an entity with the specified ID.
@@ -264,7 +262,6 @@ public class LookupDao<T> implements ShardedDao<T> {
             Supplier<Boolean> entityPopulator) {
         return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, updater, entityPopulator));
     }
-
 
     /**
      * Saves an entity to the database and obtains a locked context for further operations.
@@ -426,7 +423,6 @@ public class LookupDao<T> implements ShardedDao<T> {
         return delegate.get(dbNamespace, keys);
     }
 
-
     /**
      * Executes a function within a database session on the shard corresponding to the provided ID.
      *
@@ -481,7 +477,6 @@ public class LookupDao<T> implements ShardedDao<T> {
     public ShardCalculator<String> getShardCalculator() {
         return delegate.getShardCalculator();
     }
-
 
     /**
      * The {@code ReadOnlyContext} class represents a context for executing read-only operations

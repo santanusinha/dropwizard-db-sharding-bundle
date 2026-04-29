@@ -318,7 +318,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(tenantId, parentKey, key, t -> t));
     }
 
-
     public <U> U get(String tenantId, String parentKey, Object key, Function<T, U> function) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
@@ -359,7 +358,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return transactionExecutor.get(tenantId).execute(dao.sessionFactory, false, "save", opContext,
                 shardId);
     }
-
 
     /**
      * Saves a collection of entities associated to the database and returns a boolean indicating the
@@ -425,7 +423,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
                 context.getShardId(), false);
     }
-
 
     /**
      * Updates an entity within a locked context using a specific ID and an updater function.
@@ -669,7 +666,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return run(tenantId, querySpec, Function.identity());
     }
 
-
     /**
      * Run read-only queries on all shards and transform them into required types
      *
@@ -795,7 +791,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
     }
 
-
     public int updateUsingQuery(String tenantId, String parentKey,
                                 UpdateOperationMeta updateOperationMeta) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
@@ -903,7 +898,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             throw new RuntimeException("Error updating entity with criteria: " + querySpec, e);
         }
     }
-
 
     /**
      * Creates or updates a single entity within a specific shard based on a query and update logic.
@@ -1200,8 +1194,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         return new ScrollResult<>(pointer, outputBuilder.build());
     }
 
-
-
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
                                                final Object key) {
         return readOnlyExecutor(tenantId, parentKey, key, x -> x);
@@ -1247,7 +1239,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 observer
         );
     }
-
 
     public ReadOnlyContext<T> readOnlyExecutor(final String tenantId, final String parentKey,
                                                final QuerySpec<T, T> querySpec,
