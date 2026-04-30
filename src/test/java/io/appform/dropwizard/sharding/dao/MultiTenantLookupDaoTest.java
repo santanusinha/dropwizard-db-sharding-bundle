@@ -487,7 +487,7 @@ public class MultiTenantLookupDaoTest {
   }
 
   @Test
-  public void testReadAugmentParentWithQuerySpecFactory() throws Exception {
+  void testReadAugmentParentWithQuerySpecFactory() throws Exception {
     final String phoneNumber = "9830968020";
 
     Phone phone = Phone.builder()
@@ -537,7 +537,7 @@ public class MultiTenantLookupDaoTest {
   }
 
   @Test
-  public void testReadAugmentParentWithQuerySpecFactoryAndFilter() throws Exception {
+  void testReadAugmentParentWithQuerySpecFactoryAndFilter() throws Exception {
     final String phoneNumber = "9830968021";
 
     Phone phone = Phone.builder()
@@ -588,7 +588,7 @@ public class MultiTenantLookupDaoTest {
   }
 
   @Test
-  public void testReadOneAugmentParentWithQuerySpecFactory() throws Exception {
+  void testReadOneAugmentParentWithQuerySpecFactory() throws Exception {
     final String phoneNumber = "9830968022";
 
     Phone phone = Phone.builder()
@@ -634,7 +634,7 @@ public class MultiTenantLookupDaoTest {
   }
 
   @Test
-  public void testReadOneAugmentParentWithQuerySpecFactoryAndFilter() throws Exception {
+  void testReadOneAugmentParentWithQuerySpecFactoryAndFilter() throws Exception {
     final String phoneNumber = "9830968023";
 
     Phone phone = Phone.builder()
@@ -683,7 +683,7 @@ public class MultiTenantLookupDaoTest {
   }
 
   @Test
-  public void testReadAugmentParentWithQuerySpecFactoryNullReturnsException() throws Exception {
+  void testReadAugmentParentWithQuerySpecFactoryNullReturnsException() throws Exception {
     final String phoneNumber = "9830968024";
 
     Phone phone = Phone.builder()
@@ -694,10 +694,9 @@ public class MultiTenantLookupDaoTest {
 
     final Function<Phone, QuerySpec<Transaction, Transaction>> nullFactory = parent -> null;
 
-    assertThrows(RuntimeException.class, () ->
-        phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
+    val readOnlyContext = phoneDao.readOnlyExecutor("TENANT1", phoneNumber)
             .readAugmentParent(transactionDao, nullFactory, 0, Integer.MAX_VALUE,
-                (parent, children) -> {})
-            .execute());
+                (parent, children) -> {});
+    assertThrows(RuntimeException.class, () -> readOnlyContext.execute());
   }
 }

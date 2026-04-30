@@ -1142,7 +1142,7 @@ public class LockTest {
 
     @Test
     @SneakyThrows
-    public void testReadMultiChildRetrieveWithQuerySpecFactory() {
+    void testReadMultiChildRetrieveWithQuerySpecFactory() {
         SomeLookupObject p1 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Parent 1")
@@ -1177,7 +1177,7 @@ public class LockTest {
 
     @Test
     @SneakyThrows
-    public void testReadMultiChildRetrieveNoPopulateWithQuerySpecFactory() {
+    void testReadMultiChildRetrieveNoPopulateWithQuerySpecFactory() {
         final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> querySpecFactory =
                 parent -> (queryRoot, query, criteriaBuilder) -> {
                     query.where(
@@ -1187,20 +1187,23 @@ public class LockTest {
                 };
 
         assertFalse(lookupDao.readOnlyExecutor("0").execute().isPresent());
+        AtomicBoolean consumerInvoked = new AtomicBoolean(false);
         assertFalse(lookupDao.readOnlyExecutor("0", () -> false)
                 .readAugmentParent(relationDao,
                         querySpecFactory,
                         0,
                         Integer.MAX_VALUE,
                         (parent, children) -> {
+                            consumerInvoked.set(true);
                         })
                 .execute()
                 .isPresent());
+        assertFalse(consumerInvoked.get());
     }
 
     @Test
     @SneakyThrows
-    public void testReadMultiChildConditionalWithQuerySpecFactory() {
+    void testReadMultiChildConditionalWithQuerySpecFactory() {
         SomeLookupObject p1 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Parent 1")
@@ -1249,7 +1252,7 @@ public class LockTest {
 
     @Test
     @SneakyThrows
-    public void testReadOneAugmentParentWithQuerySpecFactory() {
+    void testReadOneAugmentParentWithQuerySpecFactory() {
         SomeLookupObject p1 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Parent 1")
@@ -1280,7 +1283,7 @@ public class LockTest {
 
     @Test
     @SneakyThrows
-    public void testReadOneAugmentParentWithQuerySpecFactoryAndFilter() {
+    void testReadOneAugmentParentWithQuerySpecFactoryAndFilter() {
         SomeLookupObject p1 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Parent 1")
@@ -1323,7 +1326,7 @@ public class LockTest {
 
     @Test
     @SneakyThrows
-    public void testReadAugmentParentWithQuerySpecFactoryNullReturnsException() {
+    void testReadAugmentParentWithQuerySpecFactoryNullReturnsException() {
         SomeLookupObject p1 = SomeLookupObject.builder()
                 .myId("0")
                 .name("Parent 1")
@@ -1333,11 +1336,10 @@ public class LockTest {
         final Function<SomeLookupObject, QuerySpec<SomeOtherObject, SomeOtherObject>> nullFactory =
                 parent -> null;
 
-        assertThrows(RuntimeException.class, () ->
-                lookupDao.readOnlyExecutor(p1.getMyId())
+        val readOnlyContext = lookupDao.readOnlyExecutor(p1.getMyId())
                         .readAugmentParent(relationDao, nullFactory, 0, Integer.MAX_VALUE,
-                                (parent, children) -> {})
-                        .execute());
+                                (parent, children) -> {});
+        assertThrows(RuntimeException.class, () -> readOnlyContext.execute());
     }
 
     @Test
