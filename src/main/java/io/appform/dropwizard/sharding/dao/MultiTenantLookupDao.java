@@ -1295,16 +1295,8 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 int numResults,
                 BiConsumer<T, List<U>> consumer,
                 Predicate<T> filter) {
-            return apply(parent -> {
-                if (filter.test(parent)) {
-                    try {
-                        consumer.accept(parent,
-                                relationalDao.select(this, querySpec, first, numResults));
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
+            return readAugmentParent(relationalDao, parent -> querySpec, first, numResults,
+                    consumer, filter);
         }
 
         /**
