@@ -173,8 +173,12 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
 
         void update(T oldEntity, T entity) {
-            currentSession().evict(oldEntity); //Detach ... otherwise update is a no-op
-            currentSession().update(entity);
+            if (currentSession().contains(entity)) {
+                currentSession().merge(entity);
+            } else {
+                currentSession().evict(oldEntity);
+                currentSession().update(entity);
+            }
         }
 
         List<T> select(SelectParam selectParam) {
