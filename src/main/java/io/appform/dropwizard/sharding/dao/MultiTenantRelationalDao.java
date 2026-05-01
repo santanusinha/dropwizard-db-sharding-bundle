@@ -563,7 +563,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .build();
         try {
             return transactionExecutor.get(tenantId).execute(context.getSessionFactory(),
-                    true,
+                    false,
                     "update",
                     opContext,
                     context.getShardId(), false);
@@ -1095,7 +1095,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
 
         try {
             return transactionExecutor.get(tenantId).execute(context.getSessionFactory(),
-                    true,
+                    false,
                     "createOrUpdate",
                     opContext,
                     context.getShardId(), false);
