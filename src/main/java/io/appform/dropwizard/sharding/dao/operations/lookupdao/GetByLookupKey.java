@@ -33,6 +33,11 @@ public class GetByLookupKey<T, R> extends OpContext<R> {
   }
 
   @Override
+  public boolean isTransactionOptional() {
+    return true;
+  }
+
+  @Override
   public OpType getOpType() {
     return OpType.GET_BY_LOOKUP_KEY;
   }
