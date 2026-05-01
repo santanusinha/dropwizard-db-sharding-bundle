@@ -145,7 +145,8 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         this.observer = observer;
         shardInfoProviders.forEach((tenantId, shardInfoProvider) -> {
             this.transactionExecutor.put(tenantId,
-                    new TransactionExecutor(shardInfoProvider, DaoType.LOOKUP, entityClass, observer));
+                    new TransactionExecutor(shardInfoProvider, DaoType.LOOKUP, entityClass, observer,
+                            shardingOptions.get(tenantId).isSkipReadOnlyTransaction()));
         });
         Field[] fields = FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
         Preconditions.checkArgument(fields.length != 0, "At least one field needs to be sharding key");
@@ -407,7 +408,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                     .updater(dao::update)
                     .build();
             return transactionExecutor.get(tenantId)
-                    .<Boolean>execute(dao.sessionFactory, true, "updateImpl", opContext,
+                    .<Boolean>execute(dao.sessionFactory, false, "updateImpl", opContext,
                             shardId);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
@@ -466,7 +467,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 key -> dao.getLocked(key, updater, LockModeType.NONE),
                 null,
                 id,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
+                false,
                 shardInfoProviders.get(tenantId), entityClass, observer);
     }
 
@@ -503,7 +504,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 key -> dao.getLocked(key, updater, LockModeType.NONE),
                 entityPopulator,
                 id,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
+                false,
                 shardInfoProviders.get(tenantId), entityClass, observer);
     }
 
@@ -1282,8 +1283,12 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          * @param entity The entity to be updated in the shard.
          */
         void update(T entity) {
-            currentSession().evict(entity); //Detach .. otherwise update is a no-op
-            currentSession().update(entity);
+            if (currentSession().contains(entity)) {
+                currentSession().merge(entity);
+            } else {
+                currentSession().evict(entity);
+                currentSession().update(entity);
+            }
         }
 
         /**
