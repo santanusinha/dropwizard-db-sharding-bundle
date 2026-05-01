@@ -1196,7 +1196,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                     .mutator(updater)
                     .updater(dao::update).build();
             return transactionExecutor.get(tenantId)
-                    .<Boolean>execute(dao.sessionFactory, true, "updateAll",
+                    .<Boolean>execute(dao.sessionFactory, false, "updateAll",
                             opContext, shardId);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity with criteria: " + querySpec, e);
