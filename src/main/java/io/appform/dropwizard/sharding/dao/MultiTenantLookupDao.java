@@ -413,7 +413,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                     .updater(dao::update)
                     .build();
             return transactionExecutor.get(tenantId)
-                    .<Boolean>execute(dao.sessionFactory, true, "updateImpl", opContext,
+                    .<Boolean>execute(dao.sessionFactory, false, "updateImpl", opContext,
                             shardId);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
