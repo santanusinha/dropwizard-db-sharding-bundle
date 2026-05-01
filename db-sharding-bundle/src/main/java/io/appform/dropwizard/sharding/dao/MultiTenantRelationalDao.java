@@ -282,7 +282,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         this.observer = observer;
         shardInfoProviders.forEach((tenantId, shardInfoProvider) -> {
             this.transactionExecutor.put(tenantId,
-                    new TransactionExecutor(shardInfoProvider, DaoType.RELATIONAL, entityClass, observer));
+                    new TransactionExecutor(shardInfoProvider, DaoType.RELATIONAL, entityClass, observer,
+                            shardingOptions.get(tenantId).isSkipReadOnlyTransaction()));
         });
         Field[] fields = FieldUtils.getFieldsWithAnnotation(entityClass, Id.class);
         Preconditions.checkArgument(fields.length != 0, "A field needs to be designated as @Id");
@@ -1232,7 +1233,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 dao.sessionFactory,
                 () -> Lists.newArrayList(dao.getLocked(key, updater, LockModeType.NONE)),
                 entityPopulator,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
+                false,
                 shardInfoProviders.get(tenantId),
                 DaoType.RELATIONAL,
                 entityClass,
@@ -1282,7 +1283,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 dao.sessionFactory,
                 () -> dao.select(selectParam),
                 entityPopulator,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
+                false,
                 shardInfoProviders.get(tenantId),
                 DaoType.RELATIONAL,
                 entityClass,
