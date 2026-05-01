@@ -51,9 +51,10 @@ public class CreateOrUpdateByLookupKey<T> extends OpContext<T> {
       return null;
     }
     val updated = mutator.apply(result);
-    if (null != updated) {
-      updater.accept(updated);
+    if (null == updated) {
+      return result;
     }
+    updater.accept(updated);
     return getter.apply(id);
   }
 
