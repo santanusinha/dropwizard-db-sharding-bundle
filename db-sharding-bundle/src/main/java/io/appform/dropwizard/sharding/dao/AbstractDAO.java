@@ -180,11 +180,44 @@ public class AbstractDAO<E> {
      *
      * @param entity a transient or detached instance containing new or updated state
      * @throws HibernateException
-     * @see Session#saveOrUpdate(Object)
      */
+    @SuppressWarnings("unchecked")
     protected E persist(E entity) throws HibernateException {
-        currentSession().saveOrUpdate(requireNonNull(entity));
+        final Session session = currentSession();
+        if (session.contains(requireNonNull(entity))) {
+            // Already managed in this session — dirty checking will flush changes at commit.
+            return entity;
+        }
+        final Object id = session.getSessionFactory()
+                .getPersistenceUnitUtil()
+                .getIdentifier(entity);
+        if (isAssignedId(id)) {
+            // Detached entity (has an existing DB id, not currently in session).
+            // session.saveOrUpdate() re-attaches without a DB read, leaving loadedState=null,
+            // which causes an NPE in @PartitionKey WHERE-clause binding at flush time.
+            // session.merge() does a SELECT first, populating loadedState safely.
+            return (E) session.merge(entity);
+        }
+        // Transient (new) entity — saveOrUpdate inserts and sets the generated id in-place.
+        session.saveOrUpdate(entity);
         return entity;
+    }
+
+    /**
+     * Returns true if {@code id} represents an already-assigned (non-default) identifier,
+     * i.e. the entity is detached rather than transient.
+     */
+    private static boolean isAssignedId(Object id) {
+        if (id == null) {
+            return false;
+        }
+        if (id instanceof Number) {
+            return ((Number) id).longValue() != 0;
+        }
+        if (id instanceof String) {
+            return !((String) id).isEmpty();
+        }
+        return true;
     }
 
     /**

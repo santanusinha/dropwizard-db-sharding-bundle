@@ -407,7 +407,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                     .updater(dao::update)
                     .build();
             return transactionExecutor.get(tenantId)
-                    .<Boolean>execute(dao.sessionFactory, true, "updateImpl", opContext,
+                    .<Boolean>execute(dao.sessionFactory, false, "updateImpl", opContext,
                             shardId);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
@@ -1275,15 +1275,16 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Updates the state of an entity in the shard. The entity is first detached from the current
-         * session to ensure that updates are performed. The updated entity is then associated with the
-         * session for synchronization.
+         * Updates the state of an entity in the shard. Since the entity is already managed
+         * within the current session (loaded by the preceding get), dirty checking handles
+         * flushing changes automatically at commit time.
          *
          * @param entity The entity to be updated in the shard.
          */
         void update(T entity) {
-            currentSession().evict(entity); //Detach .. otherwise update is a no-op
-            currentSession().update(entity);
+            // Entity is already managed in this session; dirty checking flushes changes at commit.
+            // Evicting and re-attaching via session.update() would null out loadedState,
+            // breaking @PartitionKey WHERE-clause binding.
         }
 
         /**

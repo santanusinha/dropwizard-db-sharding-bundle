@@ -173,8 +173,9 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         }
 
         void update(T oldEntity, T entity) {
-            currentSession().evict(oldEntity); //Detach ... otherwise update is a no-op
-            currentSession().update(entity);
+            // Entity is already managed in this session; dirty checking flushes changes at commit.
+            // Evicting and re-attaching via session.update() would null out loadedState,
+            // breaking @PartitionKey WHERE-clause binding.
         }
 
         List<T> select(SelectParam selectParam) {
@@ -738,7 +739,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .mutator(updater)
                 .updater(dao::update).build();
         try {
-            return transactionExecutor.get(tenantId).execute(daoSessionFactory, true, "update",
+            return transactionExecutor.get(tenantId).execute(daoSessionFactory, false, "update",
                     opContext, shardId, completeTransaction);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
@@ -782,7 +783,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .updater(dao::update).build();
         try {
             return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
-                    true,
+                    false,
                     "update",
                     opContext,
                     shardId);
