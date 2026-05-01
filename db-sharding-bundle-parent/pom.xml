@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.appform.dropwizard.sharding</groupId>
         <artifactId>db-sharding-bundle-root</artifactId>
-        <version>2.1.12-HIBERNATE6-SNAPSHOT</version>
+        <version>2.1.12-HIBERNATE6-RC3</version>
     </parent>
 
     <artifactId>db-sharding-bundle-parent</artifactId>
