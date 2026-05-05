@@ -150,8 +150,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         this.observer = observer;
         shardInfoProviders.forEach((tenantId, shardInfoProvider) -> {
             this.transactionExecutor.put(tenantId,
-                    new TransactionExecutor(shardInfoProvider, DaoType.LOOKUP, entityClass, observer,
-                            shardingOptions.get(tenantId).isSkipReadOnlyTransaction()));
+                    new TransactionExecutor(shardInfoProvider, DaoType.LOOKUP, entityClass, observer));
         });
         Field[] fields = FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
         Preconditions.checkArgument(fields.length != 0, "At least one field needs to be sharding key");
