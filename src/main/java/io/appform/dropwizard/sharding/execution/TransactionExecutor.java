@@ -33,25 +33,14 @@ public class TransactionExecutor {
     private final Class<?> entityClass;
     private final ShardInfoProvider shardInfoProvider;
     private final TransactionObserver observer;
-    private final boolean skipReadOnlyTransaction;
-
     public TransactionExecutor(final ShardInfoProvider shardInfoProvider,
                                final DaoType daoType,
                                final Class<?> entityClass,
                                final TransactionObserver observer) {
-        this(shardInfoProvider, daoType, entityClass, observer, false);
-    }
-
-    public TransactionExecutor(final ShardInfoProvider shardInfoProvider,
-                               final DaoType daoType,
-                               final Class<?> entityClass,
-                               final TransactionObserver observer,
-                               final boolean skipReadOnlyTransaction) {
         this.daoType = daoType;
         this.entityClass = entityClass;
         this.shardInfoProvider = shardInfoProvider;
         this.observer = observer;
-        this.skipReadOnlyTransaction = skipReadOnlyTransaction;
     }
 
     public <T> T execute(SessionFactory sessionFactory,
@@ -77,7 +66,7 @@ public class TransactionExecutor {
             .build();
         return observer.execute(context, () -> {
             val transactionHandler = new TransactionHandler(sessionFactory, readOnly,
-                skipReadOnlyTransaction && opContext.isTransactionOptional());
+                opContext.isTransactionOptional());
             if (completeTransaction) {
                 transactionHandler.beforeStart();
             }
