@@ -24,9 +24,7 @@ import javax.persistence.Table;
 
 public class BucketResolverTest extends BundleBasedTestBase {
 
-    private static final String shardingKey = "PV10";
-    private static final String childValue = "CV10";
-    private static final int preComputedBucketKeyValue = 103;
+    private static final String SHARDING_KEY = "PV10";
 
     @Override
     protected DBShardingBundleBase<TestConfig> getBundle() {
@@ -46,21 +44,21 @@ public class BucketResolverTest extends BundleBasedTestBase {
         val entityWithBucketKeyWithoutColumnNameLookupDao = bundle.createParentObjectDao(EntityWithBucketKeyWithoutColumnName.class);
 
 
-        val objWithBucketColumnAnnotation = buildEntityWithBucketKeyWithColumnName(shardingKey);
+        val objWithBucketColumnAnnotation = buildEntityWithBucketKeyWithColumnName(SHARDING_KEY);
         entityWithBucketKeyWithColumnNameLookupDao.save(objWithBucketColumnAnnotation);
-        val savedObjWithBucketColumnAnnotation = entityWithBucketKeyWithColumnNameLookupDao.get(shardingKey).orElse(null);
+        val savedObjWithBucketColumnAnnotation = entityWithBucketKeyWithColumnNameLookupDao.get(SHARDING_KEY).orElse(null);
         Assertions.assertNotNull(savedObjWithBucketColumnAnnotation);
 
-        val bucketKeyExtractedWithColumn = bundle.getBucketInfo(shardingKey, EntityWithBucketKeyWithColumnName.class);
+        val bucketKeyExtractedWithColumn = bundle.getBucketInfo(SHARDING_KEY, EntityWithBucketKeyWithColumnName.class);
         Assertions.assertNotNull(bucketKeyExtractedWithColumn);
         Assertions.assertEquals(savedObjWithBucketColumnAnnotation.getBucketKey(), bucketKeyExtractedWithColumn.getValue());
 
-        val objWithoutBucketColumnAnnotation = buildEntityWithBucketKeyWithoutColumnName(shardingKey);
+        val objWithoutBucketColumnAnnotation = buildEntityWithBucketKeyWithoutColumnName(SHARDING_KEY);
         entityWithBucketKeyWithoutColumnNameLookupDao.save(objWithoutBucketColumnAnnotation);
-        val savedObjWithoutBucketColumnAnnotation = entityWithBucketKeyWithoutColumnNameLookupDao.get(shardingKey).orElse(null);
+        val savedObjWithoutBucketColumnAnnotation = entityWithBucketKeyWithoutColumnNameLookupDao.get(SHARDING_KEY).orElse(null);
         Assertions.assertNotNull(savedObjWithoutBucketColumnAnnotation);
 
-        val bucketKeyExtractedWithoutColumn = bundle.getBucketInfo(shardingKey, EntityWithBucketKeyWithoutColumnName.class);
+        val bucketKeyExtractedWithoutColumn = bundle.getBucketInfo(SHARDING_KEY, EntityWithBucketKeyWithoutColumnName.class);
         Assertions.assertNotNull(bucketKeyExtractedWithoutColumn);
         Assertions.assertEquals(savedObjWithoutBucketColumnAnnotation.getBucketKey(), bucketKeyExtractedWithoutColumn.getValue());
     }
