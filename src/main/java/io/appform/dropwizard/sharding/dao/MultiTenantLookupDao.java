@@ -412,7 +412,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                     .updater(dao::update)
                     .build();
             return transactionExecutor.get(tenantId)
-                    .<Boolean>execute(dao.sessionFactory, true, "updateImpl", opContext,
+                    .<Boolean>execute(dao.sessionFactory, false, "updateImpl", opContext,
                             shardId);
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity: " + id, e);
@@ -471,7 +471,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
                 null,
                 id,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
+                false,
                 shardInfoProviders.get(tenantId), entityClass, observer);
     }
 
@@ -508,7 +508,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
                 entityPopulator,
                 id,
-                shardingOptions.get(tenantId).isSkipReadOnlyTransaction(),
+                false,
                 shardInfoProviders.get(tenantId), entityClass, observer);
     }
 
