@@ -5,6 +5,14 @@ import org.apache.commons.collections.MapUtils;
 
 import java.util.Map;
 
+/***
+ * This class is responsible for resolving the bucket information for a given sharding key and tenant id.
+ * it gets initialised with a BucketIdExtractor and a map of initialised entities meta.
+ * The getBucketInfo method takes the tenant id, sharding key and the class of the entity and returns the bucket information for that entity.
+ * If the entity is not initialised or the bucket information cannot be resolved, it returns null.
+ *
+ * @param <T>
+ */
 public class BucketResolver<T> {
 
     private final BucketIdExtractor<T> bucketIdExtractor;
