@@ -307,7 +307,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         this.shardCalculator = new ShardCalculator<>(shardManagers, new ConsistentHashBucketIdExtractor<>(shardManagers));
         this.shardingOptions = shardingOptions;
         sessionFactories.forEach((tenantId, factories) -> daos.put(tenantId,
-                factories.stream().map(RelationalDaoPriv::new).collect(Collectors.toList())));
+                factories.stream().map(RelationalDaoPriv::new).toList()));
         this.entityClass = entityClass;
         this.shardInfoProviders = shardInfoProviders;
         this.observer = observer;
@@ -1382,7 +1382,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
-                }).collect(Collectors.toList());
+                }).toList();
     }
 
     public List<T> scatterGather(final String tenantId, DetachedCriteria criteria, int start,
@@ -1408,7 +1408,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
-                }).flatMap(Collection::stream).collect(Collectors.toList());
+                }).flatMap(Collection::stream).toList();
     }
 
     /**
@@ -1446,7 +1446,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
-                }).flatMap(Collection::stream).collect(Collectors.toList());
+                }).flatMap(Collection::stream).toList();
     }
 
     protected Field getKeyField() {
@@ -1483,7 +1483,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 })
                 .sorted(comparator)
                 .limit(pageSize)
-                .collect(Collectors.toList());
+                .toList();
         //This list will be of _pageSize_ long but max fetched might be _pageSize_ * numShards long
         val outputBuilder = ImmutableList.<T>builder();
         results.forEach(result -> {
@@ -1507,10 +1507,10 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     private ScrollExecutor<T> buildScrollExecutor(String tenantId) {
         val daoList = daos.get(tenantId);
         return new ScrollExecutor<>(
-                daoList.stream().map(dao -> dao.sessionFactory).collect(Collectors.toList()),
+                daoList.stream().map(dao -> dao.sessionFactory).toList(),
                 daoList.stream()
                         .map(dao -> (Function<SelectParam, List<T>>) dao::select)
-                        .collect(Collectors.toList()),
+                        .toList(),
                 transactionExecutor.get(tenantId),
                 entityClass);
     }
