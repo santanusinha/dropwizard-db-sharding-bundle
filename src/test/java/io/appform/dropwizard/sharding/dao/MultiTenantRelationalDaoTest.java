@@ -28,6 +28,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.RelationalEntityWithAIKey;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -317,6 +318,56 @@ public class MultiTenantRelationalDaoTest {
       do {
         nextPtr = relationalDao.scrollDown("TENANT1",
             DetachedCriteria.forClass(RelationalEntity.class),
+            null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
+        nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
+      }
+      while (!nextPtr.getResult().isEmpty());
+      assertEquals(ids, receivedIds);
+    }
+  }
+
+  @Test
+  void testScrollingWithQuerySpec() {
+    val ids = new HashSet<String>();
+    IntStream.range(1, 1_000)
+        .forEach(i -> {
+          try {
+            val id = Integer.toString(i);
+            ids.add(id);
+            relationalDao.save("TENANT1", UUID.randomUUID().toString(),
+                RelationalEntity.builder()
+                    .key(id)
+                    .value("abcd" + i)
+                    .build());
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
+
+    // QuerySpec equivalent of DetachedCriteria.forClass(RelationalEntity.class) -- select all
+    final QuerySpec<RelationalEntity, RelationalEntity> querySpec =
+        (root, query, cb) -> { };
+
+    {
+      var nextPtr = (ScrollResult<RelationalEntity>) null;
+      val receivedIds = new HashSet<String>();
+
+      do {
+        nextPtr = relationalDao.scrollUp("TENANT1",
+            querySpec,
+            null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
+        nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
+      }
+      while (!nextPtr.getResult().isEmpty());
+      assertEquals(ids, receivedIds);
+    }
+    {
+      var nextPtr = (ScrollResult<RelationalEntity>) null;
+      val receivedIds = new HashSet<String>();
+
+      do {
+        nextPtr = relationalDao.scrollDown("TENANT1",
+            querySpec,
             null == nextPtr ? null : nextPtr.getPointer(), 5, "key");
         nextPtr.getResult().forEach(e -> receivedIds.add(e.getKey()));
       }

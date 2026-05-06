@@ -7,6 +7,7 @@ import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.ScrollTestEntity;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
@@ -193,6 +194,64 @@ public class ScrollTest {
             pointer = result.getPointer();
             log.info("Received {} entities", result.getResult().size());
         } while (result.getResult().size() != 0);
+        assertTrue(entities.containsAll(ids),
+                   "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
+    }
+
+    @Test
+    void testScrollDownWithQuerySpec() {
+        val numEntities = 400;
+        val pageSize = 10;
+        val ids = new HashSet<Integer>();
+        val entities = new HashSet<Integer>();
+
+        populateEntities(1, numEntities, ids);
+
+        // QuerySpec equivalent of DetachedCriteria.forClass(ScrollTestEntity.class) -- select all
+        final QuerySpec<ScrollTestEntity, ScrollTestEntity> querySpec =
+                (root, query, cb) -> { };
+
+        var result = (ScrollResult<ScrollTestEntity>) null;
+        var pointer = (ScrollPointer) null;
+
+        do {
+            result = lookupDao.scrollDown(querySpec,
+                                          pointer,
+                                          pageSize,
+                                          "id");
+            addValuesToSet(entities, result);
+            pointer = result.getPointer();
+        } while (!result.getResult().isEmpty());
+
+        assertTrue(entities.containsAll(ids),
+                   "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
+    }
+
+    @Test
+    void testScrollUpWithQuerySpec() {
+        val numEntities = 400;
+        val pageSize = 10;
+        val ids = new HashSet<Integer>();
+        val entities = new HashSet<Integer>();
+
+        populateEntities(1, numEntities, ids);
+
+        // QuerySpec equivalent of DetachedCriteria.forClass(ScrollTestEntity.class) -- select all
+        final QuerySpec<ScrollTestEntity, ScrollTestEntity> querySpec =
+                (root, query, cb) -> { };
+
+        var result = (ScrollResult<ScrollTestEntity>) null;
+        var pointer = (ScrollPointer) null;
+
+        do {
+            result = lookupDao.scrollUp(querySpec,
+                                        pointer,
+                                        pageSize,
+                                        "id");
+            addValuesToSet(entities, result);
+            pointer = result.getPointer();
+        } while (!result.getResult().isEmpty());
+
         assertTrue(entities.containsAll(ids),
                    "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
     }

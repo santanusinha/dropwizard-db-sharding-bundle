@@ -298,6 +298,33 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.scrollUp(tenantId, inCriteria, inPointer, pageSize, sortFieldName);
     }
 
+    /**
+     * Scroll down using JPA CriteriaQuery spec.
+     *
+     * @see MultiTenantRelationalDao#scrollDown(String, QuerySpec, ScrollPointer, int, String)
+     */
+    public ScrollResult<T> scrollDown(
+            final QuerySpec<T, T> inQuerySpec,
+            final ScrollPointer inPointer,
+            final int pageSize,
+            @NonNull final String sortFieldName) {
+        return delegate.scrollDown(tenantId, inQuerySpec, inPointer, pageSize, sortFieldName);
+    }
+
+    /**
+     * Scroll up using JPA CriteriaQuery spec.
+     *
+     * @see MultiTenantRelationalDao#scrollUp(String, QuerySpec, ScrollPointer, int, String)
+     */
+    @SneakyThrows
+    public ScrollResult<T> scrollUp(
+            final QuerySpec<T, T> inQuerySpec,
+            final ScrollPointer inPointer,
+            final int pageSize,
+            @NonNull final String sortFieldName) {
+        return delegate.scrollUp(tenantId, inQuerySpec, inPointer, pageSize, sortFieldName);
+    }
+
     <U> List<T> select(RelationalDao.ReadOnlyContext<U> context, DetachedCriteria criteria, int first, int numResults) {
         return delegate.select(context.getDelegate(), criteria, first, numResults);
     }
