@@ -55,7 +55,7 @@ public class CreateOrUpdateByLookupKey<T> extends OpContext<T> {
       return result;
     }
     updater.accept(updated);
-    return getter.apply(id);
+    return updated;
   }
 
   @Override
