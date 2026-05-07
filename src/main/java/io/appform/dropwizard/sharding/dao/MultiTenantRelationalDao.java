@@ -163,13 +163,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return uniqueResult(criteria.getExecutableCriteria(currentSession()));
         }
 
-        /**
-         * Reads a single row matching the {@code querySpec} without any lock mode.
-         *
-         * @param querySpec QuerySpec to be used. This should contain all JPA filters which need to be
-         *                  applied for row selection
-         * @return The entity matching the query, or null if not found
-         */
         T get(final QuerySpec<T, T> querySpec) {
             val q = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
             return uniqueResult(q.setLockMode(LockModeType.NONE));
@@ -466,19 +459,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 shardId));
     }
 
-    /**
-     * Creates or updates an entity based on the provided query specification.
-     * This method allows you to create or update an entity associated with a parent key using QuerySpec.
-     * If an entity matching the query is found, it will be updated using the updater function.
-     * If no entity is found, a new entity will be generated using the entityGenerator and saved.
-     *
-     * @param tenantId The tenant ID associated with the entity.
-     * @param parentKey A string representing the parent key that determines the shard for the operation.
-     * @param querySpec The QuerySpec object specifying the criteria for selecting the entity.
-     * @param updater A function that takes the current entity and returns the updated entity.
-     * @param entityGenerator A supplier function for generating a new entity if none exists.
-     * @return An Optional containing the created or updated entity if the operation was successful.
-     */
     public Optional<T> createOrUpdate(String tenantId,
                                   final String parentKey,
                                   final QuerySpec<T, T> querySpec,

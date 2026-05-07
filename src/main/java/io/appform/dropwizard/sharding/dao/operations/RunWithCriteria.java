@@ -30,53 +30,19 @@ import java.util.function.Supplier;
 @Builder
 public class RunWithCriteria<T> extends OpContext<T> {
 
-  /**
-   * Handler function for DetachedCriteria path.
-   * Required when using DetachedCriteria, should be null when using QuerySpec.
-   */
   private Function<DetachedCriteria, T> handler;
-
-  /**
-   * The DetachedCriteria for legacy Hibernate query execution.
-   * Required when using DetachedCriteria path, should be null when using QuerySpec path.
-   */
   private DetachedCriteria detachedCriteria;
-
-  /**
-   * The QuerySpec for modern JPA Criteria API query execution.
-   * Required when using QuerySpec path, should be null when using DetachedCriteria path.
-   */
   private QuerySpec<?, ?> querySpec;
-
-  /**
-   * Handler supplier for QuerySpec path.
-   * Required when using QuerySpec, should be null when using DetachedCriteria.
-   */
   private Supplier<T> querySpecHandler;
 
   @Override
   public T apply(Session session) {
-    // DetachedCriteria path
     if (detachedCriteria != null && handler != null) {
       return handler.apply(detachedCriteria);
     }
 
-    // QuerySpec path
     if (querySpec != null && querySpecHandler != null) {
       return querySpecHandler.get();
-    }
-
-    // Error cases with helpful messages
-    if (detachedCriteria != null || handler != null) {
-      throw new IllegalStateException(
-          "DetachedCriteria path requires both 'detachedCriteria' and 'handler' to be non-null. " +
-          "Found: detachedCriteria=" + (detachedCriteria != null) + ", handler=" + (handler != null));
-    }
-
-    if (querySpec != null || querySpecHandler != null) {
-      throw new IllegalStateException(
-          "QuerySpec path requires both 'querySpec' and 'querySpecHandler' to be non-null. " +
-          "Found: querySpec=" + (querySpec != null) + ", querySpecHandler=" + (querySpecHandler != null));
     }
 
     throw new IllegalStateException(
