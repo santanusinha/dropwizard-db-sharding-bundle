@@ -18,6 +18,13 @@ import java.util.function.UnaryOperator;
  * Acquire lock on an entity using QuerySpec.
  * If entity present, performs mutation and updates it.
  * Else create the entity using the given @Supplier entityGenerator.
+ * <p>
+ * Behavior:
+ * <ul>
+ *   <li>If the entity exists: it will be updated using the mutator</li>
+ *   <li>If the entity doesn't exist: a new entity is created using entityGenerator</li>
+ *   <li>Returns null if entity doesn't exist AND entityGenerator returns null</li>
+ * </ul>
  *
  * @param <T> Type of entity on which operation being performed.
  */
@@ -28,7 +35,7 @@ public class CreateOrUpdateByQuerySpec<T> extends OpContext<T> {
   @NonNull QuerySpec<T, T> querySpec;
   UnaryOperator<T> mutator;
   Supplier<T> entityGenerator;
-  private Function<QuerySpec<T, T>, T> getLockedForWrite;
+  private Function<QuerySpec<T, T>, T>  getLockedForWrite;
   private Function<QuerySpec<T, T>, T> getter;
   private Function<T, T> saver;
   private BiConsumer<T, T> updater;
@@ -53,7 +60,7 @@ public class CreateOrUpdateByQuerySpec<T> extends OpContext<T> {
 
   @Override
   public OpType getOpType() {
-    return OpType.CREATE_OR_UPDATE;
+    return OpType.CREATE_OR_UPDATE_BY_QUERY_SPEC;
   }
 
   @Override

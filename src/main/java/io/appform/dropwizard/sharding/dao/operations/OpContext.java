@@ -73,7 +73,6 @@ public abstract class OpContext<T> implements Function<Session, T> {
     <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
     <T, R> P visit(Select<T, R> opContext);
-
   }
 
 }

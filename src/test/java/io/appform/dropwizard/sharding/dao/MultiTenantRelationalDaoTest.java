@@ -172,6 +172,36 @@ public class MultiTenantRelationalDaoTest {
   }
 
   @Test
+  public void testCreateOrUpdateWithQuerySpec() throws Exception {
+    // Test creation path
+    val saved = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
+            (QuerySpec<RelationalEntityWithAIKey, RelationalEntityWithAIKey>) (root, query, cb) ->
+                query.where(cb.equal(root.get("key"), "testIdQuerySpec")),
+            e -> e.setValue("Some Other Text"),
+            () -> RelationalEntityWithAIKey.builder()
+                .key("testIdQuerySpec")
+                .value("Some New Text")
+                .build())
+        .orElse(null);
+    assertNotNull(saved);
+    assertEquals("Some New Text", saved.getValue());
+
+    // Test update path
+    val updated = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
+            (QuerySpec<RelationalEntityWithAIKey, RelationalEntityWithAIKey>) (root, query, cb) ->
+                query.where(cb.equal(root.get("key"), "testIdQuerySpec")),
+            e -> e.setValue("Some Other Text"),
+            () -> RelationalEntityWithAIKey.builder()
+                .key("testIdQuerySpec")
+                .value("Some New Text")
+                .build())
+        .orElse(null);
+    assertNotNull(updated);
+    assertEquals(saved.getId(), updated.getId());
+    assertEquals("Some Other Text", updated.getValue());
+  }
+
+  @Test
   public void testUpdateUsingQuery() throws Exception {
     val relationalKey = UUID.randomUUID().toString();
 
@@ -395,6 +425,36 @@ public class MultiTenantRelationalDaoTest {
         });
     assertEquals(ids,
         relationalDao.run("TENANT1", DetachedCriteria.forClass(RelationalEntity.class))
+            .values()
+            .stream()
+            .flatMap(Collection::stream)
+            .map(v -> ((RelationalEntity) v).getKey())
+            .collect(Collectors.toSet()));
+  }
+
+  @Test
+  public void testMultiShardRunWithQuerySpec() {
+    val ids = new HashSet<String>();
+    IntStream.range(1, 1_000)
+        .forEach(i -> {
+          try {
+            val id = Integer.toString(i);
+            ids.add(id);
+            relationalDao.save("TENANT1", UUID.randomUUID().toString(),
+                RelationalEntity.builder()
+                    .key(id)
+                    .value("abcd" + i)
+                    .build());
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
+
+    // QuerySpec equivalent of DetachedCriteria.forClass(RelationalEntity.class) -- select all
+    final QuerySpec<RelationalEntity, RelationalEntity> querySpec = (root, query, cb) -> { };
+
+    assertEquals(ids,
+        relationalDao.run("TENANT1", querySpec)
             .values()
             .stream()
             .flatMap(Collection::stream)
