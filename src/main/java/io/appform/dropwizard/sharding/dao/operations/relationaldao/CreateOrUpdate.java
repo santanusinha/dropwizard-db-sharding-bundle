@@ -20,16 +20,17 @@ import java.util.function.UnaryOperator;
  * Else create the entity using the given @Supplier entityGenerator.
  *
  * @param <T> Type of entity on which operation being performed.
+ * @param <C> Type of criteria used to query the entity (DetachedCriteria or QuerySpec).
  */
 @Data
 @Builder
-public class CreateOrUpdate<T> extends OpContext<T> {
+public class CreateOrUpdate<T, C> extends OpContext<T> {
 
-  @NonNull DetachedCriteria criteria;
+  @NonNull C criteria;
   UnaryOperator<T> mutator;
   Supplier<T> entityGenerator;
-  private Function<DetachedCriteria, T> getLockedForWrite;
-  private Function<DetachedCriteria, T> getter;
+  private Function<C, T> getLockedForWrite;
+  private Function<C, T> getter;
   private Function<T, T> saver;
   private BiConsumer<T, T> updater;
 

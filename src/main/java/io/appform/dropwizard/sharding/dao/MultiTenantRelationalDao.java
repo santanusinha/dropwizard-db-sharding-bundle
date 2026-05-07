@@ -40,7 +40,6 @@ import io.appform.dropwizard.sharding.dao.operations.UpdateAll;
 import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
 import io.appform.dropwizard.sharding.dao.operations.UpdateWithScroll;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
-import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.execution.DaoType;
@@ -442,7 +441,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = CreateOrUpdate.<T>builder()
+        val opContext = CreateOrUpdate.<T, DetachedCriteria>builder()
                 .criteria(selectionCriteria)
                 .getLockedForWrite(dao::getLockedForWrite)
                 .entityGenerator(entityGenerator)
@@ -467,8 +466,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = CreateOrUpdateByQuerySpec.<T>builder()
-                .querySpec(querySpec)
+        val opContext = CreateOrUpdate.<T, QuerySpec<T, T>>builder()
+                .criteria(querySpec)
                 .getLockedForWrite(dao::getLockedForWrite)
                 .entityGenerator(entityGenerator)
                 .saver(dao::save)

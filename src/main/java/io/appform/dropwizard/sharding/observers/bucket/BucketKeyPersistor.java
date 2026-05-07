@@ -22,7 +22,6 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLoo
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
-import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
@@ -217,7 +216,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(CreateOrUpdate<T> createOrUpdate) {
+    public <T, C> Void visit(CreateOrUpdate<T, C> createOrUpdate) {
         final var oldMutator = createOrUpdate.getMutator();
         createOrUpdate.setMutator(result -> {
             if (result != null) {
@@ -230,26 +229,6 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
         final var oldSaver = createOrUpdate.getSaver();
         createOrUpdate.setSaver((T entity) -> {
-            addBucketId(entity);
-            return oldSaver.apply(entity);
-        });
-        return null;
-    }
-
-    @Override
-    public <T> Void visit(CreateOrUpdateByQuerySpec<T> createOrUpdateByQuerySpec) {
-        final var oldMutator = createOrUpdateByQuerySpec.getMutator();
-        createOrUpdateByQuerySpec.setMutator(result -> {
-            if (result != null) {
-                T value = oldMutator.apply(result);
-                addBucketId(value);
-                return value;
-            }
-            return null;
-        });
-
-        final var oldSaver = createOrUpdateByQuerySpec.getSaver();
-        createOrUpdateByQuerySpec.setSaver((T entity) -> {
             addBucketId(entity);
             return oldSaver.apply(entity);
         });
