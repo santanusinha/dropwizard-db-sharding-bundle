@@ -774,9 +774,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final LookupDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List<T>> opContext = RunWithCriteria.<List<T>>builder()
+                    OpContext<List<T>> opContext = RunWithCriteria.<List<T>, DetachedCriteria>builder()
                             .handler(dao::run)
-                            .detachedCriteria(criteria)
+                            .criteria(criteria)
                             .build();
                     return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
                             true, "run",

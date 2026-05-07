@@ -1,53 +1,35 @@
 package io.appform.dropwizard.sharding.dao.operations;
 
-import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NonNull;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Run a query inside this shard and return resulting list.
  * <p>
- * This operation supports two execution paths:
- * <ul>
- *   <li><b>DetachedCriteria path (legacy Hibernate API):</b> Requires both {@code detachedCriteria} and {@code handler}.
- *       The handler function executes the criteria query.</li>
- *   <li><b>QuerySpec path (modern JPA Criteria API):</b> Requires both {@code querySpec} and {@code querySpecHandler}.
- *       The querySpecHandler supplier executes the QuerySpec query.</li>
- * </ul>
- * <p>
- * The two paths are mutually exclusive - provide fields for only one path.
- * An {@link IllegalStateException} will be thrown at execution time if neither path has complete parameters,
- * or if parameters are mixed between paths.
+ * This operation is generic over the criteria type, supporting both legacy Hibernate API
+ * (DetachedCriteria) and modern JPA Criteria API (QuerySpec), as well as any future
+ * criteria types.
  *
  * @param <T> Return type on performing the operation.
+ * @param <C> Type of criteria used to query (DetachedCriteria, QuerySpec, etc.).
  */
 @Data
 @Builder
-public class RunWithCriteria<T> extends OpContext<T> {
+public class RunWithCriteria<T, C> extends OpContext<T> {
 
-  private Function<DetachedCriteria, T> handler;
-  private DetachedCriteria detachedCriteria;
-  private QuerySpec<?, ?> querySpec;
-  private Supplier<T> querySpecHandler;
+  @NonNull
+  private C criteria;
+
+  @NonNull
+  private Function<C, T> handler;
 
   @Override
   public T apply(Session session) {
-    if (detachedCriteria != null && handler != null) {
-      return handler.apply(detachedCriteria);
-    }
-
-    if (querySpec != null && querySpecHandler != null) {
-      return querySpecHandler.get();
-    }
-
-    throw new IllegalStateException(
-        "RunWithCriteria requires either (detachedCriteria + handler) OR (querySpec + querySpecHandler). " +
-        "All fields are null.");
+    return handler.apply(criteria);
   }
 
   @Override

@@ -856,8 +856,8 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List> opContext = RunWithCriteria.<List>builder()
-                            .detachedCriteria(criteria).handler(dao::run).build();
+                    OpContext<List> opContext = RunWithCriteria.<List, DetachedCriteria>builder()
+                            .criteria(criteria).handler(dao::run).build();
                     return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
                             true,
                             "run",
@@ -897,9 +897,9 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List> opContext = RunWithCriteria.<List>builder()
-                            .querySpec(querySpec)
-                            .querySpecHandler(() -> dao.run(querySpec))
+                    OpContext<List> opContext = RunWithCriteria.<List, QuerySpec<T, T>>builder()
+                            .criteria(querySpec)
+                            .handler(dao::run)
                             .build();
                     return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
                             true,

@@ -166,7 +166,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(RunWithCriteria<T> runWithCriteria) {
+    public <T, C> Void visit(RunWithCriteria<T, C> runWithCriteria) {
         return null;
     }
 
