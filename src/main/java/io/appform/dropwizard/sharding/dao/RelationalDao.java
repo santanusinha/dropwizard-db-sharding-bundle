@@ -376,8 +376,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param querySpec The QuerySpec defining query criteria. Typically, a grouping or counting query
      * @return A map of shard vs result-list
      */
-    @SuppressWarnings("rawtypes")
-    public Map<Integer, List> run(QuerySpec<T, T> querySpec) {
+    public Map<Integer, List<T>> run(QuerySpec<T, T> querySpec) {
         return delegate.run(tenantId, querySpec);
     }
 
@@ -389,8 +388,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @param <U>        Return type
      * @return Translated result
      */
-    @SuppressWarnings("rawtypes")
-    public <U> U run(QuerySpec<T, T> querySpec, Function<Map<Integer, List>, U> translator) {
+    public <U> U run(QuerySpec<T, T> querySpec, Function<Map<Integer, List<T>>, U> translator) {
         return delegate.run(tenantId, querySpec, translator);
     }
 

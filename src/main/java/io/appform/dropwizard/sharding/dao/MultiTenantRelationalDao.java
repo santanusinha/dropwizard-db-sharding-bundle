@@ -246,8 +246,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
          * @param querySpec QuerySpec defining the query criteria.
          * @return List of elements or empty list if none found
          */
-        @SuppressWarnings("rawtypes")
-        List run(QuerySpec<T, T> querySpec) {
+        List<T> run(QuerySpec<T, T> querySpec) {
             val query = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
             return list(query);
         }
@@ -874,8 +873,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * @param querySpec The QuerySpec defining query criteria. Typically, a grouping or counting query
      * @return A map of shard vs result-list
      */
-    @SuppressWarnings("rawtypes")
-    public Map<Integer, List> run(String tenantId, QuerySpec<T, T> querySpec) {
+    public Map<Integer, List<T>> run(String tenantId, QuerySpec<T, T> querySpec) {
         return run(tenantId, querySpec, Function.identity());
     }
 
@@ -889,15 +887,14 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      * @param <U>        Return type
      * @return Translated result
      */
-    @SuppressWarnings("rawtypes")
     public <U> U run(String tenantId, QuerySpec<T, T> querySpec,
-                     Function<Map<Integer, List>, U> translator) {
+                     Function<Map<Integer, List<T>>, U> translator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val output = IntStream.range(0, daos.get(tenantId).size())
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List> opContext = RunWithCriteria.<List, QuerySpec<T, T>>builder()
+                    OpContext<List<T>> opContext = RunWithCriteria.<List<T>, QuerySpec<T, T>>builder()
                             .criteria(querySpec)
                             .handler(dao::run)
                             .build();
