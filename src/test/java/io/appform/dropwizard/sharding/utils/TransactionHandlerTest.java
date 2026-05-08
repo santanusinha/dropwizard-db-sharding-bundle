@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -13,9 +15,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.sql.Connection;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.context.internal.ManagedSessionContext;
+import org.hibernate.jdbc.Work;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -137,6 +141,65 @@ class TransactionHandlerTest {
         transactionHandler.afterEnd();
 
         verify(transaction, times(1)).commit(); // Ensure commit is called
+        verify(session, times(1)).close();
+    }
+
+    // --- Tests for the conn.rollback() branch added in e63436e ---
+
+    /**
+     * When readOnly=true AND skipCommit=true (transaction-optional) AND this handler owns the
+     * session, afterEnd() must roll back the implicit JDBC transaction via doWork to prevent
+     * MVCC snapshot leakage across connection-pool connections.
+     */
+    @Test
+    void testReadOnlySkipCommit_afterEnd_rollsBackConnection() throws Exception {
+        Connection mockConn = mock(Connection.class);
+        // Capture and immediately execute the Work so we can verify conn.rollback()
+        doAnswer(invocation -> {
+            Work work = invocation.getArgument(0);
+            work.execute(mockConn);
+            return null;
+        }).when(session).doWork(any());
+
+        TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true, true);
+        transactionHandler.beforeStart();
+        transactionHandler.afterEnd();
+
+        verify(session, times(1)).doWork(any());
+        verify(mockConn, times(1)).rollback();
+        verify(session, times(1)).close();
+    }
+
+    /**
+     * When readOnly=false (even with skipCommit=true), the conn.rollback() branch must NOT fire —
+     * only read-only sessions carry a lingering implicit JDBC transaction worth cleaning up.
+     */
+    @Test
+    void testWriteSkipCommit_afterEnd_doesNotRollBackConnection() {
+        TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false, true);
+        transactionHandler.beforeStart();
+        transactionHandler.afterEnd();
+
+        verify(session, never()).doWork(any());
+        verify(session, times(1)).close();
+    }
+
+    /**
+     * When skipCommit=false (normal owned transaction), afterEnd() must commit via Hibernate —
+     * the doWork/conn.rollback() path must NOT be reached.
+     */
+    @Test
+    void testReadOnlyOwnedTransaction_afterEnd_doesNotRollBackConnection() {
+        org.hibernate.Transaction transaction = mock(org.hibernate.Transaction.class);
+        when(session.getTransaction()).thenReturn(transaction);
+        when(transaction.getStatus()).thenReturn(org.hibernate.resource.transaction.spi.TransactionStatus.ACTIVE);
+
+        TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true, false);
+        transactionHandler.beforeStart();
+        transactionHandler.afterEnd();
+
+        verify(session, never()).doWork(any());
+        verify(transaction, times(1)).commit();
         verify(session, times(1)).close();
     }
 }
