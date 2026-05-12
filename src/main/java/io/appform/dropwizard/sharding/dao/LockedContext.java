@@ -7,6 +7,7 @@ import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
+import io.appform.dropwizard.sharding.utils.CopyFromParentUtils;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import lombok.Getter;
 import lombok.val;
@@ -170,6 +171,7 @@ public class LockedContext<T> {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
+                CopyFromParentUtils.copyFields(parent, entity);
                 relationalDao.save(this, entity);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -195,6 +197,7 @@ public class LockedContext<T> {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
+                CopyFromParentUtils.copyFields(parent, entity);
                 relationalDao.save(this, entity);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -221,6 +224,7 @@ public class LockedContext<T> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
+                    CopyFromParentUtils.copyFields(parent, entity);
                     relationalDao.save(this, entity);
                 }
             } catch (Exception e) {
@@ -248,6 +252,7 @@ public class LockedContext<T> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
+                    CopyFromParentUtils.copyFields(parent, entity);
                     relationalDao.save(this, entity);
                 }
             } catch (Exception e) {
@@ -300,6 +305,7 @@ public class LockedContext<T> {
     public <U> LockedContext<T> save(RelationalDao<U> relationalDao, U entity, Function<U, U> handler) {
         return apply(parent -> {
             try {
+                CopyFromParentUtils.copyFields(parent, entity);
                 relationalDao.save(this, entity, handler);
             } catch (Exception e) {
                 throw new RuntimeException(e);
