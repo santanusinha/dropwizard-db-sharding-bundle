@@ -33,6 +33,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;

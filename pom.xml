@@ -6,7 +6,7 @@
 
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle-root</artifactId>
-    <version>2.1.12-HIBERNATE6-RC2</version>
+    <version>2.1.12-HIBERNATE6-RC3</version>
     <packaging>pom</packaging>
     <name>Dropwizard Database Sharding Bundle Root</name>
     <url>https://github.com/santanusinha/dropwizard-db-sharding-bundle</url>

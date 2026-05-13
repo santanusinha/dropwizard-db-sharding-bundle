@@ -4,6 +4,12 @@ import io.appform.dropwizard.sharding.BalancedDBShardingBundle;
 import io.appform.dropwizard.sharding.BundleBasedTestBase;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,12 +21,6 @@ import lombok.val;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Table;
 
 public class BucketResolverTest extends BundleBasedTestBase {
 
