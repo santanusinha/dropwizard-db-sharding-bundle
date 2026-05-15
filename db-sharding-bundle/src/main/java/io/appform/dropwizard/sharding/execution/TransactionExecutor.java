@@ -33,7 +33,6 @@ public class TransactionExecutor {
     private final Class<?> entityClass;
     private final ShardInfoProvider shardInfoProvider;
     private final TransactionObserver observer;
-
     public TransactionExecutor(final ShardInfoProvider shardInfoProvider,
                                final DaoType daoType,
                                final Class<?> entityClass,
@@ -66,7 +65,8 @@ public class TransactionExecutor {
             .opContext(opContext)
             .build();
         return observer.execute(context, () -> {
-            val transactionHandler = new TransactionHandler(sessionFactory, readOnly);
+            val transactionHandler = new TransactionHandler(sessionFactory, readOnly,
+                opContext.isTransactionOptional());
             if (completeTransaction) {
                 transactionHandler.beforeStart();
             }

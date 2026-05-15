@@ -115,6 +115,12 @@ public class TransactionHandler {
             throw e;
         } finally {
             if (sessionAcquired) {
+                if (skipCommit && readOnly) {
+                    // isTransactionOptional=true reads skip beginTransaction(), so no Hibernate-managed
+                    // transaction exists. But autoCommit=false means an implicit DB transaction is open.
+                    // Roll it back directly to prevent MVCC snapshot leakage across pool connections.
+                    session.doWork(conn -> conn.rollback());
+                }
                 session.close();
                 ManagedSessionContext.unbind(sessionFactory);
                 MDC.remove(TENANT_ID);
