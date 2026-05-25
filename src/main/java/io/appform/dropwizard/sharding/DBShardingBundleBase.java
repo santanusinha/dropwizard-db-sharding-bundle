@@ -30,6 +30,8 @@ import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
+import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
+import io.appform.dropwizard.sharding.hibernate.SessionFactoryFactory;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BucketInfo;
@@ -39,6 +41,7 @@ import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
+import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import java.util.Arrays;
@@ -94,6 +97,17 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
             protected ShardBlacklistingStore getBlacklistingStore() {
                 return DBShardingBundleBase.this.getBlacklistingStore();
             }
+
+            @Override
+            protected SessionFactoryFactory<T> createSessionFactoryFactory(
+                    List<Class<?>> entities,
+                    HealthCheckManager healthCheckManager,
+                    ShardInfoProvider shardInfoProvider,
+                    int shard,
+                    ShardedHibernateFactory shardConfig) {
+                return DBShardingBundleBase.this.createSessionFactoryFactory(
+                        entities, healthCheckManager, shardInfoProvider, shard, shardConfig);
+            }
         };
     }
 
@@ -116,6 +130,17 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
             protected ShardBlacklistingStore getBlacklistingStore() {
                 return DBShardingBundleBase.this.getBlacklistingStore();
             }
+
+            @Override
+            protected SessionFactoryFactory<T> createSessionFactoryFactory(
+                    List<Class<?>> entities,
+                    HealthCheckManager healthCheckManager,
+                    ShardInfoProvider shardInfoProvider,
+                    int shard,
+                    ShardedHibernateFactory shardConfig) {
+                return DBShardingBundleBase.this.createSessionFactoryFactory(
+                        entities, healthCheckManager, shardInfoProvider, shard, shardConfig);
+            }
         };
     }
 
@@ -129,6 +154,25 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     protected ShardBlacklistingStore getBlacklistingStore() {
         return new NoopShardBlacklistingStore();
+    }
+
+    protected SessionFactoryFactory<T> createSessionFactoryFactory(
+            List<Class<?>> entities,
+            HealthCheckManager healthCheckManager,
+            ShardInfoProvider shardInfoProvider,
+            int shard,
+            ShardedHibernateFactory shardConfig) {
+        return new SessionFactoryFactory<T>(entities, healthCheckManager) {
+            @Override
+            protected String name() {
+                return shardInfoProvider.shardName(shard);
+            }
+
+            @Override
+            public PooledDataSourceFactory getDataSourceFactory(T t) {
+                return shardConfig.getShards().get(shard);
+            }
+        };
     }
 
     public List<SessionFactory> getSessionFactories() {

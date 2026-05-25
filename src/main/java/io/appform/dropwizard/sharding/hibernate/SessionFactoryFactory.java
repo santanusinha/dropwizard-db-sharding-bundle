@@ -69,7 +69,7 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
                 .build();
     }
 
-    private void disableAutoCommit(final PooledDataSourceFactory dbConfig) {
+    protected void disableAutoCommit(final PooledDataSourceFactory dbConfig) {
         if (dbConfig instanceof DataSourceFactory) {
             ((DataSourceFactory) dbConfig).setAutoCommitByDefault(false);
         } else {

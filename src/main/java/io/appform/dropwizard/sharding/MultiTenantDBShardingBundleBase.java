@@ -29,6 +29,7 @@ import io.appform.dropwizard.sharding.caching.LookupCache;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.MetricConfig;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
+import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.AbstractDAO;
 import io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao;
@@ -133,17 +134,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         final List<CompletableFuture<SessionFactorySource>> futures = IntStream.range(0, shardCount)
                 .mapToObj(shard -> CompletableFuture.supplyAsync(() -> {
                   try {
-                    return new SessionFactoryFactory<T>(initialisedEntities, healthCheckManager) {
-                      @Override
-                      protected String name() {
-                        return shardInfoProvider.shardName(shard);
-                      }
-
-                      @Override
-                      public PooledDataSourceFactory getDataSourceFactory(T t) {
-                        return shardConfig.getShards().get(shard);
-                      }
-                    }.build(configuration, environment);
+                    return createSessionFactoryFactory(initialisedEntities, healthCheckManager,
+                            shardInfoProvider, shard, shardConfig).build(configuration, environment);
                   } catch (Exception e) {
                     log.error("Failed to build session factory for shard {}", shard, e);
                     throw new RuntimeException("Shard " + shard + " build failed", e);
@@ -200,6 +192,25 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   protected Map<String, Map<Integer, Boolean>> healthStatus() {
     return healthCheckManagers.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().status()));
+  }
+
+  protected SessionFactoryFactory<T> createSessionFactoryFactory(
+          List<Class<?>> entities,
+          HealthCheckManager healthCheckManager,
+          ShardInfoProvider shardInfoProvider,
+          int shard,
+          ShardedHibernateFactory shardConfig) {
+    return new SessionFactoryFactory<T>(entities, healthCheckManager) {
+      @Override
+      protected String name() {
+        return shardInfoProvider.shardName(shard);
+      }
+
+      @Override
+      public PooledDataSourceFactory getDataSourceFactory(T t) {
+        return shardConfig.getShards().get(shard);
+      }
+    };
   }
 
   protected abstract MultiTenantShardedHibernateFactory getConfig(T config);
