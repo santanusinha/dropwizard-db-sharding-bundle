@@ -3,73 +3,119 @@ package io.appform.dropwizard.sharding.utils;
 import io.appform.dropwizard.sharding.sharding.CopyFromParent;
 import io.appform.dropwizard.sharding.sharding.ParentEntity;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CopyFromParentUtils {
+/**
+ * Copies fields annotated with {@link CopyFromParent} from a parent entity to a child entity
+ * using cached {@link MethodHandle}s for near-direct-access performance.
+ * <p>
+ * On first invocation for a given child class, this utility:
+ * <ol>
+ *   <li>Scans the child class for {@link ParentEntity} and {@link CopyFromParent} annotations</li>
+ *   <li>Resolves the corresponding fields on the parent class</li>
+ *   <li>Builds {@link MethodHandle} pairs (getter for parent, setter for child)</li>
+ *   <li>Caches the result for all subsequent invocations (once per class per JVM lifetime)</li>
+ * </ol>
+ * <p>
+ * This is a no-op if the child class has no {@link ParentEntity} annotation or no
+ * {@link CopyFromParent} fields.
+ */
+@Slf4j
+public final class CopyFromParentUtils {
 
-    /**
-     * Cache keyed by child class → pre-computed field mappings.
-     * Populated once per entity type per JVM lifetime.
-     */
-    private static final Map<Class<?>, List<FieldMapping>> CACHE = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, List<FieldHandleMapping>> CACHE = new ConcurrentHashMap<>();
+    private static final List<FieldHandleMapping> NO_MAPPINGS = Collections.emptyList();
 
-    /**
-     * Sentinel value for classes without @ParentEntity — avoids repeated reflection.
-     */
-    private static final List<FieldMapping> NO_MAPPINGS = Collections.emptyList();
+    private CopyFromParentUtils() {
+        // utility class
+    }
 
     /**
      * Copies annotated fields from parent to child.
-     * No-op if child class has no @ParentEntity or no @CopyFromParent fields.
+     * No-op if child class has no {@code @ParentEntity} or no {@code @CopyFromParent} fields.
      *
-     * @param parent  The parent entity (source of field values)
-     * @param child   The child entity (target)
-     * @throws IllegalArgumentException if parent type doesn't match @ParentEntity declaration
+     * @param parent the parent entity (source of field values)
+     * @param child  the child entity (target)
+     * @throws IllegalArgumentException if parent type doesn't match {@code @ParentEntity} declaration
+     * @throws RuntimeException         if field access fails
      */
     public static <T, U> void copyFields(T parent, U child) {
         if (parent == null || child == null) {
             return;
         }
 
-        List<FieldMapping> mappings = CACHE.computeIfAbsent(child.getClass(), cls -> {
-            ParentEntity parentAnn = cls.getAnnotation(ParentEntity.class);
-            if (parentAnn == null) {
-                return NO_MAPPINGS;
-            }
-
-            List<FieldMapping> result = new ArrayList<>();
-            for (Field childField : getAllFields(cls)) {
-                CopyFromParent copyAnn = childField.getAnnotation(CopyFromParent.class);
-                if (copyAnn == null) {
-                    continue;
-                }
-
-                Field parentField = findField(parentAnn.value(), copyAnn.field());
-                if (parentField == null) {
-                    // This should never happen if compile-time processor ran.
-                    // Runtime safety net.
-                    throw new IllegalStateException(
-                            String.format("@CopyFromParent(field=\"%s\") on %s.%s: "
-                                            + "field not found on parent %s",
-                                    copyAnn.field(), cls.getSimpleName(),
-                                    childField.getName(), parentAnn.value().getSimpleName()));
-                }
-
-                childField.setAccessible(true);
-                parentField.setAccessible(true);
-                result.add(new FieldMapping(parentField, childField));
-            }
-            return result.isEmpty() ? NO_MAPPINGS : Collections.unmodifiableList(result);
-        });
+        List<FieldHandleMapping> mappings = CACHE.computeIfAbsent(
+                child.getClass(), CopyFromParentUtils::buildMappings);
 
         if (mappings == NO_MAPPINGS) {
             return;
         }
 
-        // Runtime type check: verify the actual parent matches @ParentEntity declaration
+        validateParentType(parent, child);
+        applyMappings(parent, child, mappings);
+    }
+
+    private static List<FieldHandleMapping> buildMappings(Class<?> childClass) {
+        ParentEntity parentAnn = childClass.getAnnotation(ParentEntity.class);
+        if (parentAnn == null) {
+            return NO_MAPPINGS;
+        }
+
+        Class<?> parentClass = parentAnn.value();
+        List<FieldHandleMapping> result = new ArrayList<>();
+
+        for (Field childField : getAllFields(childClass)) {
+            CopyFromParent copyAnn = childField.getAnnotation(CopyFromParent.class);
+            if (copyAnn == null) {
+                continue;
+            }
+
+            String parentFieldName = copyAnn.field();
+            Field parentField = findField(parentClass, parentFieldName);
+            if (parentField == null) {
+                // This should never happen if compile-time processor ran.
+                // Runtime safety net.
+                throw new IllegalStateException(
+                        String.format("@CopyFromParent(field=\"%s\") on %s.%s: "
+                                        + "field not found on parent %s",
+                                parentFieldName, childClass.getSimpleName(),
+                                childField.getName(), parentClass.getSimpleName()));
+            }
+
+            try {
+                MethodHandles.Lookup parentLookup = MethodHandles.privateLookupIn(
+                        parentClass, MethodHandles.lookup());
+                MethodHandles.Lookup childLookup = MethodHandles.privateLookupIn(
+                        childClass, MethodHandles.lookup());
+
+                MethodHandle parentGetter = parentLookup.unreflectGetter(parentField);
+                MethodHandle childSetter = childLookup.unreflectSetter(childField);
+
+                result.add(new FieldHandleMapping(
+                        parentGetter, childSetter,
+                        parentFieldName, childField.getName()));
+            } catch (IllegalAccessException e) {
+                throw new IllegalStateException(
+                        String.format("Cannot create MethodHandle for field mapping %s.%s -> %s.%s",
+                                parentClass.getSimpleName(), parentFieldName,
+                                childClass.getSimpleName(), childField.getName()), e);
+            }
+        }
+
+        return result.isEmpty() ? NO_MAPPINGS : Collections.unmodifiableList(result);
+    }
+
+    private static <T, U> void validateParentType(T parent, U child) {
         ParentEntity parentAnn = child.getClass().getAnnotation(ParentEntity.class);
         if (!parentAnn.value().isAssignableFrom(parent.getClass())) {
             throw new IllegalArgumentException(
@@ -78,14 +124,18 @@ public class CopyFromParentUtils {
                             parentAnn.value().getSimpleName(),
                             parent.getClass().getSimpleName()));
         }
+    }
 
-        for (FieldMapping m : mappings) {
+    private static <T, U> void applyMappings(T parent, U child, List<FieldHandleMapping> mappings) {
+        for (FieldHandleMapping m : mappings) {
             try {
-                m.childField.set(child, m.parentField.get(parent));
-            } catch (IllegalAccessException e) {
+                Object value = m.parentGetter.invoke(parent);
+                m.childSetter.invoke(child, value);
+            } catch (Throwable e) {
                 throw new RuntimeException(
-                        String.format("Failed to copy field %s -> %s",
-                                m.parentField.getName(), m.childField.getName()), e);
+                        String.format("Failed to copy field %s -> %s on %s",
+                                m.parentFieldName, m.childFieldName,
+                                child.getClass().getSimpleName()), e);
             }
         }
     }
@@ -113,8 +163,10 @@ public class CopyFromParentUtils {
     }
 
     @AllArgsConstructor
-    private static class FieldMapping {
-        final Field parentField;
-        final Field childField;
+    private static class FieldHandleMapping {
+        final MethodHandle parentGetter;
+        final MethodHandle childSetter;
+        final String parentFieldName;
+        final String childFieldName;
     }
 }
