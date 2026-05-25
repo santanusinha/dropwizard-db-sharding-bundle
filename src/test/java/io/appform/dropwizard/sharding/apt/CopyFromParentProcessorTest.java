@@ -14,22 +14,24 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testValidAnnotation_compiles() {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "public class Parent {\n"
-                + "    private String name;\n"
-                + "    public String getName() { return name; }\n"
-                + "    public void setName(String name) { this.name = name; }\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Parent {",
+                        "    private String name;",
+                        "    public String getName() { return name; }",
+                        "    public void setName(String name) { this.name = name; }",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"name\")\n"
-                + "    private String childName;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"name\")",
+                        "    private String childName;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
@@ -41,20 +43,19 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testCopyFromParentWithoutParentEntity_fails() {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"name\")\n"
-                + "    private String childName;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"name\")",
+                        "    private String childName;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
                 .compile(child);
 
         assertThat(compilation).failed();
-        // The error message is:
-        // "@CopyFromParent on Child.childName requires @ParentEntity on the enclosing class test.Child"
         assertThat(compilation)
                 .hadErrorContaining("requires @ParentEntity on the enclosing class")
                 .inFile(child);
@@ -63,28 +64,28 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testFieldNotFoundOnParent_fails() {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "public class Parent {\n"
-                + "    private String name;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Parent {",
+                        "    private String name;",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"nonExistent\")\n"
-                + "    private String childField;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"nonExistent\")",
+                        "    private String childField;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
-        // The error message is:
-        // "@CopyFromParent(field="nonExistent") on Child.childField: field 'nonExistent' not found on parent test.Parent"
         assertThat(compilation)
                 .hadErrorContaining("field 'nonExistent' not found on parent")
                 .inFile(child);
@@ -93,28 +94,28 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testTypeMismatch_fails() {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "public class Parent {\n"
-                + "    private int count;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Parent {",
+                        "    private int count;",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"count\")\n"
-                + "    private String childCount;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"count\")",
+                        "    private String childCount;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
-        // The error message is:
-        // "@CopyFromParent type mismatch on Child.childCount: parent field 'count' is int, child field is java.lang.String"
         assertThat(compilation)
                 .hadErrorContaining("type mismatch on Child.childCount: parent field 'count' is int")
                 .inFile(child);
@@ -123,30 +124,30 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testTransientParentField_fails() {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "import javax.persistence.Transient;\n"
-                + "public class Parent {\n"
-                + "    @Transient\n"
-                + "    private String tempValue;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import javax.persistence.Transient;",
+                        "public class Parent {",
+                        "    @Transient",
+                        "    private String tempValue;",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"tempValue\")\n"
-                + "    private String childTemp;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"tempValue\")",
+                        "    private String childTemp;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
-        // The error message is:
-        // "@CopyFromParent(field="tempValue") on Child.childTemp: parent field 'tempValue' on Parent is marked @Transient and will not be persisted"
         assertThat(compilation)
                 .hadErrorContaining("marked @Transient and will not be persisted")
                 .inFile(child);
@@ -154,22 +155,23 @@ public class CopyFromParentProcessorTest {
 
     @Test
     public void testCompatibleTypes_compiles() {
-        // int -> long should be assignable (widening primitive conversion)
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "public class Parent {\n"
-                + "    private int count;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Parent {",
+                        "    private int count;",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"count\")\n"
-                + "    private long childCount;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"count\")",
+                        "    private long childCount;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
@@ -181,23 +183,25 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testMultipleFields_compiles() {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "public class Parent {\n"
-                + "    private String name;\n"
-                + "    private int count;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Parent {",
+                        "    private String name;",
+                        "    private int count;",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"name\")\n"
-                + "    private String childName;\n"
-                + "    @CopyFromParent(field = \"count\")\n"
-                + "    private int childCount;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"name\")",
+                        "    private String childName;",
+                        "    @CopyFromParent(field = \"count\")",
+                        "    private int childCount;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
@@ -209,26 +213,29 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testInheritedParentField_compiles() {
         JavaFileObject grandParent = JavaFileObjects.forSourceString("test.GrandParent",
-                "package test;\n"
-                + "public class GrandParent {\n"
-                + "    private String inheritedField;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class GrandParent {",
+                        "    private String inheritedField;",
+                        "}"));
 
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
-                "package test;\n"
-                + "public class Parent extends GrandParent {\n"
-                + "    private String ownField;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Parent extends GrandParent {",
+                        "    private String ownField;",
+                        "}"));
 
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
-                "package test;\n"
-                + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
-                + "import io.appform.dropwizard.sharding.sharding.ParentEntity;\n"
-                + "@ParentEntity(Parent.class)\n"
-                + "public class Child {\n"
-                + "    @CopyFromParent(field = \"inheritedField\")\n"
-                + "    private String childField;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
+                        "@ParentEntity(Parent.class)",
+                        "public class Child {",
+                        "    @CopyFromParent(field = \"inheritedField\")",
+                        "    private String childField;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
@@ -240,10 +247,11 @@ public class CopyFromParentProcessorTest {
     @Test
     public void testNoAnnotations_compiles() {
         JavaFileObject plain = JavaFileObjects.forSourceString("test.Plain",
-                "package test;\n"
-                + "public class Plain {\n"
-                + "    private String name;\n"
-                + "}\n");
+                String.join("\n",
+                        "package test;",
+                        "public class Plain {",
+                        "    private String name;",
+                        "}"));
 
         Compilation compilation = Compiler.javac()
                 .withProcessors(new CopyFromParentProcessor())
