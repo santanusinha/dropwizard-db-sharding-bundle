@@ -73,7 +73,9 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
         if (dbConfig instanceof DataSourceFactory) {
             ((DataSourceFactory) dbConfig).setAutoCommitByDefault(false);
         } else {
-            dbConfig.getProperties().put("defaultAutoCommit", "false");
+            throw new IllegalArgumentException(
+                    "Unsupported type: " + dbConfig.getClass().getName()
+                    + ". Only DataSourceFactory is supported for disabling autoCommit.");
         }
     }
 
