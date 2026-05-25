@@ -42,69 +42,70 @@ public class CopyFromParentProcessor extends AbstractProcessor {
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
         for (Element element : roundEnv.getElementsAnnotatedWith(CopyFromParent.class)) {
-            if (!(element instanceof VariableElement)) {
-                continue;
-            }
-            VariableElement childField = (VariableElement) element;
-
-            TypeElement childClass = (TypeElement) childField.getEnclosingElement();
-            ParentEntity parentAnn = childClass.getAnnotation(ParentEntity.class);
-
-            // 1. @CopyFromParent without @ParentEntity
-            if (parentAnn == null) {
-                error(childField,
-                        "@CopyFromParent on %s.%s requires @ParentEntity on the enclosing class %s",
-                        childClass.getSimpleName(), childField.getSimpleName(),
-                        childClass.getQualifiedName());
-                continue;
-            }
-
-            // Resolve parent class TypeElement
-            TypeElement parentClass = resolveParentClass(parentAnn);
-            if (parentClass == null) {
-                error(childField,
-                        "Could not resolve parent class declared in @ParentEntity on %s",
-                        childClass.getQualifiedName());
-                continue;
-            }
-
-            // 2. Check parent field exists
-            CopyFromParent copyAnn = childField.getAnnotation(CopyFromParent.class);
-            String parentFieldName = copyAnn.field();
-            VariableElement parentField = findField(parentClass, parentFieldName);
-
-            if (parentField == null) {
-                error(childField,
-                        "@CopyFromParent(field=\"%s\") on %s.%s: field '%s' not found on parent %s",
-                        parentFieldName, childClass.getSimpleName(),
-                        childField.getSimpleName(), parentFieldName,
-                        parentClass.getQualifiedName());
-                continue;
-            }
-
-            // 3. Type mismatch check
-            TypeMirror parentFieldType = parentField.asType();
-            TypeMirror childFieldType = childField.asType();
-            if (!processingEnv.getTypeUtils().isAssignable(parentFieldType, childFieldType)) {
-                error(childField,
-                        "@CopyFromParent type mismatch on %s.%s: parent field '%s' is %s, "
-                                + "child field is %s",
-                        childClass.getSimpleName(), childField.getSimpleName(),
-                        parentFieldName, parentFieldType, childFieldType);
-            }
-
-            // 4. @Transient check on parent field
-            if (hasTransientAnnotation(parentField)) {
-                error(childField,
-                        "@CopyFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is "
-                                + "marked @Transient and will not be persisted",
-                        parentFieldName, childClass.getSimpleName(),
-                        childField.getSimpleName(), parentFieldName,
-                        parentClass.getSimpleName());
+            if (element instanceof VariableElement) {
+                validateField((VariableElement) element);
             }
         }
         // Don't claim the annotations — let other processors see them too
         return false;
+    }
+
+    private void validateField(VariableElement childField) {
+        TypeElement childClass = (TypeElement) childField.getEnclosingElement();
+        ParentEntity parentAnn = childClass.getAnnotation(ParentEntity.class);
+
+        // 1. @CopyFromParent without @ParentEntity
+        if (parentAnn == null) {
+            error(childField,
+                    "@CopyFromParent on %s.%s requires @ParentEntity on the enclosing class %s",
+                    childClass.getSimpleName(), childField.getSimpleName(),
+                    childClass.getQualifiedName());
+            return;
+        }
+
+        // Resolve parent class TypeElement
+        TypeElement parentClass = resolveParentClass(parentAnn);
+        if (parentClass == null) {
+            error(childField,
+                    "Could not resolve parent class declared in @ParentEntity on %s",
+                    childClass.getQualifiedName());
+            return;
+        }
+
+        // 2. Check parent field exists
+        CopyFromParent copyAnn = childField.getAnnotation(CopyFromParent.class);
+        String parentFieldName = copyAnn.field();
+        VariableElement parentField = findField(parentClass, parentFieldName);
+
+        if (parentField == null) {
+            error(childField,
+                    "@CopyFromParent(field=\"%s\") on %s.%s: field '%s' not found on parent %s",
+                    parentFieldName, childClass.getSimpleName(),
+                    childField.getSimpleName(), parentFieldName,
+                    parentClass.getQualifiedName());
+            return;
+        }
+
+        // 3. Type mismatch check
+        TypeMirror parentFieldType = parentField.asType();
+        TypeMirror childFieldType = childField.asType();
+        if (!processingEnv.getTypeUtils().isAssignable(parentFieldType, childFieldType)) {
+            error(childField,
+                    "@CopyFromParent type mismatch on %s.%s: parent field '%s' is %s, "
+                            + "child field is %s",
+                    childClass.getSimpleName(), childField.getSimpleName(),
+                    parentFieldName, parentFieldType, childFieldType);
+        }
+
+        // 4. @Transient check on parent field
+        if (hasTransientAnnotation(parentField)) {
+            error(childField,
+                    "@CopyFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is "
+                            + "marked @Transient and will not be persisted",
+                    parentFieldName, childClass.getSimpleName(),
+                    childField.getSimpleName(), parentFieldName,
+                    parentClass.getSimpleName());
+        }
     }
 
     /**
