@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.12-7]
+- Added logs to print the original exception during DB exception handling.
+
+  **Reason**: For DB-related exceptions, rollback is attempted in the `catch` block and then the exception is rethrown.
+  - If rollback also fails (for example, due to a database connectivity issue), the rollback exception can override the original exception.
+  - Logging the original exception preserves the root cause and improves debugging.
+
 ## [2.1.10-10]
 - Added changes for new central deployment.
 - Exposed interface for entity registration in `DbShardingBundle`. ([#130](https://github.com/santanusinha/dropwizard-db-sharding-bundle/pull/130))

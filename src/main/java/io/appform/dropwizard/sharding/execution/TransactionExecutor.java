@@ -21,12 +21,14 @@ import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.hibernate.SessionFactory;
 
 /**
  * Utility functional class for running transactions.
  */
+@Slf4j
 public class TransactionExecutor {
 
     private final DaoType daoType;
@@ -77,6 +79,7 @@ public class TransactionExecutor {
                 }
                 return result;
             } catch (Exception e) {
+                log.error("Error executing transaction", e);
                 if (completeTransaction) {
                     transactionHandler.onError();
                 }
