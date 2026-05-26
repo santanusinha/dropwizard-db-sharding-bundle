@@ -82,6 +82,65 @@ public class CopyFromParentUtilsTest {
         private String copied;
     }
 
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @ParentEntity(TestParent.class)
+    static class NoOverrideChild {
+        @CopyFromParent(field = "transactionId", override = false)
+        private String txnId;
+
+        @CopyFromParent(field = "amount", override = false)
+        private long childAmount;
+
+        @CopyFromParent(field = "customerId", override = false)
+        private String customerId;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @ParentEntity(TestParent.class)
+    static class MixedOverrideChild {
+        @CopyFromParent(field = "transactionId", override = true)
+        private String txnId;
+
+        @CopyFromParent(field = "amount", override = false)
+        private long childAmount;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    static class PrimitiveParent {
+        private int intVal;
+        private boolean boolVal;
+        private char charVal;
+        private double doubleVal;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @ParentEntity(PrimitiveParent.class)
+    static class NoOverridePrimitiveChild {
+        @CopyFromParent(field = "intVal", override = false)
+        private int intVal;
+
+        @CopyFromParent(field = "boolVal", override = false)
+        private boolean boolVal;
+
+        @CopyFromParent(field = "charVal", override = false)
+        private char charVal;
+
+        @CopyFromParent(field = "doubleVal", override = false)
+        private double doubleVal;
+    }
+
     // Tests
 
     @Test
@@ -199,5 +258,135 @@ public class CopyFromParentUtilsTest {
 
         assertNull(child.getTxnId());
         assertEquals(0, child.getChildAmount());
+    }
+
+    @Test
+    public void testNoOverride_skipsWhenChildFieldAlreadySet() {
+        TestParent parent = TestParent.builder()
+                .transactionId("PARENT-TXN")
+                .amount(500)
+                .customerId("PARENT-CUST")
+                .build();
+        NoOverrideChild child = NoOverrideChild.builder()
+                .txnId("CHILD-TXN")
+                .childAmount(100)
+                .customerId("CHILD-CUST")
+                .build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("CHILD-TXN", child.getTxnId(), "should not override existing String");
+        assertEquals(100, child.getChildAmount(), "should not override existing primitive");
+        assertEquals("CHILD-CUST", child.getCustomerId(), "should not override existing String");
+    }
+
+    @Test
+    public void testNoOverride_copiesWhenChildFieldIsDefault() {
+        TestParent parent = TestParent.builder()
+                .transactionId("PARENT-TXN")
+                .amount(500)
+                .customerId("PARENT-CUST")
+                .build();
+        NoOverrideChild child = new NoOverrideChild(); // all defaults: null, 0, null
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("PARENT-TXN", child.getTxnId(), "should copy when child field is null/default");
+        assertEquals(500, child.getChildAmount(), "should copy when child field is null/default");
+        assertEquals("PARENT-CUST", child.getCustomerId(), "should copy when child field is null/default");
+    }
+
+    @Test
+    public void testNoOverride_partiallySet() {
+        TestParent parent = TestParent.builder()
+                .transactionId("PARENT-TXN")
+                .amount(500)
+                .customerId("PARENT-CUST")
+                .build();
+        NoOverrideChild child = NoOverrideChild.builder()
+                .txnId("EXISTING")
+                .build(); // childAmount = 0, customerId = null
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("EXISTING", child.getTxnId(), "should not override existing value");
+        assertEquals(500, child.getChildAmount(), "should copy when child field is null/default");
+        assertEquals("PARENT-CUST", child.getCustomerId(), "should copy when child field is null/default");
+    }
+
+    @Test
+    public void testMixedOverride_respectsPerFieldSetting() {
+        TestParent parent = TestParent.builder()
+                .transactionId("PARENT-TXN")
+                .amount(500)
+                .build();
+        MixedOverrideChild child = MixedOverrideChild.builder()
+                .txnId("EXISTING-TXN")
+                .childAmount(100)
+                .build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("PARENT-TXN", child.getTxnId(), "override=true should always copy");
+        assertEquals(100, child.getChildAmount(), "override=false should not override existing value");
+    }
+
+    @Test
+    public void testNoOverride_allPrimitiveTypes_defaultsAreCopied() {
+        PrimitiveParent parent = PrimitiveParent.builder()
+                .intVal(42)
+                .boolVal(true)
+                .charVal('X')
+                .doubleVal(3.14)
+                .build();
+        NoOverridePrimitiveChild child = new NoOverridePrimitiveChild(); // all primitive defaults
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals(42, child.getIntVal());
+        assertEquals(true, child.isBoolVal());
+        assertEquals('X', child.getCharVal());
+        assertEquals(3.14, child.getDoubleVal());
+    }
+
+    @Test
+    public void testNoOverride_allPrimitiveTypes_nonDefaultsPreserved() {
+        PrimitiveParent parent = PrimitiveParent.builder()
+                .intVal(42)
+                .boolVal(true)
+                .charVal('X')
+                .doubleVal(3.14)
+                .build();
+        NoOverridePrimitiveChild child = NoOverridePrimitiveChild.builder()
+                .intVal(7)
+                .boolVal(true)
+                .charVal('A')
+                .doubleVal(1.0)
+                .build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals(7, child.getIntVal(), "non-default int should be preserved");
+        assertEquals(true, child.isBoolVal(), "non-default boolean should be preserved");
+        assertEquals('A', child.getCharVal(), "non-default char should be preserved");
+        assertEquals(1.0, child.getDoubleVal(), "non-default double should be preserved");
+    }
+
+    @Test
+    public void testOverrideTrue_isDefaultBehavior() {
+        // TestChild uses override=true (default), so existing values should be overwritten
+        TestParent parent = TestParent.builder()
+                .transactionId("NEW")
+                .amount(999)
+                .build();
+        TestChild child = TestChild.builder()
+                .txnId("OLD")
+                .childAmount(1)
+                .build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("NEW", child.getTxnId(), "override=true (default) should overwrite");
+        assertEquals(999, child.getChildAmount(), "override=true (default) should overwrite");
     }
 }

@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -100,10 +101,12 @@ public final class CopyFromParentUtils {
 
                 MethodHandle parentGetter = parentLookup.unreflectGetter(parentField);
                 MethodHandle childSetter = childLookup.unreflectSetter(childField);
+                MethodHandle childGetter = childLookup.unreflectGetter(childField);
 
                 result.add(new FieldHandleMapping(
-                        parentGetter, childSetter,
-                        parentFieldName, childField.getName()));
+                        parentGetter, childSetter, childGetter,
+                        parentFieldName, childField.getName(),
+                        copyAnn.override(), childField.getType()));
             } catch (IllegalAccessException e) {
                 throw new IllegalStateException(
                         String.format("Cannot create MethodHandle for field mapping %s.%s -> %s.%s",
@@ -129,6 +132,9 @@ public final class CopyFromParentUtils {
     private static <T, U> void applyMappings(T parent, U child, List<FieldHandleMapping> mappings) {
         for (FieldHandleMapping m : mappings) {
             try {
+                if (!m.override && !isDefaultValue(m.childGetter.invoke(child), m.childFieldType)) {
+                    continue;
+                }
                 Object value = m.parentGetter.invoke(parent);
                 m.childSetter.invoke(child, value);
             } catch (Throwable e) {
@@ -138,6 +144,32 @@ public final class CopyFromParentUtils {
                                 child.getClass().getSimpleName()), e);
             }
         }
+    }
+
+    private static final Map<Class<?>, Object> PRIMITIVE_DEFAULTS = Map.of(
+            boolean.class, false,
+            char.class, '\0',
+            byte.class, (byte) 0,
+            short.class, (short) 0,
+            int.class, 0,
+            long.class, 0L,
+            float.class, 0.0f,
+            double.class, 0.0d
+    );
+
+    /**
+     * Checks whether a value is the default for its type.
+     * For reference types: {@code null}.
+     * For primitives: exact comparison against the boxed default ({@code 0}, {@code false}, {@code '\0'}, etc.).
+     */
+    private static boolean isDefaultValue(Object value, Class<?> fieldType) {
+        if (value == null) {
+            return !fieldType.isPrimitive();
+        }
+        if (!fieldType.isPrimitive()) {
+            return false;
+        }
+        return Objects.equals(value, PRIMITIVE_DEFAULTS.get(fieldType));
     }
 
     private static List<Field> getAllFields(Class<?> cls) {
@@ -166,7 +198,10 @@ public final class CopyFromParentUtils {
     private static class FieldHandleMapping {
         final MethodHandle parentGetter;
         final MethodHandle childSetter;
+        final MethodHandle childGetter;
         final String parentFieldName;
         final String childFieldName;
+        final boolean override;
+        final Class<?> childFieldType;
     }
 }
