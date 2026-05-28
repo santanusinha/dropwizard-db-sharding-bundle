@@ -389,4 +389,133 @@ public class CopyFromParentUtilsTest {
         assertEquals("NEW", child.getTxnId(), "override=true (default) should overwrite");
         assertEquals(999, child.getChildAmount(), "override=true (default) should overwrite");
     }
+
+    // Inherited @ParentEntity tests
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @ParentEntity(TestParent.class)
+    static class AnnotatedBase {
+        @CopyFromParent(field = "transactionId")
+        private String txnId;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    static class InheritedChild extends AnnotatedBase {
+        private String ownField;
+
+        @Builder
+        public InheritedChild(String txnId, String ownField) {
+            super(txnId);
+            this.ownField = ownField;
+        }
+    }
+
+    @Test
+    public void testCopyFields_inheritsParentEntityFromSuperclass() {
+        TestParent parent = TestParent.builder().transactionId("INHERITED-TXN").build();
+        InheritedChild child = InheritedChild.builder().ownField("mine").build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("INHERITED-TXN", child.getTxnId());
+        assertEquals("mine", child.getOwnField());
+    }
+
+    @Test
+    public void testCopyFields_inheritedChild_overwritesExistingValue() {
+        TestParent parent = TestParent.builder().transactionId("NEW").build();
+        InheritedChild child = InheritedChild.builder().txnId("OLD").ownField("mine").build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals("NEW", child.getTxnId());
+    }
+
+    // Tests for private fields declared in superclasses
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    static class SuperclassParentBase {
+        private long partitionId;
+        private String baseField;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    static class ConcreteParent extends SuperclassParentBase {
+        private String concreteField;
+
+        @Builder
+        public ConcreteParent(long partitionId, String baseField, String concreteField) {
+            super(partitionId, baseField);
+            this.concreteField = concreteField;
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @ParentEntity(ConcreteParent.class)
+    static class ChildBase {
+        @CopyFromParent(field = "partitionId")
+        private long partitionId;
+
+        @CopyFromParent(field = "baseField")
+        private String baseField;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    static class ConcreteChild extends ChildBase {
+        private String childOwnField;
+
+        @Builder
+        public ConcreteChild(long partitionId, String baseField, String childOwnField) {
+            super(partitionId, baseField);
+            this.childOwnField = childOwnField;
+        }
+    }
+
+    @Test
+    public void testCopyFields_privateFieldInParentSuperclass() {
+        ConcreteParent parent = ConcreteParent.builder()
+                .partitionId(42L).baseField("base").concreteField("concrete").build();
+        ConcreteChild child = ConcreteChild.builder().childOwnField("mine").build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals(42L, child.getPartitionId());
+        assertEquals("base", child.getBaseField());
+        assertEquals("mine", child.getChildOwnField());
+    }
+
+    @Test
+    public void testCopyFields_privateFieldInChildSuperclass() {
+        ConcreteParent parent = ConcreteParent.builder()
+                .partitionId(99L).baseField("fromParent").build();
+        ConcreteChild child = ConcreteChild.builder()
+                .partitionId(1L).baseField("existing").childOwnField("mine").build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals(99L, child.getPartitionId());
+        assertEquals("fromParent", child.getBaseField());
+    }
+
+    @Test
+    public void testCopyFields_bothFieldsInSuperclasses() {
+        ConcreteParent parent = ConcreteParent.builder().partitionId(777L).build();
+        ConcreteChild child = ConcreteChild.builder().build();
+
+        CopyFromParentUtils.copyFields(parent, child);
+
+        assertEquals(777L, child.getPartitionId());
+    }
 }

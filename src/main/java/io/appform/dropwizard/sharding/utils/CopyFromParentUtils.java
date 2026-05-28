@@ -67,7 +67,7 @@ public final class CopyFromParentUtils {
     }
 
     private static List<FieldHandleMapping> buildMappings(Class<?> childClass) {
-        ParentEntity parentAnn = childClass.getAnnotation(ParentEntity.class);
+        ParentEntity parentAnn = findParentEntityAnnotation(childClass);
         if (parentAnn == null) {
             return NO_MAPPINGS;
         }
@@ -95,9 +95,9 @@ public final class CopyFromParentUtils {
 
             try {
                 MethodHandles.Lookup parentLookup = MethodHandles.privateLookupIn(
-                        parentClass, MethodHandles.lookup());
+                        parentField.getDeclaringClass(), MethodHandles.lookup());
                 MethodHandles.Lookup childLookup = MethodHandles.privateLookupIn(
-                        childClass, MethodHandles.lookup());
+                        childField.getDeclaringClass(), MethodHandles.lookup());
 
                 MethodHandle parentGetter = parentLookup.unreflectGetter(parentField);
                 MethodHandle childSetter = childLookup.unreflectSetter(childField);
@@ -119,7 +119,7 @@ public final class CopyFromParentUtils {
     }
 
     private static <T, U> void validateParentType(T parent, U child) {
-        ParentEntity parentAnn = child.getClass().getAnnotation(ParentEntity.class);
+        ParentEntity parentAnn = findParentEntityAnnotation(child.getClass());
         if (!parentAnn.value().isAssignableFrom(parent.getClass())) {
             throw new IllegalArgumentException(
                     String.format("Parent type mismatch for %s: expected %s, got %s",
@@ -190,6 +190,18 @@ public final class CopyFromParentUtils {
             } catch (NoSuchFieldException e) {
                 current = current.getSuperclass();
             }
+        }
+        return null;
+    }
+
+    private static ParentEntity findParentEntityAnnotation(Class<?> cls) {
+        Class<?> current = cls;
+        while (current != null && current != Object.class) {
+            ParentEntity ann = current.getAnnotation(ParentEntity.class);
+            if (ann != null) {
+                return ann;
+            }
+            current = current.getSuperclass();
         }
         return null;
     }
