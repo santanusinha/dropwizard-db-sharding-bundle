@@ -4,27 +4,32 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.function.Function;
 
 /**
- * Run a query with given criteria inside this shard and returns resulting list.
+ * Run a query inside this shard and return resulting list.
+ * <p>
+ * This operation is generic over the criteria type, supporting both legacy Hibernate API
+ * (DetachedCriteria) and modern JPA Criteria API (QuerySpec), as well as any future
+ * criteria types.
  *
  * @param <T> Return type on performing the operation.
+ * @param <C> Type of criteria used to query (DetachedCriteria, QuerySpec, etc.).
  */
 @Data
 @Builder
-public class RunWithCriteria<T> extends OpContext<T> {
+public class RunWithCriteria<T, C> extends OpContext<T> {
 
   @NonNull
-  private Function<DetachedCriteria, T> handler;
+  private C criteria;
+
   @NonNull
-  private DetachedCriteria detachedCriteria;
+  private Function<C, T> handler;
 
   @Override
   public T apply(Session session) {
-    return handler.apply(detachedCriteria);
+    return handler.apply(criteria);
   }
 
   @Override

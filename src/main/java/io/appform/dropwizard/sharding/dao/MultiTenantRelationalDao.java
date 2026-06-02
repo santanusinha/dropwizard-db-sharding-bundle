@@ -162,6 +162,11 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return uniqueResult(criteria.getExecutableCriteria(currentSession()));
         }
 
+        T get(final QuerySpec<T, T> querySpec) {
+            val q = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
+            return uniqueResult(q.setLockMode(LockModeType.NONE));
+        }
+
         T getLocked(Object lookupKey, UnaryOperator<Criteria> criteriaUpdater, LockMode lockMode) {
             Criteria criteria = criteriaUpdater.apply(currentSession()
                     .createCriteria(entityClass)
@@ -233,6 +238,17 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         List run(DetachedCriteria criteria) {
             return criteria.getExecutableCriteria(currentSession())
                     .list();
+        }
+
+        /**
+         * Run a query inside this shard using QuerySpec and return the matching list.
+         *
+         * @param querySpec QuerySpec defining the query criteria.
+         * @return List of elements or empty list if none found
+         */
+        List<T> run(QuerySpec<T, T> querySpec) {
+            val query = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
+            return list(query);
         }
 
         long count(final DetachedCriteria criteria) {
@@ -424,8 +440,33 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, parentKey);
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-        val opContext = CreateOrUpdate.<T>builder()
+        val opContext = CreateOrUpdate.<T, DetachedCriteria>builder()
                 .criteria(selectionCriteria)
+                .getLockedForWrite(dao::getLockedForWrite)
+                .entityGenerator(entityGenerator)
+                .saver(dao::save)
+                .mutator(updater)
+                .updater(dao::update)
+                .getter(dao::get)
+                .build();
+        return Optional.of(transactionExecutor.get(tenantId).execute(
+                dao.sessionFactory,
+                false,
+                "createOrUpdate",
+                opContext,
+                shardId));
+    }
+
+    public Optional<T> createOrUpdate(String tenantId,
+                                  final String parentKey,
+                                  final QuerySpec<T, T> querySpec,
+                                  final UnaryOperator<T> updater,
+                                  final Supplier<T> entityGenerator) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        int shardId = shardCalculator.shardId(tenantId, parentKey);
+        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
+        val opContext = CreateOrUpdate.<T, QuerySpec<T, T>>builder()
+                .criteria(querySpec)
                 .getLockedForWrite(dao::getLockedForWrite)
                 .entityGenerator(entityGenerator)
                 .saver(dao::save)
@@ -814,8 +855,49 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
                     final RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
-                    OpContext<List> opContext = RunWithCriteria.<List>builder()
-                            .detachedCriteria(criteria).handler(dao::run).build();
+                    OpContext<List> opContext = RunWithCriteria.<List, DetachedCriteria>builder()
+                            .criteria(criteria).handler(dao::run).build();
+                    return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                            true,
+                            "run",
+                            opContext,
+                            shardId);
+                }));
+        return translator.apply(output);
+    }
+
+    /**
+     * Run arbitrary read-only queries on all shards using QuerySpec and return results.
+     *
+     * @param tenantId  The tenant ID associated with the entity.
+     * @param querySpec The QuerySpec defining query criteria. Typically, a grouping or counting query
+     * @return A map of shard vs result-list
+     */
+    public Map<Integer, List<T>> run(String tenantId, QuerySpec<T, T> querySpec) {
+        return run(tenantId, querySpec, Function.identity());
+    }
+
+
+    /**
+     * Run read-only queries on all shards using QuerySpec and transform them into required types
+     *
+     * @param tenantId   The tenant ID associated with the entity.
+     * @param querySpec  The QuerySpec defining query criteria. Typically, a grouping or counting query
+     * @param translator A method to transform results to required type
+     * @param <U>        Return type
+     * @return Translated result
+     */
+    public <U> U run(String tenantId, QuerySpec<T, T> querySpec,
+                     Function<Map<Integer, List<T>>, U> translator) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        val output = IntStream.range(0, daos.get(tenantId).size())
+                .boxed()
+                .collect(Collectors.toMap(Function.identity(), shardId -> {
+                    final RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
+                    OpContext<List<T>> opContext = RunWithCriteria.<List<T>, QuerySpec<T, T>>builder()
+                            .criteria(querySpec)
+                            .handler(dao::run)
+                            .build();
                     return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
                             true,
                             "run",
