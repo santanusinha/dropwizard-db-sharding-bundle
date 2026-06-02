@@ -75,7 +75,9 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T, R> P visit(Select<T, R> opContext);
 
-    <T, R, U> P visit(CopyFromParentAndSave<T, R, U> opContext);
+    default <T, R, U> P visit(CopyFromParentAndSave<T, R, U> opContext) {
+      throw new UnsupportedOperationException("CopyFromParentAndSave OpContext not supported");
+    }
 
   }
 

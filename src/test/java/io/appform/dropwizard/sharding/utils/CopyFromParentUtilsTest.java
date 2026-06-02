@@ -281,7 +281,7 @@ public class CopyFromParentUtilsTest {
     }
 
     @Test
-    public void testNoOverride_copiesWhenChildFieldIsDefault() {
+    public void testNoOverride_doesNotCopyEvenWhenChildFieldIsDefault() {
         TestParent parent = TestParent.builder()
                 .transactionId("PARENT-TXN")
                 .amount(500)
@@ -291,9 +291,9 @@ public class CopyFromParentUtilsTest {
 
         CopyFromParentUtils.copyFields(parent, child);
 
-        assertEquals("PARENT-TXN", child.getTxnId(), "should copy when child field is null/default");
-        assertEquals(500, child.getChildAmount(), "should copy when child field is null/default");
-        assertEquals("PARENT-CUST", child.getCustomerId(), "should copy when child field is null/default");
+        assertNull(child.getTxnId(), "override=false should never copy");
+        assertEquals(0, child.getChildAmount(), "override=false should never copy");
+        assertNull(child.getCustomerId(), "override=false should never copy");
     }
 
     @Test
@@ -309,9 +309,9 @@ public class CopyFromParentUtilsTest {
 
         CopyFromParentUtils.copyFields(parent, child);
 
-        assertEquals("EXISTING", child.getTxnId(), "should not override existing value");
-        assertEquals(500, child.getChildAmount(), "should copy when child field is null/default");
-        assertEquals("PARENT-CUST", child.getCustomerId(), "should copy when child field is null/default");
+        assertEquals("EXISTING", child.getTxnId(), "override=false should never copy");
+        assertEquals(0, child.getChildAmount(), "override=false should never copy");
+        assertNull(child.getCustomerId(), "override=false should never copy");
     }
 
     @Test
@@ -332,7 +332,7 @@ public class CopyFromParentUtilsTest {
     }
 
     @Test
-    public void testNoOverride_allPrimitiveTypes_defaultsAreCopied() {
+    public void testNoOverride_allPrimitiveTypes_defaultsAreNotCopied() {
         PrimitiveParent parent = PrimitiveParent.builder()
                 .intVal(42)
                 .boolVal(true)
@@ -343,10 +343,10 @@ public class CopyFromParentUtilsTest {
 
         CopyFromParentUtils.copyFields(parent, child);
 
-        assertEquals(42, child.getIntVal());
-        assertEquals(true, child.isBoolVal());
-        assertEquals('X', child.getCharVal());
-        assertEquals(3.14, child.getDoubleVal());
+        assertEquals(0, child.getIntVal(), "override=false should never copy");
+        assertEquals(false, child.isBoolVal(), "override=false should never copy");
+        assertEquals('\0', child.getCharVal(), "override=false should never copy");
+        assertEquals(0.0, child.getDoubleVal(), "override=false should never copy");
     }
 
     @Test
