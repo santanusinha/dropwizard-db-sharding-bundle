@@ -151,7 +151,7 @@ Add the bundle dependency:
 <dependency>
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version> 2.1.12-HIBERNATE6-RC4</version>
+    <version>2.1.12-HIBERNATE6-RC4</version>
 </dependency>
 ```
 
@@ -167,7 +167,7 @@ declaration order and the first entry for any given artifact wins:
         <dependency>
             <groupId>io.appform.dropwizard.sharding</groupId>
             <artifactId>db-sharding-bundle-dependencies</artifactId>
-            <version> 2.1.12-HIBERNATE6-RC4</version>
+            <version>2.1.12-HIBERNATE6-RC4</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
