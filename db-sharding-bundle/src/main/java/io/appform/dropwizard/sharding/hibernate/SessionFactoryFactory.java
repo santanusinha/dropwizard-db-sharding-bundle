@@ -1,6 +1,7 @@
 package io.appform.dropwizard.sharding.hibernate;
 
 import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
+import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.db.DatabaseConfiguration;
 import io.dropwizard.db.ManagedDataSource;
 import io.dropwizard.db.PooledDataSourceFactory;
@@ -49,7 +50,7 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
 
     public SessionFactorySource build(T configuration, Environment environment) throws Exception {
         final PooledDataSourceFactory dbConfig = getDataSourceFactory(configuration);
-        dbConfig.getProperties().put("defaultAutoCommit", "false");
+        disableAutoCommit(dbConfig);
         final ManagedDataSource dataSource = dbConfig.build(environment.metrics(), name());
         final ConnectionProvider provider = buildConnectionProvider(dataSource, dbConfig.getProperties());
         this.sessionFactory = buildSessionFactory(
@@ -67,6 +68,16 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
                 .dataSource(dataSource)
                 .factory(sessionFactory)
                 .build();
+    }
+
+    private void disableAutoCommit(final PooledDataSourceFactory dbConfig) {
+        if (dbConfig instanceof DataSourceFactory) {
+            ((DataSourceFactory) dbConfig).setAutoCommitByDefault(false);
+        } else {
+            throw new IllegalArgumentException(
+                    "Unsupported type: " + dbConfig.getClass().getName()
+                    + ". Only DataSourceFactory is supported for disabling autoCommit.");
+        }
     }
 
     private ConnectionProvider buildConnectionProvider(final DataSource dataSource,
@@ -94,7 +105,7 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
         for (Map.Entry<String, String> property : properties.entrySet()) {
             configuration.setProperty(property.getKey(), property.getValue());
         }
-        // Must be set after user properties to prevent override — pair with defaultAutoCommit=false on the pool
+        // Must be set after user properties to prevent override — paired with disableAutoCommit() on the pool
         configuration.setProperty(AvailableSettings.CONNECTION_PROVIDER_DISABLES_AUTOCOMMIT, "true");
         addAnnotatedClasses(configuration, entities);
         final ServiceRegistry registry = new StandardServiceRegistryBuilder(bootstrapServiceRegistry)
