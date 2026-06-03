@@ -30,6 +30,7 @@ import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
 import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
+import io.appform.dropwizard.sharding.dao.operations.CopyFromParentAndSave;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveAll;
 import io.appform.dropwizard.sharding.dao.operations.ScrollParam;
@@ -449,10 +450,28 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 context.getShardId(), false);
     }
 
+    public <U> void save(LockedContext<U> context, T entity, U parent) {
+        val tenantId = context.getTenantId();
+        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        val opContext = CopyFromParentAndSave.<T, T, U>builder()
+                .entity(entity).saver(dao::save).parent(parent).build();
+        transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
+                context.getShardId(), false);
+    }
+
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         val tenantId = context.getTenantId();
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).afterSave(handler).build();
+        transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
+                context.getShardId(), false);
+    }
+
+    <U> void save(LockedContext<U> context, T entity, Function<T, T> handler, U parent) {
+        val tenantId = context.getTenantId();
+        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        val opContext = CopyFromParentAndSave.<T, T, U>builder()
+                .entity(entity).saver(dao::save).afterSave(handler).parent(parent).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
                 context.getShardId(), false);
     }
