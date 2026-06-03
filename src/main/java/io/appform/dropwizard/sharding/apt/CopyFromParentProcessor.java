@@ -8,15 +8,18 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.tools.Diagnostic;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -64,7 +67,7 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         }
 
         // Resolve parent class TypeElement
-        TypeElement parentClass = resolveParentClass(parentAnn);
+        TypeElement parentClass = resolveParentClass(childClass);
         if (parentClass == null) {
             error(childField,
                     "Could not resolve parent class declared in @ParentEntity on %s",
@@ -109,22 +112,27 @@ public class CopyFromParentProcessor extends AbstractProcessor {
     }
 
     /**
-     * Resolves the {@link TypeElement} for the class declared in {@code @ParentEntity(value)}.
-     * Uses the {@link MirroredTypeException} trick because annotation class values are not
-     * directly available at compile time.
+     * Resolves the {@link TypeElement} for the class declared in {@code @ParentEntity(value)}
+     * using the {@link javax.lang.model.element.AnnotationMirror} API, which provides
+     * compile-time-safe access to annotation values.
      */
-    private TypeElement resolveParentClass(ParentEntity parentAnn) {
-        try {
-            // This will throw MirroredTypeException — that's expected
-            parentAnn.value();
-            return null; // unreachable
-        } catch (MirroredTypeException mte) {
-            TypeMirror typeMirror = mte.getTypeMirror();
-            if (typeMirror instanceof DeclaredType) {
-                return (TypeElement) ((DeclaredType) typeMirror).asElement();
+    private TypeElement resolveParentClass(Element element) {
+        for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+            if (!mirror.getAnnotationType().toString()
+                    .equals(ParentEntity.class.getName())) {
+                continue;
             }
-            return null;
+            for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
+                    : mirror.getElementValues().entrySet()) {
+                if (entry.getKey().getSimpleName().contentEquals("value")) {
+                    TypeMirror typeMirror = (TypeMirror) entry.getValue().getValue();
+                    if (typeMirror instanceof DeclaredType) {
+                        return (TypeElement) ((DeclaredType) typeMirror).asElement();
+                    }
+                }
+            }
         }
+        return null;
     }
 
     /**
