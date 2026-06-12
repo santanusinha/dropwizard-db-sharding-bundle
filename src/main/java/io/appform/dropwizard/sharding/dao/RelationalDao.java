@@ -142,6 +142,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return delegate.createOrUpdate(tenantId, parentKey, selectionCriteria, updater, entityGenerator);
     }
 
+    public Optional<T> createOrUpdate(
+            final String parentKey,
+            final QuerySpec<T, T> querySpec,
+            final UnaryOperator<T> updater,
+            final Supplier<T> entityGenerator) {
+        return delegate.createOrUpdate(tenantId, parentKey, querySpec, updater, entityGenerator);
+    }
+
     public <U> void save(LockedContext<U> context, T entity) {
         delegate.save(context, entity);
     }
