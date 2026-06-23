@@ -224,6 +224,24 @@ public class LookupDao<T> implements ShardedDao<T> {
         return delegate.lockAndGetExecutor(dbNamespace, id);
     }
 
+    /**
+     * Locks an entity by its lookup key using SELECT FOR UPDATE, applies a mutator, and
+     * persists the change — all within the existing transaction of the provided {@link LockedContext}.
+     *
+     * @param <U>     The entity type of the parent LockedContext.
+     * @param context The LockedContext whose transaction is joined.
+     * @param key     The lookup key identifying the entity to lock.
+     * @param mutator The mutator to apply to the locked entity.
+     * @return The mutated entity.
+     * @throws javax.persistence.EntityNotFoundException if no entity is found for the given key.
+     */
+    public <U> T lockAndMutate(
+            final LockedContext<U> context,
+            final String key,
+            final LockedContext.Mutator<T> mutator) {
+        return delegate.lockAndMutate(context, key, mutator);
+    }
+
     public ReadOnlyContext<T> readOnlyExecutor(String id) {
         return readOnlyExecutor(id, x -> x);
     }

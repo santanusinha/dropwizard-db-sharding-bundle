@@ -150,6 +150,26 @@ public class RelationalDao<T> implements ShardedDao<T> {
         delegate.save(context, entity, handler);
     }
 
+    /**
+     * Locks multiple rows matching individual criteria using SELECT FOR UPDATE NOWAIT,
+     * applies a mutator to each, and persists the changes — all within the existing
+     * transaction of the provided {@link LockedContext}.
+     *
+     * @param <U>          The entity type of the parent LockedContext.
+     * @param context      The LockedContext whose transaction is joined.
+     * @param criteriaList A list of {@link DetachedCriteria}, each expected to match exactly one row.
+     * @param mutator      A function applied to each locked entity; returns the mutated entity.
+     * @return The list of mutated entities in criteria order.
+     * @throws javax.persistence.EntityNotFoundException if any criteria matches no row
+     * @throws RuntimeException if the lock cannot be acquired (e.g. NOWAIT contention)
+     */
+    public <U> List<T> lockAndMutateEach(
+            final LockedContext<U> context,
+            final List<DetachedCriteria> criteriaList,
+            final UnaryOperator<T> mutator) {
+        return delegate.lockAndMutateEach(context, criteriaList, mutator);
+    }
+
 
     /**
      * Updates an entity within a locked context using a specific ID and an updater function.

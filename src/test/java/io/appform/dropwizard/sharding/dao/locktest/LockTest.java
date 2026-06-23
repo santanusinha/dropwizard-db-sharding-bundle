@@ -51,6 +51,11 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -1370,6 +1375,405 @@ public class LockTest {
         assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         assertEquals("Changed", lookupDao.get("0").get().getName());
         assertEquals("Changed", relationDao.get("0", 1L).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    void testLockAndMutateEachUpdatesMultipleRelationalEntities() {
+        // Arrange
+        SomeLookupObject parent = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent")
+                .build();
+        lookupDao.save(parent);
+
+        SomeOtherObject c1 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("OriginalOne")
+                .build()).get();
+        SomeOtherObject c2 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("OriginalTwo")
+                .build()).get();
+
+        List<DetachedCriteria> criteriaList = List.of(
+                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c1.getId())),
+                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c2.getId()))
+        );
+
+        // Act: one transaction locks parent, locks+mutates c1 and c2
+        lookupDao.lockAndGetExecutor("0")
+                .lockAndMutateEach(relationDao, criteriaList, child -> {
+                    child.setValue("UPDATED");
+                    return child;
+                })
+                .mutate(p -> p.setName("Changed"))
+                .execute();
+
+        // Assert parent name was changed
+        assertEquals("Changed", lookupDao.get("0").get().getName());
+        // Assert both relational children were mutated
+        assertEquals("UPDATED", relationDao.get("0", c1.getId()).get().getValue());
+        assertEquals("UPDATED", relationDao.get("0", c2.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLockAndMutateEachThrowsWhenEntityNotFound() {
+        SomeLookupObject parent = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent")
+                .build();
+        lookupDao.save(parent);
+
+        // Criteria that matches no row
+        List<DetachedCriteria> criteriaList = List.of(
+                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", Long.MAX_VALUE))
+        );
+
+        assertThrows(RuntimeException.class, () ->
+                lookupDao.lockAndGetExecutor("0")
+                        .lockAndMutateEach(relationDao, criteriaList, child -> child)
+                        .execute()
+        );
+
+        // TX rolled back: parent name unchanged
+        assertEquals("Parent", lookupDao.get("0").get().getName());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLockAndMutateUpdatesLookupEntityWithinRelationalContext() {
+        // Arrange: a lookup entity and a relational entity both on the shard for key "0"
+        SomeLookupObject parent = SomeLookupObject.builder()
+                .myId("0")
+                .name("InitialName")
+                .build();
+        lookupDao.save(parent);
+
+        SomeOtherObject relational = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("InitialValue")
+                .build()).get();
+
+        // Act: lock relational entity; within the same TX also lock+mutate the lookup entity
+        relationDao.lockAndGetExecutor("0",
+                        DetachedCriteria.forClass(SomeOtherObject.class)
+                                .add(Restrictions.eq("id", relational.getId())))
+                .lockAndMutate(lookupDao, "0", lookup -> lookup.setName("UpdatedName"))
+                .mutate(r -> r.setValue("UpdatedValue"))
+                .execute();
+
+        // Assert relational entity value was changed
+        assertEquals("UpdatedValue", relationDao.get("0", relational.getId()).get().getValue());
+        // Assert lookup entity name was changed in the same transaction
+        assertEquals("UpdatedName", lookupDao.get("0").get().getName());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLockAndMutateThrowsWhenLookupEntityNotFound() {
+        SomeLookupObject parent = SomeLookupObject.builder()
+                .myId("0")
+                .name("Parent")
+                .build();
+        lookupDao.save(parent);
+
+        SomeOtherObject relational = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("Hello")
+                .build()).get();
+
+        // "nonexistent-key" has no SomeLookupObject → lockAndMutate throws RuntimeException
+        assertThrows(RuntimeException.class, () ->
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", relational.getId())))
+                        .lockAndMutate(lookupDao, "nonexistent-key",
+                                lookup -> lookup.setName("Updated"))
+                        .mutate(r -> r.setValue("ShouldNotPersist"))
+                        .execute()
+        );
+
+        // TX rolled back: relational entity value unchanged
+        assertEquals("Hello", relationDao.get("0", relational.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLockAndMutateThrowsWhenLookupKeyMapsToDifferentShard() {
+        // Anchor the LockedContext on shard for key "0" (maps to shard 0).
+        SomeLookupObject parentShard0 = SomeLookupObject.builder()
+                .myId("0")
+                .name("Shard0Parent")
+                .build();
+        lookupDao.save(parentShard0);
+
+        SomeOtherObject relational = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("Hello")
+                .build()).get();
+
+        // A real lookup entity exists for key "1" — but "1" maps to shard 1, a DIFFERENT shard.
+        SomeLookupObject parentShard1 = SomeLookupObject.builder()
+                .myId("1")
+                .name("Shard1Parent")
+                .build();
+        lookupDao.save(parentShard1);
+
+        // Cross-shard lockAndMutate must be rejected with IllegalArgumentException,
+        // even though the entity exists (proves it's the shard guard, not "entity not found").
+        assertThrows(IllegalArgumentException.class, () ->
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", relational.getId())))
+                        .lockAndMutate(lookupDao, "1", lookup -> lookup.setName("ShouldNotPersist"))
+                        .mutate(r -> r.setValue("ShouldNotPersist"))
+                        .execute()
+        );
+
+        // TX rolled back: neither entity changed.
+        assertEquals("Hello", relationDao.get("0", relational.getId()).get().getValue());
+        assertEquals("Shard1Parent", lookupDao.get("1").get().getName());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLockAndMutateEachProtectsEachRowFromConcurrentAccess() {
+        lookupDao.save(SomeLookupObject.builder().myId("0").name("Parent").build());
+
+        SomeOtherObject c1 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC1").build()).get();
+        SomeOtherObject c2 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC2").build()).get();
+
+        List<DetachedCriteria> criteriaList = List.of(
+                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c1.getId())),
+                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c2.getId()))
+        );
+
+        CountDownLatch bothRowsLockedLatch = new CountDownLatch(1);
+        CountDownLatch releaseLatch = new CountDownLatch(1);
+        AtomicBoolean firstMutatorCalled = new AtomicBoolean(false);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // T1: locks c1, then c2 via lockAndMutateEach; signals only after c2 is locked
+        Future<?> txn1 = executor.submit(() -> {
+            try {
+                lookupDao.lockAndGetExecutor("0")
+                        .lockAndMutateEach(relationDao, criteriaList, child -> {
+                            if (firstMutatorCalled.getAndSet(true)) {
+                                // Second call: c2 is now locked — signal and hold
+                                bothRowsLockedLatch.countDown();
+                                try {
+                                    releaseLatch.await(5, TimeUnit.SECONDS);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                            child.setValue("T1_UPDATED");
+                            return child;
+                        })
+                        .execute();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        // Wait until T1 holds locks on both c1 and c2
+        assertTrue(bothRowsLockedLatch.await(5, TimeUnit.SECONDS), "T1 should lock both rows within 5s");
+
+        // T2: independently lock c2 directly (bypasses parent — tests row-level lock specifically)
+        assertThrows(RuntimeException.class, () ->
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", c2.getId())))
+                        .execute()
+        );
+
+        releaseLatch.countDown();
+        txn1.get(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertEquals("T1_UPDATED", relationDao.get("0", c1.getId()).get().getValue());
+        assertEquals("T1_UPDATED", relationDao.get("0", c2.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testLockAndMutateEachFailsWhenRowAlreadyLockedByAnotherTransaction() {
+        lookupDao.save(SomeLookupObject.builder().myId("0").name("Parent").build());
+
+        SomeOtherObject c1 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC1").build()).get();
+        SomeOtherObject c2 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC2").build()).get();
+
+        CountDownLatch c1LockedLatch = new CountDownLatch(1);
+        CountDownLatch releaseLatch = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // T1: lock c1 directly via the traditional lockAndGetExecutor (single-row lock)
+        // Parent (SomeLookupObject) is NOT locked by T1.
+        Future<?> txn1 = executor.submit(() -> {
+            try {
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", c1.getId())))
+                        .mutate(child -> {
+                            c1LockedLatch.countDown();
+                            try {
+                                releaseLatch.await(5, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            child.setValue("T1_UPDATED");
+                        })
+                        .execute();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertTrue(c1LockedLatch.await(5, TimeUnit.SECONDS), "T1 should lock c1 within 5s");
+
+        // T2: lockAndMutateEach on [c1, c2] — parent lock succeeds (T1 doesn't hold it),
+        // but the NOWAIT lock on c1 fails immediately because T1 holds it.
+        assertThrows(RuntimeException.class, () ->
+                lookupDao.lockAndGetExecutor("0")
+                        .lockAndMutateEach(relationDao, List.of(
+                                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c1.getId())),
+                                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c2.getId()))
+                        ), child -> child)
+                        .execute()
+        );
+
+        releaseLatch.countDown();
+        txn1.get(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertEquals("T1_UPDATED", relationDao.get("0", c1.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testSingleTableLockAndMutateEachProtectsRowsFromConcurrentAccess() {
+        // Single-table scenario (analogous to user_balances sharded by user_id):
+        // c0 = anchor row, c1 + c2 = "program balance" rows — all in some_other_data, no SomeLookupObject needed.
+        SomeOtherObject c0 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("Anchor").build()).get();
+        SomeOtherObject c1 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC1").build()).get();
+        SomeOtherObject c2 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC2").build()).get();
+
+        CountDownLatch bothRowsLockedLatch = new CountDownLatch(1);
+        CountDownLatch releaseLatch = new CountDownLatch(1);
+        AtomicBoolean firstMutatorCalled = new AtomicBoolean(false);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // T1: lock c0 as anchor, then lock c1 and c2 via lockAndMutateEach — all one table
+        Future<?> txn1 = executor.submit(() -> {
+            try {
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", c0.getId())))
+                        .lockAndMutateEach(relationDao, List.of(
+                                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c1.getId())),
+                                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c2.getId()))
+                        ), child -> {
+                            if (firstMutatorCalled.getAndSet(true)) {
+                                // Second call: c2 now locked — signal and hold
+                                bothRowsLockedLatch.countDown();
+                                try {
+                                    releaseLatch.await(5, TimeUnit.SECONDS);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            }
+                            child.setValue("T1_UPDATED");
+                            return child;
+                        })
+                        .execute();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertTrue(bothRowsLockedLatch.await(5, TimeUnit.SECONDS), "T1 should lock both rows within 5s");
+
+        // T2: independently try to lock c2 directly — same table, no parent involved
+        assertThrows(RuntimeException.class, () ->
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", c2.getId())))
+                        .execute()
+        );
+
+        releaseLatch.countDown();
+        txn1.get(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertEquals("T1_UPDATED", relationDao.get("0", c1.getId()).get().getValue());
+        assertEquals("T1_UPDATED", relationDao.get("0", c2.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testSingleTableLockAndMutateEachFailsWhenRowAlreadyLocked() {
+        // Reverse: T1 holds c1 via the traditional lockAndGetExecutor (single-row lock).
+        // T2 starts a lockAndMutateEach on [c1, c2] anchored at c0 — fails on c1.
+        SomeOtherObject c0 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("Anchor").build()).get();
+        SomeOtherObject c1 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC1").build()).get();
+        SomeOtherObject c2 = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0").value("OriginalC2").build()).get();
+
+        CountDownLatch c1LockedLatch = new CountDownLatch(1);
+        CountDownLatch releaseLatch = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        // T1: lock c1 via traditional lockAndGetExecutor — does NOT lock c0 or c2
+        Future<?> txn1 = executor.submit(() -> {
+            try {
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", c1.getId())))
+                        .mutate(child -> {
+                            c1LockedLatch.countDown();
+                            try {
+                                releaseLatch.await(5, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                            }
+                            child.setValue("T1_UPDATED");
+                        })
+                        .execute();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        assertTrue(c1LockedLatch.await(5, TimeUnit.SECONDS), "T1 should lock c1 within 5s");
+
+        // T2: anchor at c0 (unlocked), then lockAndMutateEach [c1, c2] — fails on c1
+        assertThrows(RuntimeException.class, () ->
+                relationDao.lockAndGetExecutor("0",
+                                DetachedCriteria.forClass(SomeOtherObject.class)
+                                        .add(Restrictions.eq("id", c0.getId())))
+                        .lockAndMutateEach(relationDao, List.of(
+                                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c1.getId())),
+                                DetachedCriteria.forClass(SomeOtherObject.class).add(Restrictions.eq("id", c2.getId()))
+                        ), child -> child)
+                        .execute()
+        );
+
+        releaseLatch.countDown();
+        txn1.get(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertEquals("T1_UPDATED", relationDao.get("0", c1.getId()).get().getValue());
     }
 
     private boolean saveEntity(LockedContext<SomeLookupObject> lockedContext) {
