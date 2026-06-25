@@ -20,7 +20,7 @@ public class LockedContextRollbackTest extends BundleBasedTestBase {
 
     @Override
     protected DBShardingBundleBase<TestConfig> getBundle() {
-        return new DBShardingBundle<TestConfig>(SomeLookupObject.class, SomeOtherObject.class) {
+        return new DBShardingBundle<>(SomeLookupObject.class, SomeOtherObject.class) {
             @Override
             protected ShardedHibernateFactory getConfig(TestConfig config) {
                 return testConfig.getShards();
