@@ -72,6 +72,10 @@ public class TransactionHandler {
      * session is successfully set up. In case of any setup failure, it also ensures proper cleanup.
      *
      */
+    // Intentionally catches Throwable (not Exception): the acquired session/connection must be
+    // released even if setup fails with an Error (e.g. OOM during beginTransaction()), otherwise
+    // the pooled connection leaks. The Throwable is always rethrown, so no error is swallowed.
+    @SuppressWarnings("java:S1181")
     public void beforeStart() {
         try {
             if (ManagedSessionContext.hasBind(sessionFactory)) {
