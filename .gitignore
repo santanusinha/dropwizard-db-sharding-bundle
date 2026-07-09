@@ -6,3 +6,5 @@ target
 *.iws
 dep
 out
+.project
+.settings

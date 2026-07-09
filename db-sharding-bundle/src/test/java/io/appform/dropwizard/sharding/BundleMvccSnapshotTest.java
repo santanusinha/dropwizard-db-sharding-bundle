@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -146,6 +147,55 @@ class BundleMvccSnapshotTest {
         assertTrue(v2.isPresent());
         assertEquals("version-2", v2.get().getText(),
                 "LookupDao.get() must see the committed update — not a stale MVCC snapshot");
+    }
+
+    /**
+     * Companion to {@link #get_afterCrossPoolUpdate_seesLatestCommit()} that exercises the
+     * <b>error</b> completion path ({@code TransactionHandler.onError()}) rather than the normal
+     * one ({@code afterEnd()}).
+     *
+     * <p>A transaction-optional read ({@code transactionOptional=true}, {@code readOnly=true})
+     * runs its SELECT — silently opening an implicit DB transaction on the pooled read connection
+     * — and then throws while applying the post-fetch handler. This drives
+     * {@code TransactionExecutor} into {@code onError()}, which (like {@code afterEnd()}) must roll
+     * back the implicit transaction before the connection is returned to the pool. Without the
+     * {@code onError()} rollback, the REPEATABLE_READ snapshot stays pinned on the reused physical
+     * connection and the next read returns stale {@code "version-1"}.
+     *
+     * <p>{@code GetByLookupKey.apply()} executes {@code getter.apply(...)} (the SELECT) <i>before</i>
+     * {@code afterGet.apply(...)} (the handler), so a throwing handler guarantees the implicit
+     * transaction is already open when the exception propagates.
+     */
+    @Test
+    void get_afterErrorInOptionalRead_seesLatestCommit() throws Exception {
+        // 1. Write "version-1"
+        writeLookupDao.save(TestEntity.builder()
+                .externalId("mvcc-err-1")
+                .text("version-1")
+                .build());
+
+        // 2. Optional read whose SELECT runs (opening implicit T1 on C_read) and then throws in the
+        //    post-fetch handler -> TransactionExecutor.onError(). The fix rolls T1 back here.
+        final java.util.function.Function<TestEntity, TestEntity> throwingHandler = entity -> {
+            throw new IllegalStateException("boom after select");
+        };
+        assertThrows(IllegalStateException.class, () ->
+                readLookupDao.get("mvcc-err-1", throwingHandler));
+
+        // 3. Update to "version-2" via writeBundle — commits on a separate connection
+        writeLookupDao.update("mvcc-err-1", entity -> {
+            entity.ifPresent(e -> e.setText("version-2"));
+            return entity.orElse(null);
+        });
+
+        // 4. Read again — same physical C_read is reused (pool_size=1)
+        //    WITH FIX:    onError rolled T1 back → new T2 at fresh snapshot → "version-2" ✓
+        //    WITHOUT FIX: T1 still open (REPEATABLE_READ snapshot S1) → stale "version-1" ✗
+        val v2 = readLookupDao.get("mvcc-err-1");
+        assertTrue(v2.isPresent());
+        assertEquals("version-2", v2.get().getText(),
+                "After an errored optional read, onError() must roll back the connection so later "
+                        + "reads see the latest commit — not a stale MVCC snapshot");
     }
 
     // -------------------------------------------------------------------------

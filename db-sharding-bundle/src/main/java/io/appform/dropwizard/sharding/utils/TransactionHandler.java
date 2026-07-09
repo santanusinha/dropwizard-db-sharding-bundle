@@ -72,6 +72,10 @@ public class TransactionHandler {
      * session is successfully set up. In case of any setup failure, it also ensures proper cleanup.
      *
      */
+    // Intentionally catches Throwable (not Exception): the acquired session/connection must be
+    // released even if setup fails with an Error (e.g. OOM during beginTransaction()), otherwise
+    // the pooled connection leaks. The Throwable is always rethrown, so no error is swallowed.
+    @SuppressWarnings("java:S1181")
     public void beforeStart() {
         try {
             if (ManagedSessionContext.hasBind(sessionFactory)) {
@@ -115,12 +119,7 @@ public class TransactionHandler {
             throw e;
         } finally {
             if (sessionAcquired) {
-                if (skipCommit && readOnly) {
-                    // isTransactionOptional=true reads skip beginTransaction(), so no Hibernate-managed
-                    // transaction exists. But autoCommit=false means an implicit DB transaction is open.
-                    // Roll it back directly to prevent MVCC snapshot leakage across pool connections.
-                    session.doWork(conn -> conn.rollback());
-                }
+                rollbackImplicitTransactionIfNeeded();
                 session.close();
                 ManagedSessionContext.unbind(sessionFactory);
                 MDC.remove(TENANT_ID);
@@ -138,10 +137,29 @@ public class TransactionHandler {
             }
         } finally {
             if (sessionAcquired) {
+                rollbackImplicitTransactionIfNeeded();
                 session.close();
                 ManagedSessionContext.unbind(sessionFactory);
                 MDC.remove(TENANT_ID);
             }
+        }
+    }
+
+    /**
+     * Rolls back the implicit database transaction opened by transaction-optional (read-only)
+     * operations before the owning session is closed and its connection returned to the pool.
+     * <p>
+     * When {@code isTransactionOptional=true}, {@link #beforeStart()} skips
+     * {@link #beginTransaction()}, so no Hibernate-managed transaction exists. However, pooled
+     * connections run with {@code autoCommit=false}, so the first SELECT silently opens an implicit
+     * DB transaction. If the connection is returned to the pool without a rollback, its
+     * REPEATABLE_READ MVCC snapshot stays pinned and a later borrower of the same physical
+     * connection can observe stale data. This must run on both the normal ({@link #afterEnd()})
+     * and error ({@link #onError()}) completion paths.
+     */
+    private void rollbackImplicitTransactionIfNeeded() {
+        if (skipCommit && readOnly) {
+            session.doWork(conn -> conn.rollback());
         }
     }
 
