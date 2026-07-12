@@ -23,10 +23,6 @@ import java.util.function.Function;
 public abstract class OpContext<T> implements Function<Session, T> {
   public abstract OpType getOpType();
 
-  public boolean isTransactionOptional() {
-    return false;
-  }
-
   public abstract <P> P visit(OpContextVisitor<P> visitor);
 
   public interface OpContextVisitor<P> {

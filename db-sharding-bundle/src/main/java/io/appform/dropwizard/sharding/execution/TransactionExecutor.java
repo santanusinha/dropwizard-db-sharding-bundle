@@ -67,8 +67,7 @@ public class TransactionExecutor {
             .opContext(opContext)
             .build();
         return observer.execute(context, () -> {
-            val transactionHandler = new TransactionHandler(sessionFactory, readOnly,
-                opContext.isTransactionOptional());
+            val transactionHandler = new TransactionHandler(sessionFactory, readOnly);
             if (completeTransaction) {
                 transactionHandler.beforeStart();
             }
