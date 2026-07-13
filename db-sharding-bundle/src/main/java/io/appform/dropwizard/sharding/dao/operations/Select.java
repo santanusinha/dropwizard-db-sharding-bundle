@@ -34,11 +34,6 @@ public class Select<T, R> extends OpContext<R> {
   }
 
   @Override
-  public boolean isTransactionOptional() {
-    return true;
-  }
-
-  @Override
   public OpType getOpType() {
     return OpType.SELECT;
   }

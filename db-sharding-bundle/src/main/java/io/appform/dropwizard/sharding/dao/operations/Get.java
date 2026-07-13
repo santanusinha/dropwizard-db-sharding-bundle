@@ -32,11 +32,6 @@ public class Get<T, G,  R> extends OpContext<R> {
   }
 
   @Override
-  public boolean isTransactionOptional() {
-    return true;
-  }
-
-  @Override
   public OpType getOpType() {
     return OpType.GET;
   }

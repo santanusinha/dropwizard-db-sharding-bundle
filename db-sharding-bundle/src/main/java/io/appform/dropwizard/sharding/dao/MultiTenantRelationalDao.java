@@ -1232,7 +1232,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 dao.sessionFactory,
                 () -> Lists.newArrayList(dao.getLocked(key, updater, LockModeType.NONE)),
                 entityPopulator,
-                false,
                 shardInfoProviders.get(tenantId),
                 DaoType.RELATIONAL,
                 entityClass,
@@ -1282,7 +1281,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 dao.sessionFactory,
                 () -> dao.select(selectParam),
                 entityPopulator,
-                false,
                 shardInfoProviders.get(tenantId),
                 DaoType.RELATIONAL,
                 entityClass,
@@ -1337,7 +1335,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         private final int shardId;
         private final SessionFactory sessionFactory;
         private final Supplier<Boolean> entityPopulator;
-        private final boolean skipTransaction;
         private final TransactionExecutionContext executionContext;
         private final TransactionObserver observer;
 
@@ -1347,7 +1344,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 final SessionFactory sessionFactory,
                 final Supplier<List<T>> getter,
                 final Supplier<Boolean> entityPopulator,
-                final boolean skipTxn,
                 final ShardInfoProvider shardInfoProvider,
                 final DaoType daoType,
                 final Class<?> entityClass,
@@ -1357,7 +1353,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             this.shardId = shardId;
             this.sessionFactory = sessionFactory;
             this.entityPopulator = entityPopulator;
-            this.skipTransaction = skipTxn;
             this.observer = observer;
             val shardName = shardInfoProvider.shardName(shardId);
             val opContext = ReadOnlyForRelationalDao.<T>builder()
@@ -1478,8 +1473,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
          */
         private List<T> executeImpl() {
             return observer.execute(executionContext, () -> {
-                TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true,
-                        this.skipTransaction);
+                TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true);
                 transactionHandler.beforeStart();
                 try {
                     val opContext = ((ReadOnlyForRelationalDao<T>) executionContext.getOpContext());

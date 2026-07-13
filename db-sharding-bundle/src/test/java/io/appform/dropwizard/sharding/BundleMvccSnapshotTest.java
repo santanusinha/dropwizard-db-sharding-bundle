@@ -35,12 +35,13 @@ import static org.mockito.Mockito.when;
  * Regression test for the MVCC stale-read bug, exercised through the full bundle stack.
  *
  * <h3>The problem</h3>
- * {@link LookupDao#get(String)} uses {@code transactionOptional=true}, which means
- * {@code TransactionHandler} never calls {@code beginTransaction()}. Production connection pools
- * set {@code autoCommit=false}, so the first SQL statement silently opens an implicit database
- * transaction. If no {@code conn.rollback()} is issued before the connection is returned to the
- * pool, a REPEATABLE_READ snapshot is pinned on the pooled connection. A subsequent read on that
- * same physical connection sees stale data even after another connection committed fresh rows.
+ * {@link LookupDao#get(String)} was historically {@code transactionOptional=true}, which meant
+ * {@code TransactionHandler} never called {@code beginTransaction()} for the read. Production
+ * connection pools set {@code autoCommit=false}, so the first SQL statement silently opens an
+ * implicit database transaction. Under Hibernate 6 the pooled connection is then released back to
+ * the pool right after the SELECT with that implicit transaction still open, pinning a
+ * REPEATABLE_READ snapshot. A subsequent read on that same physical connection sees stale data
+ * even after another connection committed fresh rows.
  *
  * <h3>Setup</h3>
  * Two separate bundle instances both point to the same H2 named database:
@@ -52,10 +53,12 @@ import static org.mockito.Mockito.when;
  * </ul>
  *
  * <h3>How the fix is validated</h3>
- * {@code TransactionHandler.afterEnd()} calls {@code conn.rollback()} when
- * {@code skipCommit && readOnly && sessionAcquired}. This releases the REPEATABLE_READ snapshot
- * on the pooled read connection before it is returned. Without the fix, the second
- * {@code readLookupDao.get()} returns stale {@code "version-1"}.
+ * Under the ownership invariant, {@code TransactionHandler} ALWAYS begins a real managed
+ * transaction for an owned session — even a read-only one — and commits it in
+ * {@code afterEnd()} (or rolls it back in {@code onError()}) on the SAME connection before it is
+ * returned to the pool. This closes the implicit DB transaction and releases the REPEATABLE_READ
+ * snapshot on the pooled read connection. Without the fix (transaction-optional read, no
+ * begin/commit), the second {@code readLookupDao.get()} returns stale {@code "version-1"}.
  */
 class BundleMvccSnapshotTest {
 
@@ -109,13 +112,14 @@ class BundleMvccSnapshotTest {
      * Sequence:
      * <ol>
      *   <li>Write {@code "version-1"} via writeBundle (own Tomcat pool connection, commits).</li>
-     *   <li>Read via readBundle → {@code LookupDao → TransactionHandler(readSf, readOnly=true,
-     *       transactionOptional=true)}. Implicit T1 opens on the pooled read connection C_read.
-     *       The fix calls {@code conn.rollback()} → T1 released, C_read is clean.</li>
+     *   <li>Read via readBundle → {@code LookupDao → TransactionHandler(readSf, readOnly=true)}.
+     *       The owned session begins a real transaction; the SELECT runs inside it and
+     *       {@code afterEnd()} commits on the pooled read connection C_read, releasing any
+     *       snapshot. C_read is clean.</li>
      *   <li>Write {@code "version-2"} via writeBundle (commits on a separate connection).</li>
      *   <li>Read again via readBundle — the same physical connection C_read is reused:
      *       <ul>
-     *         <li><b>With fix:</b> T1 was rolled back → new T2 at fresh snapshot → {@code "version-2"} ✓</li>
+     *         <li><b>With fix:</b> T1 committed → new T2 at fresh snapshot → {@code "version-2"} ✓</li>
      *         <li><b>Without fix:</b> T1 still open (REPEATABLE_READ snapshot S1) → stale
      *             {@code "version-1"} ✗</li>
      *       </ul></li>
@@ -129,7 +133,7 @@ class BundleMvccSnapshotTest {
                 .text("version-1")
                 .build());
 
-        // 2. Read via readBundle (transactionOptional=true) — fix calls conn.rollback() in afterEnd()
+        // 2. Read via readBundle — owned session begins+commits a real transaction in afterEnd()
         val v1 = readLookupDao.get("mvcc-1");
         assertTrue(v1.isPresent());
         assertEquals("version-1", v1.get().getText());
@@ -141,7 +145,7 @@ class BundleMvccSnapshotTest {
         });
 
         // 4. Read again — same physical C_read is reused (pool_size=1)
-        //    WITH FIX:    T1 rolled back → new T2 at fresh snapshot → "version-2" ✓
+        //    WITH FIX:    T1 committed → new T2 at fresh snapshot → "version-2" ✓
         //    WITHOUT FIX: T1 still open (REPEATABLE_READ snapshot S1) → stale "version-1" ✗
         val v2 = readLookupDao.get("mvcc-1");
         assertTrue(v2.isPresent());
@@ -154,13 +158,12 @@ class BundleMvccSnapshotTest {
      * <b>error</b> completion path ({@code TransactionHandler.onError()}) rather than the normal
      * one ({@code afterEnd()}).
      *
-     * <p>A transaction-optional read ({@code transactionOptional=true}, {@code readOnly=true})
-     * runs its SELECT — silently opening an implicit DB transaction on the pooled read connection
-     * — and then throws while applying the post-fetch handler. This drives
-     * {@code TransactionExecutor} into {@code onError()}, which (like {@code afterEnd()}) must roll
-     * back the implicit transaction before the connection is returned to the pool. Without the
-     * {@code onError()} rollback, the REPEATABLE_READ snapshot stays pinned on the reused physical
-     * connection and the next read returns stale {@code "version-1"}.
+     * <p>A transaction-optional-style read ({@code readOnly=true}) now runs inside a real
+     * transaction: its SELECT executes and then the post-fetch handler throws. This drives
+     * {@code TransactionExecutor} into {@code onError()}, which rolls the transaction back on the
+     * pooled read connection before it is returned. Without a transaction (the old
+     * transaction-optional path), the implicit REPEATABLE_READ snapshot would stay pinned on the
+     * reused physical connection and the next read would return stale {@code "version-1"}.
      *
      * <p>{@code GetByLookupKey.apply()} executes {@code getter.apply(...)} (the SELECT) <i>before</i>
      * {@code afterGet.apply(...)} (the handler), so a throwing handler guarantees the implicit
@@ -174,8 +177,8 @@ class BundleMvccSnapshotTest {
                 .text("version-1")
                 .build());
 
-        // 2. Optional read whose SELECT runs (opening implicit T1 on C_read) and then throws in the
-        //    post-fetch handler -> TransactionExecutor.onError(). The fix rolls T1 back here.
+        // 2. Optional-style read whose SELECT runs inside a real transaction and then throws in the
+        //    post-fetch handler -> TransactionExecutor.onError(). The fix rolls the txn back here.
         final java.util.function.Function<TestEntity, TestEntity> throwingHandler = entity -> {
             throw new IllegalStateException("boom after select");
         };
@@ -189,7 +192,7 @@ class BundleMvccSnapshotTest {
         });
 
         // 4. Read again — same physical C_read is reused (pool_size=1)
-        //    WITH FIX:    onError rolled T1 back → new T2 at fresh snapshot → "version-2" ✓
+        //    WITH FIX:    onError rolled the txn back → new T2 at fresh snapshot → "version-2" ✓
         //    WITHOUT FIX: T1 still open (REPEATABLE_READ snapshot S1) → stale "version-1" ✗
         val v2 = readLookupDao.get("mvcc-err-1");
         assertTrue(v2.isPresent());

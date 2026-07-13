@@ -43,13 +43,8 @@ public class TransactionHandler {
     private boolean sessionAcquired = false;
 
     public TransactionHandler(SessionFactory sessionFactory, boolean readOnly) {
-        this(sessionFactory, readOnly, false);
-    }
-
-    public TransactionHandler(SessionFactory sessionFactory, boolean readOnly, boolean skipCommit) {
         this.sessionFactory = sessionFactory;
         this.readOnly = readOnly;
-        this.skipCommit = skipCommit;
     }
 
     /**
@@ -59,17 +54,25 @@ public class TransactionHandler {
      * for nested transactions. It first checks if a Hibernate {@link Session} is already bound
      * to the current thread using {@link ManagedSessionContext}.
      * <ul>
-     * <li><b>If a session exists:</b> It is reused. The handler checks if a transaction is
-     * already active and updates its internal state to skip the final commit, thereby "joining"
-     * the existing transaction.</li>
+     * <li><b>If a session exists:</b> It is reused. The handler joins the caller's transaction:
+     * if that transaction is already active it skips the final commit (the outer owner will
+     * complete it); otherwise it begins one on the shared session.</li>
      * <li><b>If no session exists:</b> A new session is opened, configured, and bound to the
      * context. This handler instance then takes "ownership" of the session by setting the
      * {@code sessionAcquired} flag, becoming responsible for its closure and transaction completion.
      * </li>
      * </ul>
      * <p>
-     * If this handler is determined to be the owner of the transaction, it begins one after the
-     * session is successfully set up. In case of any setup failure, it also ensures proper cleanup.
+     * <b>Ownership invariant:</b> a handler that owns the session ({@code sessionAcquired == true})
+     * ALWAYS runs its unit of work inside a real, managed transaction — even for reads. Pooled
+     * connections run with {@code autoCommit=false} ({@code CONNECTION_PROVIDER_DISABLES_AUTOCOMMIT
+     * =true}), so the first statement always opens an implicit DB transaction. If we skipped
+     * {@link #beginTransaction()} for an owned read, Hibernate would release the physical connection
+     * back to the pool right after the statement (release "from afterTransaction") with that
+     * implicit transaction still open; a later borrower of the same connection could then observe a
+     * stale REPEATABLE_READ snapshot. Beginning a transaction keeps the connection bound until
+     * commit/rollback runs on the SAME connection. {@code skipCommit} therefore only ever applies to
+     * the join path, where an outer transaction already owns the connection lifecycle.
      *
      */
     // Intentionally catches Throwable (not Exception): the acquired session/connection must be
@@ -81,8 +84,7 @@ public class TransactionHandler {
             if (ManagedSessionContext.hasBind(sessionFactory)) {
                 session = sessionFactory.getCurrentSession();
                 final var existingTransaction = session.getTransaction();
-                skipCommit = skipCommit
-                        || (existingTransaction != null && existingTransaction.isActive());
+                skipCommit = existingTransaction != null && existingTransaction.isActive();
             }
             else {
                 session = sessionFactory.openSession();
@@ -119,7 +121,6 @@ public class TransactionHandler {
             throw e;
         } finally {
             if (sessionAcquired) {
-                rollbackImplicitTransactionIfNeeded();
                 session.close();
                 ManagedSessionContext.unbind(sessionFactory);
                 MDC.remove(TENANT_ID);
@@ -137,29 +138,10 @@ public class TransactionHandler {
             }
         } finally {
             if (sessionAcquired) {
-                rollbackImplicitTransactionIfNeeded();
                 session.close();
                 ManagedSessionContext.unbind(sessionFactory);
                 MDC.remove(TENANT_ID);
             }
-        }
-    }
-
-    /**
-     * Rolls back the implicit database transaction opened by transaction-optional (read-only)
-     * operations before the owning session is closed and its connection returned to the pool.
-     * <p>
-     * When {@code isTransactionOptional=true}, {@link #beforeStart()} skips
-     * {@link #beginTransaction()}, so no Hibernate-managed transaction exists. However, pooled
-     * connections run with {@code autoCommit=false}, so the first SELECT silently opens an implicit
-     * DB transaction. If the connection is returned to the pool without a rollback, its
-     * REPEATABLE_READ MVCC snapshot stays pinned and a later borrower of the same physical
-     * connection can observe stale data. This must run on both the normal ({@link #afterEnd()})
-     * and error ({@link #onError()}) completion paths.
-     */
-    private void rollbackImplicitTransactionIfNeeded() {
-        if (skipCommit && readOnly) {
-            session.doWork(conn -> conn.rollback());
         }
     }
 

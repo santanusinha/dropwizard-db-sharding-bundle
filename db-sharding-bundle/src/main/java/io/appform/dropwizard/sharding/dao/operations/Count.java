@@ -27,11 +27,6 @@ public class Count extends OpContext<Long> {
   }
 
   @Override
-  public boolean isTransactionOptional() {
-    return true;
-  }
-
-  @Override
   public OpType getOpType() {
     return OpType.COUNT;
   }

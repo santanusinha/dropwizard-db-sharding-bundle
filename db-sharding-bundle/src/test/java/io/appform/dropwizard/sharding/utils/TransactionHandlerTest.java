@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,11 +58,21 @@ class TransactionHandlerTest {
     }
 
     @Test
-    void testSkipCommit() {
-        TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false, true);
+    void testOwnedReadRunsInTransactionAndCommits() {
+        // Ownership invariant: even a read-only (transaction-optional) owned session must run
+        // inside a real managed transaction so the pooled connection is held until commit and the
+        // implicit REPEATABLE_READ DB transaction is closed on the SAME connection.
+        org.hibernate.Transaction transaction = mock(org.hibernate.Transaction.class);
+        when(session.getTransaction()).thenReturn(transaction);
+        when(transaction.getStatus()).thenReturn(org.hibernate.resource.transaction.spi.TransactionStatus.ACTIVE);
+
+        TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, true);
         transactionHandler.beforeStart();
-        transactionHandler.afterEnd(); // Updated to use afterEnd for transaction completion
-        verify(session, never()).getTransaction();
+        transactionHandler.afterEnd();
+
+        verify(session, times(1)).beginTransaction(); // begin runs even for reads
+        verify(transaction, times(1)).commit();
+        verify(session, times(1)).close();
     }
 
     @Test
