@@ -172,6 +172,36 @@ public class MultiTenantRelationalDaoTest {
   }
 
   @Test
+  public void testCreateOrUpdateWithQuerySpec() throws Exception {
+    // Test creation path
+    val saved = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
+            (QuerySpec<RelationalEntityWithAIKey, RelationalEntityWithAIKey>) (root, query, cb) ->
+                query.where(cb.equal(root.get("key"), "testIdQuerySpec")),
+            e -> e.setValue("Some Other Text"),
+            () -> RelationalEntityWithAIKey.builder()
+                .key("testIdQuerySpec")
+                .value("Some New Text")
+                .build())
+        .orElse(null);
+    assertNotNull(saved);
+    assertEquals("Some New Text", saved.getValue());
+
+    // Test update path
+    val updated = relationalWithAIDao.createOrUpdate("TENANT1", "parent",
+            (QuerySpec<RelationalEntityWithAIKey, RelationalEntityWithAIKey>) (root, query, cb) ->
+                query.where(cb.equal(root.get("key"), "testIdQuerySpec")),
+            e -> e.setValue("Some Other Text"),
+            () -> RelationalEntityWithAIKey.builder()
+                .key("testIdQuerySpec")
+                .value("Some New Text")
+                .build())
+        .orElse(null);
+    assertNotNull(updated);
+    assertEquals(saved.getId(), updated.getId());
+    assertEquals("Some Other Text", updated.getValue());
+  }
+
+  @Test
   public void testUpdateUsingQuery() throws Exception {
     val relationalKey = UUID.randomUUID().toString();
 

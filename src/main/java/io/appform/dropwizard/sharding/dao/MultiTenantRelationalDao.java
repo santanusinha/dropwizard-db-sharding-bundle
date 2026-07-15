@@ -40,6 +40,7 @@ import io.appform.dropwizard.sharding.dao.operations.UpdateAll;
 import io.appform.dropwizard.sharding.dao.operations.UpdateByQuery;
 import io.appform.dropwizard.sharding.dao.operations.UpdateWithScroll;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
+import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.execution.DaoType;
@@ -162,6 +163,11 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             return uniqueResult(criteria.getExecutableCriteria(currentSession()));
         }
 
+        T get(final QuerySpec<T, T> querySpec) {
+            val q = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
+            return uniqueResult(q.setLockMode(LockModeType.NONE));
+        }
+
         T getLocked(Object lookupKey, UnaryOperator<Criteria> criteriaUpdater, LockMode lockMode) {
             Criteria criteria = criteriaUpdater.apply(currentSession()
                     .createCriteria(entityClass)
@@ -233,6 +239,18 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         List run(DetachedCriteria criteria) {
             return criteria.getExecutableCriteria(currentSession())
                     .list();
+        }
+
+        /**
+         * Run a query inside this shard using QuerySpec and return the matching list.
+         *
+         * @param querySpec QuerySpec defining the query criteria.
+         * @return List of elements or empty list if none found
+         */
+        @SuppressWarnings("rawtypes")
+        List run(QuerySpec<T, T> querySpec) {
+            val query = InternalUtils.createQuery(currentSession(), entityClass, querySpec);
+            return list(query);
         }
 
         long count(final DetachedCriteria criteria) {
@@ -426,6 +444,31 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = CreateOrUpdate.<T>builder()
                 .criteria(selectionCriteria)
+                .getLockedForWrite(dao::getLockedForWrite)
+                .entityGenerator(entityGenerator)
+                .saver(dao::save)
+                .mutator(updater)
+                .updater(dao::update)
+                .getter(dao::get)
+                .build();
+        return Optional.of(transactionExecutor.get(tenantId).execute(
+                dao.sessionFactory,
+                false,
+                "createOrUpdate",
+                opContext,
+                shardId));
+    }
+
+    public Optional<T> createOrUpdate(String tenantId,
+                                  final String parentKey,
+                                  final QuerySpec<T, T> querySpec,
+                                  final UnaryOperator<T> updater,
+                                  final Supplier<T> entityGenerator) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        int shardId = shardCalculator.shardId(tenantId, parentKey);
+        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
+        val opContext = CreateOrUpdateByQuerySpec.<T>builder()
+                .querySpec(querySpec)
                 .getLockedForWrite(dao::getLockedForWrite)
                 .entityGenerator(entityGenerator)
                 .saver(dao::save)
