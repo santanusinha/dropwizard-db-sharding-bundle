@@ -13,7 +13,9 @@ import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -41,6 +43,9 @@ public class LockedContext<T> {
     private final SessionFactory sessionFactory;
     private final TransactionExecutionContext executionContext;
     private final TransactionObserver observer;
+
+    // Transformers applied to child entities before persist via save()/saveAll()
+    private final List<BiConsumer<T, Object>> childEntityTransformers = new ArrayList<>();
 
     /**
      * Constructs a LockedContext for reading a specific entity within a locked transaction.
@@ -153,6 +158,25 @@ public class LockedContext<T> {
     }
 
     /**
+     * Registers a type-safe transformer applied to child entities before persist.
+     * Entities not matching childType are silently skipped.
+     */
+    public <U> LockedContext<T> withChildTransformer(Class<U> childType, BiConsumer<T, U> transformer) {
+        this.childEntityTransformers.add((parent, child) -> {
+            if (childType.isInstance(child)) {
+                transformer.accept(parent, childType.cast(child));
+            }
+        });
+        return this;
+    }
+
+    private void applyChildTransformers(T parent, Object child) {
+        for (BiConsumer<T, Object> transformer : childEntityTransformers) {
+            transformer.accept(parent, child);
+        }
+    }
+
+    /**
      * Generates entity of type {@code U} using entityGenerator and then persists them
      *
      * @param <U>             The type of the associated entity to be saved.
@@ -170,6 +194,7 @@ public class LockedContext<T> {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
+                applyChildTransformers(parent, entity);
                 relationalDao.save(this, entity);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -195,6 +220,7 @@ public class LockedContext<T> {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
+                applyChildTransformers(parent, entity);
                 relationalDao.save(this, entity);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -221,6 +247,7 @@ public class LockedContext<T> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
+                    applyChildTransformers(parent, entity);
                     relationalDao.save(this, entity);
                 }
             } catch (Exception e) {
@@ -248,6 +275,7 @@ public class LockedContext<T> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
+                    applyChildTransformers(parent, entity);
                     relationalDao.save(this, entity);
                 }
             } catch (Exception e) {
@@ -300,6 +328,7 @@ public class LockedContext<T> {
     public <U> LockedContext<T> save(RelationalDao<U> relationalDao, U entity, Function<U, U> handler) {
         return apply(parent -> {
             try {
+                applyChildTransformers(parent, entity);
                 relationalDao.save(this, entity, handler);
             } catch (Exception e) {
                 throw new RuntimeException(e);
