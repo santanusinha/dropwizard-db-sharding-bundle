@@ -55,7 +55,7 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(RunInSession<T> opContext);
 
-    <T> P visit(RunWithCriteria<T> opContext);
+    <T, C> P visit(RunWithCriteria<T, C> opContext);
 
     P visit(DeleteByLookupKey opContext);
 
@@ -65,12 +65,11 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
 
-    <T> P visit(CreateOrUpdate<T> opContext);
+    <T, C> P visit(CreateOrUpdate<T, C> opContext);
 
     <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
     <T, R> P visit(Select<T, R> opContext);
-
   }
 
 }

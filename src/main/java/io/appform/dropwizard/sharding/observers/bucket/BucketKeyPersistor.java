@@ -166,7 +166,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(RunWithCriteria<T> runWithCriteria) {
+    public <T, C> Void visit(RunWithCriteria<T, C> runWithCriteria) {
         return null;
     }
 
@@ -216,7 +216,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
     }
 
     @Override
-    public <T> Void visit(CreateOrUpdate<T> createOrUpdate) {
+    public <T, C> Void visit(CreateOrUpdate<T, C> createOrUpdate) {
         final var oldMutator = createOrUpdate.getMutator();
         createOrUpdate.setMutator(result -> {
             if (result != null) {
