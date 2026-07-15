@@ -78,6 +78,7 @@ import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 
+import javax.persistence.EntityNotFoundException;
 import javax.persistence.Id;
 import javax.persistence.LockModeType;
 import javax.persistence.criteria.CriteriaBuilder;
@@ -86,6 +87,7 @@ import javax.persistence.criteria.Root;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -569,6 +571,53 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         } catch (Exception e) {
             throw new RuntimeException("Error updating entity with scroll: " + querySpec, e);
         }
+    }
+
+    /**
+     * Locks multiple rows matching individual criteria using SELECT FOR UPDATE NOWAIT,
+     * applies a mutator to each, and persists the changes — all within the existing
+     * transaction of the provided {@link LockedContext}.
+     *
+     * <p>
+     * SINGLE-SHARD ONLY: every row addressed by {@code criteriaList} must reside on the same
+     * shard as {@code context} (the shard whose session/transaction is already bound). This
+     * feature exists to mutate co-sharded rows atomically; atomicity cannot be guaranteed across
+     * shards because each shard is a separate database with its own transaction. The caller is
+     * responsible for ensuring the criteria only match rows on {@code context.getShardId()}.
+     *
+     * @param <U>          The entity type of the parent LockedContext.
+     * @param context      The LockedContext whose transaction is joined.
+     * @param criteriaList A list of {@link DetachedCriteria}, each of which MUST match exactly one
+     *                     row (point lock by unique key). Zero rows throws (entity not found);
+     *                     more than one row throws {@code NonUniqueResultException}. Both roll back
+     *                     the entire transaction.
+     * @param mutator      A function applied to each locked entity; returns the mutated entity.
+     * @return The list of mutated entities in criteria order.
+     * @throws javax.persistence.EntityNotFoundException if any criteria matches no row
+     * @throws RuntimeException if the lock cannot be acquired (e.g. NOWAIT contention)
+     */
+    <U> List<T> lockAndMutateEach(
+            final LockedContext<U> context,
+            final List<DetachedCriteria> criteriaList,
+            final UnaryOperator<T> mutator) {
+        val tenantId = context.getTenantId();
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(criteriaList != null && !criteriaList.isEmpty(),
+                "criteriaList must not be null or empty");
+        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final List<T> results = new ArrayList<>();
+        for (final DetachedCriteria criteria : criteriaList) {
+            // Each criteria must resolve to exactly one row: getLockedForWrite uses uniqueResult(),
+            // so >1 match throws NonUniqueResultException and rolls back the whole transaction.
+            final T entity = dao.getLockedForWrite(criteria);
+            if (entity == null) {
+                throw new EntityNotFoundException("Entity not found for criteria: " + criteria);
+            }
+            final T mutated = mutator.apply(entity);
+            dao.update(entity, mutated);
+            results.add(mutated);
+        }
+        return results;
     }
 
     <U> List<T> select(

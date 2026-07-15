@@ -68,6 +68,7 @@ import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 
+import javax.persistence.EntityNotFoundException;
 import javax.persistence.LockModeType;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.Root;
@@ -442,6 +443,49 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(id),
                 DaoType.LOOKUP, entityClass, shardInfoProviders.get(tenantId), observer);
 
+    }
+
+    /**
+     * Locks an entity by its lookup key using SELECT FOR UPDATE, applies a mutator, and
+     * persists the change — all within the existing transaction of the provided {@link LockedContext}.
+     * <p>
+     * This is intended for cross-DAO chaining: e.g. locking a LookupDao entity inside a
+     * RelationalDao LockedContext when both reside on the same shard.
+     * <p>
+     * SINGLE-SHARD ONLY: the entity identified by {@code key} must map to the same shard as
+     * {@code context}. This is enforced: if {@code key} hashes to a different shard than
+     * {@code context.getShardId()}, an {@link IllegalArgumentException} is thrown before any lock
+     * is taken. Atomicity cannot be guaranteed across shards (separate databases, separate
+     * transactions), so cross-shard use is unsupported.
+     *
+     * @param <U>     The entity type of the parent LockedContext.
+     * @param context The LockedContext whose transaction is joined.
+     * @param key     The lookup key identifying the entity to lock.
+     * @param mutator The mutator to apply to the locked entity.
+     * @return The mutated entity.
+     * @throws IllegalArgumentException if {@code key} maps to a different shard than {@code context}.
+     * @throws javax.persistence.EntityNotFoundException if no entity is found for the given key.
+     */
+    <U> T lockAndMutate(
+            final LockedContext<U> context,
+            final String key,
+            final LockedContext.Mutator<T> mutator) {
+        val tenantId = context.getTenantId();
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        final int keyShardId = shardCalculator.shardId(tenantId, key);
+        Preconditions.checkArgument(keyShardId == context.getShardId(),
+                "Cross-shard lockAndMutate not allowed: key '%s' maps to shard %s but LockedContext "
+                        + "is on shard %s. The LookupDao entity must be co-sharded with the "
+                        + "LockedContext (e.g. keyed on the same userId).",
+                key, keyShardId, context.getShardId());
+        final LookupDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final T entity = dao.getLockedForWrite(key);
+        if (entity == null) {
+            throw new EntityNotFoundException("Entity not found for key: " + key);
+        }
+        mutator.mutator(entity);
+        dao.update(entity);
+        return entity;
     }
 
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId, String id) {

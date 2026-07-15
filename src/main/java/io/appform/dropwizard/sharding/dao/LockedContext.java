@@ -153,6 +153,62 @@ public class LockedContext<T> {
     }
 
     /**
+     * Locks multiple rows of another {@link RelationalDao} entity using SELECT FOR UPDATE NOWAIT,
+     * applies a mutator to each, and persists the changes — all within the current transaction.
+     * <p>
+     * Each {@link DetachedCriteria} must match exactly one row (point lock, no gap locking).
+     * If any criteria matches no row or the NOWAIT lock fails, the entire transaction is rolled back.
+     *
+     * @param <U>          The type of the entity to be locked and mutated.
+     * @param relationalDao The DAO for the entity to lock.
+     * @param criteriaList  A list of criteria, each targeting one row.
+     * @param mutator       Applied to each locked entity; returns the mutated entity.
+     * @return This LockedContext for further chaining.
+     */
+    public <U> LockedContext<T> lockAndMutateEach(
+            RelationalDao<U> relationalDao,
+            List<DetachedCriteria> criteriaList,
+            UnaryOperator<U> mutator) {
+        return apply(parent -> {
+            try {
+                relationalDao.lockAndMutateEach(this, criteriaList, mutator);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
+     * Locks a {@link LookupDao} entity by key using SELECT FOR UPDATE, applies a mutator,
+     * and persists the change — all within the current transaction.
+     * <p>
+     * The LookupDao entity must reside on the same shard as this LockedContext
+     * (e.g. both sharded on the same user ID).
+     *
+     * @param <U>     The type of the LookupDao entity.
+     * @param lookupDao The DAO for the entity to lock.
+     * @param key       The lookup key identifying the entity.
+     * @param mutator   Applied to the locked entity.
+     * @return This LockedContext for further chaining.
+     */
+    public <U> LockedContext<T> lockAndMutate(
+            LookupDao<U> lookupDao,
+            String key,
+            Mutator<U> mutator) {
+        return apply(parent -> {
+            try {
+                lookupDao.lockAndMutate(this, key, mutator);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    /**
      * Generates entity of type {@code U} using entityGenerator and then persists them
      *
      * @param <U>             The type of the associated entity to be saved.
