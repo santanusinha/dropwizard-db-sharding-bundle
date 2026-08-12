@@ -1396,8 +1396,12 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
          * @param entity The entity to be updated in the shard.
          */
         void update(T entity) {
-            currentSession().evict(entity); //Detach .. otherwise update is a no-op
-            currentSession().update(entity);
+            if (currentSession().contains(entity)) {
+                currentSession().merge(entity);
+            } else {
+                currentSession().evict(entity);
+                currentSession().update(entity);
+            }
         }
 
         /**
