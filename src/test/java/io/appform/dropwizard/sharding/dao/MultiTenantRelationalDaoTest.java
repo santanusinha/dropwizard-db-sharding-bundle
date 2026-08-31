@@ -58,6 +58,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class MultiTenantRelationalDaoTest {
 
@@ -456,6 +457,109 @@ public class MultiTenantRelationalDaoTest {
     Assertions.assertEquals(0, queryResultThree.size());
   }
 
+
+  @Test
+  public void testDaoConstructedBeforeSessionFactoriesPopulated() throws Exception {
+    // Reproduces the ordering hazard where a DI container (e.g. Guice) constructs the DAO
+    // before the bundle's run() has populated sessionFactories for any tenant - the map
+    // reference is empty at DAO construction time and is populated only afterwards.
+    final Map<String, List<SessionFactory>> lateSessionFactories = new HashMap<>();
+    final Map<String, ShardManager> lateShardManager = new HashMap<>();
+    final Map<String, ShardingBundleOptions> lateShardingOptions = new HashMap<>();
+    final Map<String, ShardInfoProvider> lateShardInfoProvider = new HashMap<>();
+    final TransactionObserver observer = new EntityClassThreadLocalObserver(
+        new DaoClassLocalObserver(new TerminalTransactionObserver()));
+
+    // DAO constructed here, while lateSessionFactories/lateShardManager/etc are still empty -
+    // exactly what happens when Guice eagerly builds @Provides DAOs before bundle.run().
+    lateShardInfoProvider.put("TENANT1", new ShardInfoProvider("TENANT1"));
+    final MultiTenantRelationalDao<RelationalEntity> lateDao = new MultiTenantRelationalDao<>(
+        lateSessionFactories, RelationalEntity.class, lateShardManager, lateShardingOptions,
+        lateShardInfoProvider, observer);
+
+    // bundle.run() happens afterwards and populates the SAME map references.
+    final List<SessionFactory> factories = IntStream.range(0, 4)
+        .mapToObj(i -> buildSessionFactory(String.format("late_tenant1_%d", i)))
+        .collect(Collectors.toList());
+    lateSessionFactories.put("TENANT1", factories);
+    lateShardManager.put("TENANT1", new BalancedShardManager(factories.size()));
+    lateShardingOptions.put("TENANT1", new ShardingBundleOptions());
+
+    try {
+      // This must succeed - not throw "Unknown tenant: TENANT1" - even though the DAO was
+      // constructed before the map was populated.
+      final RelationalEntity entity = RelationalEntity.builder().key("1").value("abcd").build();
+      final var saved = lateDao.save("TENANT1", "parent1", entity);
+      assertNotNull(saved);
+      assertTrue(lateDao.exists("TENANT1", "parent1", "1"));
+
+      // Also exercises the ScrollExecutor path (transactionExecutorForTenant), which surfaced
+      // as a NullPointerException in production: transactionExecutor was a similar eager
+      // snapshot taken from shardInfoProviders at construction time.
+      final ScrollResult<RelationalEntity> scrollResult = lateDao.scrollDown(
+          "TENANT1",
+          (QuerySpec<RelationalEntity, RelationalEntity>) (root, query, cb) -> {
+          },
+          null,
+          10,
+          "key");
+      assertNotNull(scrollResult);
+    } finally {
+      factories.forEach(SessionFactory::close);
+    }
+  }
+
+  @Test
+  public void testDaoConstructedBeforeObserverChainInitialised() throws Exception {
+    // Reproduces the ordering hazard where the observer chain (bundle.rootObserver) is still
+    // null at DAO construction time - e.g. because a DI container constructed the DAO before
+    // the bundle's run() (which builds and assigns the chain) has executed. Unlike the
+    // sessionFactories/shardInfoProviders maps, rootObserver is reassigned wholesale rather than
+    // populated in place, so a DAO capturing it directly would freeze on null forever. The
+    // LazyTransactionObserver holder must resolve the real chain lazily, at call time.
+    final Map<String, List<SessionFactory>> lateSessionFactories = new HashMap<>();
+    final Map<String, ShardManager> lateShardManager = new HashMap<>();
+    final Map<String, ShardingBundleOptions> lateShardingOptions = new HashMap<>();
+    final Map<String, ShardInfoProvider> lateShardInfoProvider = new HashMap<>();
+    final io.appform.dropwizard.sharding.observers.LazyTransactionObserver observerHolder =
+        new io.appform.dropwizard.sharding.observers.LazyTransactionObserver();
+    // Note: observerHolder.set(...) is NOT called yet at this point - mirrors bundle.rootObserver
+    // being null before run()/setupObservers() executes.
+
+    lateShardInfoProvider.put("TENANT1", new ShardInfoProvider("TENANT1"));
+    final MultiTenantRelationalDao<RelationalEntity> lateDao = new MultiTenantRelationalDao<>(
+        lateSessionFactories, RelationalEntity.class, lateShardManager, lateShardingOptions,
+        lateShardInfoProvider, observerHolder);
+
+    // bundle.run() happens afterwards: populates the maps AND builds+publishes the real chain.
+    final List<SessionFactory> factories = IntStream.range(0, 4)
+        .mapToObj(i -> buildSessionFactory(String.format("late_obs_tenant1_%d", i)))
+        .collect(Collectors.toList());
+    lateSessionFactories.put("TENANT1", factories);
+    lateShardManager.put("TENANT1", new BalancedShardManager(factories.size()));
+    lateShardingOptions.put("TENANT1", new ShardingBundleOptions());
+    observerHolder.set(new EntityClassThreadLocalObserver(
+        new DaoClassLocalObserver(new TerminalTransactionObserver())));
+
+    try {
+      // This must succeed - not throw NullPointerException ("this.observer" is null) - even
+      // though the DAO captured observerHolder before the real chain was set on it.
+      final RelationalEntity entity = RelationalEntity.builder().key("1").value("abcd").build();
+      final var saved = lateDao.save("TENANT1", "parent1", entity);
+      assertNotNull(saved);
+
+      final ScrollResult<RelationalEntity> scrollResult = lateDao.scrollDown(
+          "TENANT1",
+          (QuerySpec<RelationalEntity, RelationalEntity>) (root, query, cb) -> {
+          },
+          null,
+          10,
+          "key");
+      assertNotNull(scrollResult);
+    } finally {
+      factories.forEach(SessionFactory::close);
+    }
+  }
 
   private List<String> generateIdsInSameShard(final int numIdsToBeGenerated, String tenantId) {
     int expectedShardIndex = RandomUtils.nextInt(0, sessionFactories.get(tenantId).size());

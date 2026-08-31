@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
+import io.appform.dropwizard.sharding.observers.LazyTransactionObserver;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BucketKey;
 import io.appform.dropwizard.sharding.sharding.BucketInfo;
@@ -58,6 +59,14 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   private volatile boolean bundleInitialised = false;
 
   protected TransactionObserver rootObserver;
+  // Stable object handed to every DAO instead of rootObserver directly. rootObserver itself gets
+  // reassigned wholesale per tenant inside MultiTenantDBShardingBundleBase.run(), so DAOs must
+  // never capture it by direct reference - they'd freeze on whatever it was at DAO construction
+  // time (e.g. null, if constructed by a DI container before run() executes). This holder is
+  // never reassigned; only its internal delegate is updated, via observerHolder.set(...), so any
+  // DAO holding a reference to the holder always sees the current chain when it actually invokes
+  // an operation.
+  protected final LazyTransactionObserver observerHolder = new LazyTransactionObserver();
   protected BucketResolver<String> bucketResolver;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {

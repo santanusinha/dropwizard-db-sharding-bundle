@@ -78,6 +78,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -102,14 +103,18 @@ import static io.appform.dropwizard.sharding.query.QueryUtils.equalityFilter;
 public class MultiTenantLookupDao<T> implements ShardedDao<T> {
 
     private final Map<String, List<SessionFactory>> sessionFactories;
-    private final Map<String, List<LookupDaoPriv>> daos = Maps.newHashMap();
+    // Not a snapshot: entries are resolved lazily, on first use per tenant, via
+    // daosForTenant().
+    private final Map<String, List<LookupDaoPriv>> daos = new ConcurrentHashMap<>();
     private final Class<T> entityClass;
     @Getter
     private final ShardCalculator<String> shardCalculator;
     @Getter
     private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
-    private final Map<String, TransactionExecutor> transactionExecutor = Maps.newHashMap();
+    // Not a snapshot: shardInfoProviders is retained and entries are resolved lazily, on first
+    // use per tenant, via transactionExecutorForTenant().
+    private final Map<String, TransactionExecutor> transactionExecutor = new ConcurrentHashMap<>();
     private final Map<String, ShardInfoProvider> shardInfoProviders;
     private final TransactionObserver observer;
 
@@ -141,18 +146,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
         this.sessionFactories = sessionFactories;
-        sessionFactories.forEach((tenantId, factories) -> {
-            daos.put(tenantId, factories.stream().map(LookupDaoPriv::new).collect(Collectors.toList()));
-        });
         this.entityClass = entityClass;
         this.shardCalculator = new ShardCalculator<>(shardManagers, new ConsistentHashBucketIdExtractor<>(shardManagers));
         this.shardingOptions = shardingOptions;
         this.shardInfoProviders = shardInfoProviders;
         this.observer = observer;
-        shardInfoProviders.forEach((tenantId, shardInfoProvider) -> {
-            this.transactionExecutor.put(tenantId,
-                    new TransactionExecutor(shardInfoProvider, DaoType.LOOKUP, entityClass, observer));
-        });
         Field[] fields = FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
         Preconditions.checkArgument(fields.length != 0, "At least one field needs to be sharding key");
         Preconditions.checkArgument(fields.length == 1, "Only one field can be sharding key");
@@ -205,15 +203,15 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws Exception if backing dao throws
      */
     public <U> U get(String tenantId, String key, Function<T, U> handler) throws Exception {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, key);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
                 .getter(dao::get)
                 .afterGet(handler)
                 .build();
-        return transactionExecutor.get(tenantId).execute(dao.sessionFactory, true, "get", opContext,
+        return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory, true, "get", opContext,
                 shardId);
     }
 
@@ -221,16 +219,16 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     public <U> U get(String tenantId, String key, UnaryOperator<Criteria> criteriaUpdater,
                      Function<T, U> handler)
             throws Exception {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, key);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
                 .getter(dao::get)
                 .criteriaUpdater(criteriaUpdater)
                 .afterGet(handler)
                 .build();
-        return transactionExecutor.get(tenantId)
+        return transactionExecutorForTenant(tenantId)
                 .execute(dao.sessionFactory, true, "get", opContext, shardId);
     }
 
@@ -276,18 +274,18 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws Exception if backing dao throws
      */
     public <U> U save(String tenantId, T entity, Function<T, U> handler) throws Exception {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         final String key = keyField.get(entity).toString();
         int shardId = shardCalculator.shardId(tenantId, key);
         log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key,
                 shardId);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         val opContext = Save.<T, U>builder()
                 .saver(dao::save)
                 .entity(entity)
                 .afterSave(handler)
                 .build();
-        return transactionExecutor.get(tenantId)
+        return transactionExecutorForTenant(tenantId)
                 .execute(dao.sessionFactory, false, "save", opContext, shardId);
     }
 
@@ -295,9 +293,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                       String id,
                                       UnaryOperator<T> updater,
                                       Supplier<T> entityGenerator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val shardId = shardCalculator.shardId(tenantId, id);
-        val dao = daos.get(tenantId).get(shardId);
+        val dao = daosForTenant(tenantId).get(shardId);
         val opContext = CreateOrUpdateByLookupKey.<T>builder()
                 .id(id)
                 .getLockedForWrite(dao::getLockedForWrite)
@@ -308,7 +306,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 .getter(dao::get)
                 .build();
 
-        return Optional.of(transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+        return Optional.of(transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                 false,
                 "createOrUpdate",
                 opContext, shardId));
@@ -326,9 +324,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return True if the update was successful, false otherwise.
      */
     public boolean updateInLock(String tenantId, String id, Function<Optional<T>, T> updater) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         return updateImpl(tenantId, id, dao::getLockedForWrite, updater, shardId);
     }
 
@@ -347,9 +345,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return {@code true} if the entity is successfully updated, {@code false} if it does not exist.
      */
     public boolean update(String tenantId, String id, Function<Optional<T>, T> updater) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         return updateImpl(tenantId, id, dao::get, updater, shardId);
     }
 
@@ -369,14 +367,14 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return The number of entities affected by the update operation.
      */
     public int updateUsingQuery(String tenantId, String id, UpdateOperationMeta updateOperationMeta) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         val opContext = UpdateByQuery.builder()
                 .updater(dao::update)
                 .updateOperationMeta(updateOperationMeta)
                 .build();
-        return transactionExecutor.get(tenantId)
+        return transactionExecutorForTenant(tenantId)
                 .execute(dao.sessionFactory, false, "updateUsingQuery", opContext,
                         shardId);
     }
@@ -404,15 +402,15 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                Function<String, T> getter,
                                Function<Optional<T>, T> mutator,
                                int shardId) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         try {
-            val dao = daos.get(tenantId).get(shardId);
+            val dao = daosForTenant(tenantId).get(shardId);
             val opContext = GetAndUpdateByLookupKey.<T>builder()
                     .id(id).getter(getter)
                     .mutator(mutator)
                     .updater(dao::update)
                     .build();
-            return transactionExecutor.get(tenantId)
+            return transactionExecutorForTenant(tenantId)
                     .<Boolean>execute(dao.sessionFactory, false, "updateImpl", opContext,
                             shardId);
         } catch (Exception e) {
@@ -436,9 +434,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If an error occurs during entity locking or transaction management.
      */
     public LockedContext<T> lockAndGetExecutor(String tenantId, final String id) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(id),
                 DaoType.LOOKUP, entityClass, shardInfoProviders.get(tenantId), observer);
 
@@ -464,9 +462,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId, String id,
                                                UnaryOperator<Criteria> criteriaUpdater) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
                 key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
@@ -500,9 +498,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                                String id,
                                                UnaryOperator<Criteria> criteriaUpdater,
                                                Supplier<Boolean> entityPopulator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
                 key -> dao.getLocked(key, criteriaUpdater, LockMode.NONE),
@@ -526,14 +524,14 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public LockedContext<T> saveAndGetExecutor(String tenantId, T entity) {
         String id;
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         try {
             id = keyField.get(entity).toString();
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, dao::save,
                 DaoType.LOOKUP, entity,
                 entityClass, shardInfoProviders.get(tenantId), observer);
@@ -551,18 +549,18 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @return A list of entities obtained by executing the query criteria on all available shards.
      */
     public List<T> scatterGather(String tenantId, DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        return IntStream.range(0, daosForTenant(tenantId).size())
                 .mapToObj(shardId -> {
                     try {
-                        val dao = daos.get(tenantId).get(shardId);
+                        val dao = daosForTenant(tenantId).get(shardId);
                         val opContext = Select.<T, List<T>>builder()
                                 .getter(dao::select)
                                 .selectParam(SelectParam.<T>builder()
                                         .criteria(criteria)
                                         .build())
                                 .build();
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                        return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                                 true, "scatterGather", opContext,
                                 shardId);
                     } catch (Exception e) {
@@ -607,11 +605,11 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec, int start,
                                  int numRows) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        return IntStream.range(0, daosForTenant(tenantId).size())
                 .mapToObj(shardId -> {
                     try {
-                        val dao = daos.get(tenantId).get(shardId);
+                        val dao = daosForTenant(tenantId).get(shardId);
                         OpContext<List<T>> opContext = Select.<T, List<T>>builder()
                                 .getter(dao::select)
                                 .selectParam(SelectParam.<T>builder()
@@ -620,7 +618,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                         .numRows(numRows)
                                         .build())
                                 .build();
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                        return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                                 true,
                                 "scatterGather",
                                 opContext,
@@ -656,7 +654,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                       final ScrollPointer inPointer,
                                       final int pageSize,
                                       @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         log.trace("Scroll Pointer: {}", inPointer);
         val pointer = inPointer == null ? new ScrollPointer(ScrollPointer.Direction.DOWN) : inPointer;
         Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.DOWN),
@@ -695,7 +693,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                     final ScrollPointer inPointer,
                                     final int pageSize,
                                     @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val pointer = null == inPointer ? new ScrollPointer(ScrollPointer.Direction.UP) : inPointer;
         Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.UP),
                 "An up scroll pointer needs to be passed to this method");
@@ -724,16 +722,16 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If an error occurs while querying the database.
      */
     public List<Long> count(String tenantId, DetachedCriteria criteria) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        return IntStream.range(0, daos.get(tenantId).size())
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        return IntStream.range(0, daosForTenant(tenantId).size())
                 .mapToObj(shardId -> {
-                    val dao = daos.get(tenantId).get(shardId);
+                    val dao = daosForTenant(tenantId).get(shardId);
                     val opContext = Count.builder()
                             .counter(dao::count)
                             .criteria(criteria)
                             .build();
                     try {
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                        return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                                 true,
                                 "count",
                                 opContext,
@@ -768,16 +766,16 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     @SuppressWarnings("rawtypes")
     public <U> U run(String tenantId, DetachedCriteria criteria,
                      Function<Map<Integer, List<T>>, U> translator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val output = IntStream.range(0, daos.get(tenantId).size())
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        val output = IntStream.range(0, daosForTenant(tenantId).size())
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
-                    final LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+                    final LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
                     OpContext<List<T>> opContext = RunWithCriteria.<List<T>>builder()
                             .handler(dao::run)
                             .detachedCriteria(criteria)
                             .build();
-                    return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                    return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                             true, "run",
                             opContext,
                             shardId);
@@ -798,7 +796,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      * @throws RuntimeException If an error occurs while querying the database.
      */
     public List<T> get(String tenantId, List<String> keys) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         Map<Integer, List<String>> lookupKeysGroupByShards = keys.stream()
                 .collect(
                         Collectors.groupingBy(key -> shardCalculator.shardId(tenantId, key),
@@ -809,10 +807,10 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                         .add(Restrictions.in(keyField.getName(), lookupKeysGroupByShards.get(shardId)));
                 val opContext = Get.<List<T>, List<T>>builder()
                         .criteria(criteria)
-                        .getter(daos.get(tenantId).get(shardId)::select)
+                        .getter(daosForTenant(tenantId).get(shardId)::select)
                         .build();
-                return transactionExecutor.get(tenantId)
-                        .execute(daos.get(tenantId).get(shardId).sessionFactory, true, "get",
+                return transactionExecutorForTenant(tenantId)
+                        .execute(daosForTenant(tenantId).get(shardId).sessionFactory, true, "get",
                                 opContext, shardId);
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -836,13 +834,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *                          executing the handler.
      */
     public <U> U runInSession(String tenantId, String id, Function<Session, U> handler) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
-        LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+        LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
         val opContext = RunInSession.<U>builder()
                 .handler(handler)
                 .build();
-        return transactionExecutor.get(tenantId)
+        return transactionExecutorForTenant(tenantId)
                 .execute(dao.sessionFactory, true, "runInSession", opContext,
                         shardId);
     }
@@ -850,16 +848,16 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     public <U, V> V runInSession(String tenantId,
                                  BiFunction<Integer, Session, U> sessionHandler,
                                  Function<Map<Integer, U>, V> translator) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val output = IntStream.range(0, daos.get(tenantId).size())
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        val output = IntStream.range(0, daosForTenant(tenantId).size())
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
-                    final LookupDaoPriv dao = daos.get(tenantId).get(shardId);
+                    final LookupDaoPriv dao = daosForTenant(tenantId).get(shardId);
                     RunInSession<U> opContext = RunInSession.<U>builder()
                             .handler(currSession -> sessionHandler.apply(shardId, currSession))
                             .build();
                     try {
-                        return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                        return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                                 true,
                                 "runInSession",
                                 opContext,
@@ -885,13 +883,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *                          management.
      */
     public boolean delete(String tenantId, String id) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         int shardId = shardCalculator.shardId(tenantId, id);
         val opContext = DeleteByLookupKey.builder()
                 .id(id)
-                .handler(daos.get(tenantId).get(shardId)::delete)
+                .handler(daosForTenant(tenantId).get(shardId)::delete)
                 .build();
-        return transactionExecutor.get(tenantId).execute(daos.get(tenantId).get(shardId).sessionFactory,
+        return transactionExecutorForTenant(tenantId).execute(daosForTenant(tenantId).get(shardId).sessionFactory,
                 false,
                 "delete",
                 opContext,
@@ -911,13 +909,13 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     }
 
     private ScrollExecutor<T> buildScrollExecutor(String tenantId) {
-        val daoList = daos.get(tenantId);
+        val daoList = daosForTenant(tenantId);
         return new ScrollExecutor<>(
                 daoList.stream().map(dao -> dao.sessionFactory).collect(Collectors.toList()),
                 daoList.stream()
                         .map(dao -> (Function<SelectParam, List<T>>) dao::select)
                         .collect(Collectors.toList()),
-                transactionExecutor.get(tenantId),
+                transactionExecutorForTenant(tenantId),
                 entityClass);
     }
 
@@ -943,7 +941,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                       final ScrollPointer inPointer,
                                       final int pageSize,
                                       @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         log.trace("Scroll Pointer: {}", inPointer);
         return buildScrollExecutor(tenantId).scrollDown(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
@@ -971,7 +969,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                     final ScrollPointer inPointer,
                                     final int pageSize,
                                     @NonNull final String sortFieldName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         return buildScrollExecutor(tenantId).scrollUp(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
 
@@ -983,9 +981,9 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                        final UnaryOperator<DetachedCriteria> criteriaMutator,
                                        final Comparator<ScrollResultItem<T>> comparator,
                                        String methodName) {
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(sessionFactories.containsKey(tenantId), "Unknown tenant: " + tenantId);
         val daoIndex = new AtomicInteger();
-        val results = daos.get(tenantId).stream()
+        val results = daosForTenant(tenantId).stream()
                 .flatMap(dao -> {
                     val currIdx = daoIndex.getAndIncrement();
                     val criteria = criteriaMutator.apply(InternalUtils.cloneObject(inCriteria));
@@ -997,7 +995,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                     .numRows(pageSize)
                                     .build())
                             .build();
-                    return transactionExecutor.get(tenantId).execute(dao.sessionFactory,
+                    return transactionExecutorForTenant(tenantId).execute(dao.sessionFactory,
                                     true, methodName,
                                     opContext, currIdx)
                             .stream()
@@ -1013,6 +1011,38 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             pointer.advance(result.getShardIdx(), 1);// will get advanced
         });
         return new ScrollResult<>(pointer, outputBuilder.build());
+    }
+
+    /**
+     * Resolves the {@code TransactionExecutor} for a tenant, building it lazily on first use and
+     * caching it thereafter. See {@code daosForTenant} for the rationale behind lazy resolution -
+     * {@code shardInfoProviders} may still be empty at construction time if this DAO is
+     * constructed by a DI container before the bundle's {@code run()} has populated it.
+     *
+     * @throws IllegalArgumentException if the tenant is not (yet) present in
+     *                                  {@code shardInfoProviders}
+     */
+    private TransactionExecutor transactionExecutorForTenant(final String tenantId) {
+        return transactionExecutor.computeIfAbsent(tenantId, t -> {
+            final ShardInfoProvider shardInfoProvider = shardInfoProviders.get(t);
+            Preconditions.checkArgument(shardInfoProvider != null, "Unknown tenant: " + t);
+            return new TransactionExecutor(shardInfoProvider, DaoType.LOOKUP, entityClass, observer);
+        });
+    }
+
+    /**
+     * Resolves the list of per-shard {@code LookupDaoPriv} wrappers for a tenant, building it
+     * lazily on first use and caching it thereafter. See
+     * {@code MultiTenantRelationalDao#daosForTenant} for the rationale behind lazy resolution.
+     *
+     * @throws IllegalArgumentException if the tenant is not (yet) present in {@code sessionFactories}
+     */
+    private List<LookupDaoPriv> daosForTenant(final String tenantId) {
+        return daos.computeIfAbsent(tenantId, t -> {
+            final List<SessionFactory> factories = sessionFactories.get(t);
+            Preconditions.checkArgument(factories != null, "Unknown tenant: " + t);
+            return factories.stream().map(LookupDaoPriv::new).collect(Collectors.toList());
+        });
     }
 
     /**
@@ -1472,6 +1502,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                 }
             });
         }
+
     }
 
     /**

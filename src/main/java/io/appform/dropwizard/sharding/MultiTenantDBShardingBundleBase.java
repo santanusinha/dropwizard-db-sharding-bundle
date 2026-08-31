@@ -214,7 +214,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         this.shardManagers,
         this.shardingOptions,
         shardInfoProviders,
-        rootObserver);
+        observerHolder);
   }
 
   public <EntityType, T extends Configuration>
@@ -225,7 +225,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,
-        rootObserver);
+        observerHolder);
   }
 
   public <EntityType, T extends Configuration>
@@ -234,7 +234,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         this.shardManagers,
         this.shardingOptions,
         shardInfoProviders,
-        rootObserver);
+        observerHolder);
   }
 
 
@@ -247,7 +247,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,
-        rootObserver);
+        observerHolder);
   }
 
   public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
@@ -337,6 +337,10 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
                     metricRegistry)).setNext(rootObserver);
 
     rootObserver = new FilteringObserver(rootObserver).addFilters(filters);
+    // Publish the freshly built chain to the stable holder. DAOs hold a reference to
+    // observerHolder itself (never reassigned), not to rootObserver directly, so this update is
+    // visible to any DAO regardless of when it was constructed relative to this method running.
+    observerHolder.set(rootObserver);
     //Print the observer chain
     log.debug("Observer chain");
     rootObserver.visit(observer -> {
