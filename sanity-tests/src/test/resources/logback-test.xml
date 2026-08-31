@@ -1,0 +1,21 @@
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Bundle internals: show connection borrow/return -->
+    <logger name="io.appform.dropwizard.sharding.hibernate" level="INFO"/>
+
+    <!-- Sanity test infrastructure: show controlled connection setup -->
+    <logger name="io.appform.dropwizard.sharding.sanity" level="INFO"/>
+
+    <!-- Hibernate SQL for debugging -->
+    <logger name="org.hibernate.SQL" level="DEBUG"/>
+    <logger name="org.mariadb.jdbc" level="DEBUG"/>
+
+    <root level="WARN">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
