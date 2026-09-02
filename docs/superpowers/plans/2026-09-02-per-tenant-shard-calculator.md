@@ -172,7 +172,11 @@ git commit -m "refactor: add tenant-bound shard calculators" \
 
 - [ ] **Step 1: Write failing registry tests**
 
-Cover retrieval, missing tenants, duplicate rejection, atomic batch behavior, clearing, and concurrent reads:
+Cover retrieval, missing tenants, duplicate rejection, clearing, concurrent
+reads, and atomic batch visibility. For the atomic regression, use a custom
+insertion-ordered map that allows the two validation traversals to complete,
+then pauses the third traversal before its second entry. While registration is
+paused, compare the visibility of the first and last new tenants:
 
 ```java
 class ShardCalculatorRegistryTest {
@@ -250,6 +254,47 @@ class ShardCalculatorRegistryTest {
     }
 
     @Test
+    void batchRegistrationIsPublishedAtomically() throws Exception {
+        var oldCalculator = calculatorFor("OLD", 4);
+        ShardCalculatorRegistry.register(Map.of("OLD", oldCalculator));
+
+        var batch = new LinkedHashMap<String, ShardCalculator<String>>();
+        batch.put("NEW-FIRST", calculatorFor("NEW-FIRST", 2));
+        batch.put("NEW-MIDDLE", calculatorFor("NEW-MIDDLE", 4));
+        batch.put("NEW-LAST", calculatorFor("NEW-LAST", 8));
+        var firstEntryTransferred = new CountDownLatch(1);
+        var continuePublication = new CountDownLatch(1);
+        var pausingBatch = new PublicationPausingMap(
+                batch,
+                firstEntryTransferred,
+                continuePublication);
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var registration = executor.submit(
+                    () -> ShardCalculatorRegistry.register(pausingBatch));
+
+            assertTrue(firstEntryTransferred.await(5, TimeUnit.SECONDS));
+            boolean firstVisible = isRegistered("NEW-FIRST");
+            boolean lastVisible = isRegistered("NEW-LAST");
+            assertEquals(
+                    firstVisible,
+                    lastVisible,
+                    "A reader must not observe one tenant from a batch "
+                            + "while another remains missing");
+
+            continuePublication.countDown();
+            registration.get(5, TimeUnit.SECONDS);
+            batch.forEach((tenantId, calculator) -> assertSame(
+                    calculator,
+                    ShardCalculatorRegistry.get(tenantId)));
+            assertSame(oldCalculator, ShardCalculatorRegistry.get("OLD"));
+        } finally {
+            continuePublication.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void clearRemovesEveryTenant() {
         ShardCalculatorRegistry.register(Map.of(
                 "TENANT1", calculatorFor("TENANT1", 2),
@@ -293,10 +338,91 @@ class ShardCalculatorRegistryTest {
                 new ConsistentHashBucketIdExtractor<>(
                         Map.of(tenantId, manager)));
     }
+
+    private boolean isRegistered(String tenantId) {
+        try {
+            ShardCalculatorRegistry.get(tenantId);
+            return true;
+        } catch (IllegalStateException ignored) {
+            return false;
+        }
+    }
+
+    private static final class PublicationPausingMap
+            extends AbstractMap<String, ShardCalculator<String>> {
+        private static final int BATCH_COPY_TRAVERSAL = 3;
+
+        private final LinkedHashMap<String, ShardCalculator<String>> delegate;
+        private final CountDownLatch firstEntryTransferred;
+        private final CountDownLatch continuePublication;
+        private final AtomicInteger entrySetCalls = new AtomicInteger();
+
+        private PublicationPausingMap(
+                LinkedHashMap<String, ShardCalculator<String>> delegate,
+                CountDownLatch firstEntryTransferred,
+                CountDownLatch continuePublication) {
+            this.delegate = delegate;
+            this.firstEntryTransferred = firstEntryTransferred;
+            this.continuePublication = continuePublication;
+        }
+
+        @Override
+        public Set<Entry<String, ShardCalculator<String>>> entrySet() {
+            if (entrySetCalls.incrementAndGet() != BATCH_COPY_TRAVERSAL) {
+                return delegate.entrySet();
+            }
+            return new AbstractSet<>() {
+                @Override
+                public Iterator<Entry<String, ShardCalculator<String>>>
+                        iterator() {
+                    var entries = List.copyOf(delegate.entrySet());
+                    return new Iterator<>() {
+                        private int index;
+
+                        @Override
+                        public boolean hasNext() {
+                            return index < entries.size();
+                        }
+
+                        @Override
+                        public Entry<String, ShardCalculator<String>> next() {
+                            if (index == 1) {
+                                firstEntryTransferred.countDown();
+                                try {
+                                    assertTrue(continuePublication.await(
+                                            5,
+                                            TimeUnit.SECONDS));
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                    throw new AssertionError(e);
+                                }
+                            }
+                            return entries.get(index++);
+                        }
+                    };
+                }
+
+                @Override
+                public int size() {
+                    return delegate.size();
+                }
+            };
+        }
+
+        @Override
+        public int size() {
+            return delegate.size();
+        }
+    }
 }
 ```
 
-Add the imports required by the code above.
+The pausing entry-set iterator signals `firstEntryTransferred` before returning
+its second entry, then waits up to five seconds for `continuePublication`.
+Against a live `ConcurrentHashMap.putAll`, the first tenant is visible and the
+last is absent, so the equality assertion fails. Against immutable
+copy-on-write publication, both tenants remain absent until the completed
+snapshot is assigned. Add the imports required by the code above.
 
 - [ ] **Step 2: Run the registry tests and verify the class is missing**
 
@@ -315,8 +441,8 @@ Create a final utility class:
 ```java
 public final class ShardCalculatorRegistry {
 
-    private static final ConcurrentMap<String, ShardCalculator<String>>
-            CALCULATORS = new ConcurrentHashMap<>();
+    private static volatile Map<String, ShardCalculator<String>> calculators =
+            Map.of();
 
     private ShardCalculatorRegistry() {
     }
@@ -327,18 +453,24 @@ public final class ShardCalculatorRegistry {
         calculators.forEach((tenantId, calculator) -> {
             Objects.requireNonNull(tenantId, "tenantId");
             Objects.requireNonNull(calculator, "calculator");
-            if (CALCULATORS.containsKey(tenantId)) {
+        });
+        Map<String, ShardCalculator<String>> current =
+                ShardCalculatorRegistry.calculators;
+        calculators.keySet().forEach(tenantId -> {
+            if (current.containsKey(tenantId)) {
                 throw new IllegalStateException(
                         "ShardCalculator already registered for tenant: "
                                 + tenantId);
             }
         });
-        CALCULATORS.putAll(calculators);
+        Map<String, ShardCalculator<String>> updated = new HashMap<>(current);
+        updated.putAll(calculators);
+        ShardCalculatorRegistry.calculators = Map.copyOf(updated);
     }
 
     public static ShardCalculator<String> get(String tenantId) {
-        Objects.requireNonNull(tenantId, "tenantId");
-        var calculator = CALCULATORS.get(tenantId);
+        Map<String, ShardCalculator<String>> snapshot = calculators;
+        var calculator = snapshot.get(tenantId);
         if (calculator == null) {
             throw new IllegalStateException(
                     "ShardCalculator has not been registered for tenant: "
@@ -349,13 +481,15 @@ public final class ShardCalculatorRegistry {
 
     @VisibleForTesting
     public static synchronized void clear() {
-        CALCULATORS.clear();
+        calculators = Map.of();
     }
 }
 ```
 
-Use Guava's `VisibleForTesting` and JDK concurrent collections. Validation must
-complete before `putAll`.
+Use Guava's `VisibleForTesting`. Registration validates against one captured
+snapshot, builds an immutable merged copy, and publishes it with one volatile
+assignment. `get` captures one snapshot, and `clear` publishes the empty
+snapshot. Do not mutate a live concurrent map entry by entry.
 
 - [ ] **Step 4: Add the shared test registration helper**
 

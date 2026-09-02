@@ -67,7 +67,12 @@ are removed.
 ### `ShardCalculatorRegistry`
 
 `ShardCalculatorRegistry` is a static, process-wide registry backed by a
-`ConcurrentHashMap<String, ShardCalculator<String>>`.
+volatile, immutable copy-on-write snapshot:
+
+```java
+private static volatile Map<String, ShardCalculator<String>> calculators =
+        Map.of();
+```
 
 It exposes:
 
@@ -82,13 +87,18 @@ public static void clear()
 Registration is synchronized and all-or-nothing:
 
 1. Validate the input map, tenant IDs, and calculators.
-2. Check every tenant ID for an existing registration.
-3. If any tenant exists, throw `IllegalStateException` without publishing any
-   entries.
-4. Otherwise publish the complete map.
+2. Capture the current immutable snapshot.
+3. Check every tenant ID for an existing registration. If any tenant exists,
+   throw `IllegalStateException` without publishing any entries.
+4. Build an immutable merged snapshot without changing the published state.
+5. Publish the complete batch with one volatile assignment.
 
 This allows separate bundles with disjoint tenant IDs while preventing two
 configurations from claiming the same JVM-global tenant.
+
+`get(tenantId)` captures the volatile snapshot once and performs its lookup
+against that snapshot. `clear()` publishes `Map.of()` with one volatile
+assignment.
 
 `get(tenantId)` throws:
 
@@ -198,6 +208,11 @@ remain.
 - Reject duplicate tenants without partially publishing a batch.
 - Clear all entries between tests.
 - Support concurrent reads after successful registration.
+- Pause an insertion-ordered map during the actual batch-copy traversal and
+  assert that a reader cannot observe the first new tenant while the last
+  tenant remains missing. This regression test fails for entry-by-entry
+  publication into a live concurrent map and passes for one-assignment snapshot
+  publication.
 
 ### Bundle tests
 

@@ -21,11 +21,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -153,52 +151,32 @@ public class ShardCalculatorRegistryTest {
         ShardCalculatorRegistry.register(Map.of("OLD", oldCalculator));
 
         var batch = new LinkedHashMap<String, ShardCalculator<String>>();
-        for (int i = 0; i < 64; i++) {
-            var tenantId = "NEW-" + i;
-            batch.put(tenantId, calculatorFor(tenantId, 1 << (i % 4)));
-        }
-        var batchTenantIds = List.copyOf(batch.keySet());
-        var firstEntryRequested = new CountDownLatch(1);
-        var releaseBatch = new CountDownLatch(1);
-        var readersStart = new CountDownLatch(1);
-        var partialObserved = new AtomicBoolean(false);
-        var blockingBatch = new BlockingBatchMap(batch, firstEntryRequested, releaseBatch);
+        batch.put("NEW-FIRST", calculatorFor("NEW-FIRST", 2));
+        batch.put("NEW-MIDDLE", calculatorFor("NEW-MIDDLE", 4));
+        batch.put("NEW-LAST", calculatorFor("NEW-LAST", 8));
+        var firstEntryTransferred = new CountDownLatch(1);
+        var continuePublication = new CountDownLatch(1);
+        var pausingBatch = new PublicationPausingMap(batch, firstEntryTransferred, continuePublication);
 
-        ExecutorService executor = Executors.newFixedThreadPool(5);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            Future<?> registerFuture = executor.submit(() -> {
-                try {
-                    ShardCalculatorRegistry.register(blockingBatch);
-                } finally {
-                    releaseBatch.countDown();
-                }
-            });
+            Future<?> registerFuture = executor.submit(() -> ShardCalculatorRegistry.register(pausingBatch));
 
-            assertTrue(firstEntryRequested.await(5, TimeUnit.SECONDS));
+            assertTrue(firstEntryTransferred.await(5, TimeUnit.SECONDS));
+            boolean firstVisible = isRegistered("NEW-FIRST");
+            boolean lastVisible = isRegistered("NEW-LAST");
+            assertEquals(
+                    firstVisible,
+                    lastVisible,
+                    "A reader must not observe one tenant from a batch while another remains missing");
 
-            List<Future<?>> readerFutures = List.of(
-                    executor.submit(snapshotReaderTask(readersStart, releaseBatch, batchTenantIds, partialObserved)),
-                    executor.submit(snapshotReaderTask(readersStart, releaseBatch, batchTenantIds, partialObserved)),
-                    executor.submit(snapshotReaderTask(readersStart, releaseBatch, batchTenantIds, partialObserved)),
-                    executor.submit(snapshotReaderTask(readersStart, releaseBatch, batchTenantIds, partialObserved)));
-
-            readersStart.countDown();
-
-            for (int i = 0; i < 100_000 && !partialObserved.get(); i++) {
-                Thread.onSpinWait();
-            }
-
-            assertFalse(partialObserved.get(), "Expected readers to see only complete snapshots while registration was in progress");
-
-            releaseBatch.countDown();
+            continuePublication.countDown();
             registerFuture.get(5, TimeUnit.SECONDS);
-            for (Future<?> future : readerFutures) {
-                future.get(5, TimeUnit.SECONDS);
-            }
 
             batch.forEach((tenantId, calculator) -> assertSame(calculator, ShardCalculatorRegistry.get(tenantId)));
             assertSame(oldCalculator, ShardCalculatorRegistry.get("OLD"));
         } finally {
+            continuePublication.countDown();
             executor.shutdownNow();
         }
     }
@@ -218,68 +196,35 @@ public class ShardCalculatorRegistryTest {
         };
     }
 
-    private Callable<Void> snapshotReaderTask(
-            CountDownLatch start,
-            CountDownLatch stop,
-            List<String> tenantIds,
-            AtomicBoolean partialObserved) {
-        return () -> {
-            start.await(5, TimeUnit.SECONDS);
-            var snapshot = registrySnapshot();
-            while (stop.getCount() > 0 && !partialObserved.get()) {
-                int visibleCount = 0;
-                for (String tenantId : tenantIds) {
-                    if (snapshot.containsKey(tenantId)) {
-                        visibleCount++;
-                    }
-                }
-                if (visibleCount > 0 && visibleCount < tenantIds.size()) {
-                    partialObserved.set(true);
-                    break;
-                }
-                Thread.onSpinWait();
-            }
-            return null;
-        };
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, ShardCalculator<String>> registrySnapshot() {
+    private boolean isRegistered(String tenantId) {
         try {
-            var field = ShardCalculatorRegistry.class.getDeclaredField("calculators");
-            field.setAccessible(true);
-            return (Map<String, ShardCalculator<String>>) field.get(null);
-        } catch (NoSuchFieldException e) {
-            try {
-                var field = ShardCalculatorRegistry.class.getDeclaredField("REGISTRY");
-                field.setAccessible(true);
-                return (Map<String, ShardCalculator<String>>) field.get(null);
-            } catch (ReflectiveOperationException inner) {
-                throw new AssertionError("Unable to inspect registry snapshot", inner);
-            }
-        } catch (IllegalAccessException e) {
-            throw new AssertionError("Unable to inspect registry snapshot", e);
+            ShardCalculatorRegistry.get(tenantId);
+            return true;
+        } catch (IllegalStateException ignored) {
+            return false;
         }
     }
 
-    private static final class BlockingBatchMap extends AbstractMap<String, ShardCalculator<String>> {
+    private static final class PublicationPausingMap extends AbstractMap<String, ShardCalculator<String>> {
+        private static final int BATCH_COPY_TRAVERSAL = 3;
+
         private final LinkedHashMap<String, ShardCalculator<String>> delegate;
-        private final CountDownLatch firstEntryRequested;
-        private final CountDownLatch releaseBatch;
+        private final CountDownLatch firstEntryTransferred;
+        private final CountDownLatch continuePublication;
         private final AtomicInteger entrySetCalls = new AtomicInteger();
 
-        private BlockingBatchMap(
+        private PublicationPausingMap(
                 LinkedHashMap<String, ShardCalculator<String>> delegate,
-                CountDownLatch firstEntryRequested,
-                CountDownLatch releaseBatch) {
+                CountDownLatch firstEntryTransferred,
+                CountDownLatch continuePublication) {
             this.delegate = delegate;
-            this.firstEntryRequested = firstEntryRequested;
-            this.releaseBatch = releaseBatch;
+            this.firstEntryTransferred = firstEntryTransferred;
+            this.continuePublication = continuePublication;
         }
 
         @Override
         public Set<Entry<String, ShardCalculator<String>>> entrySet() {
-            if (entrySetCalls.incrementAndGet() == 1) {
+            if (entrySetCalls.incrementAndGet() != BATCH_COPY_TRAVERSAL) {
                 return delegate.entrySet();
             }
             return new AbstractSet<>() {
@@ -297,9 +242,9 @@ public class ShardCalculatorRegistryTest {
                         @Override
                         public Entry<String, ShardCalculator<String>> next() {
                             if (index == 1) {
-                                firstEntryRequested.countDown();
+                                firstEntryTransferred.countDown();
                                 try {
-                                    assertTrue(releaseBatch.await(5, TimeUnit.SECONDS));
+                                    assertTrue(continuePublication.await(5, TimeUnit.SECONDS));
                                 } catch (InterruptedException e) {
                                     Thread.currentThread().interrupt();
                                     throw new AssertionError(e);
