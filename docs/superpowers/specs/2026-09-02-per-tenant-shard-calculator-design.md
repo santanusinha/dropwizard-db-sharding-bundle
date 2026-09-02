@@ -235,4 +235,3 @@ remain.
 | Modify | Multi-tenant lookup, relational, cacheable, and wrapper DAOs |
 | Modify | Single-tenant DAO wrappers and affected tests |
 | Delete | `dao/ShardedDao.java` |
-
