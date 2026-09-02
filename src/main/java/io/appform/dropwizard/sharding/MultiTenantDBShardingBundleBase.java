@@ -51,6 +51,8 @@ import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import io.dropwizard.Configuration;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
@@ -114,6 +116,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public void run(T configuration, Environment environment) {
     this.completeBundleInitialization();
     final var tenantedConfig = getConfig(configuration);
+    final Map<String, ShardCalculator<String>> shardCalculators = Maps.newHashMap();
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
       //Encryption Support through jasypt-hibernate5
       var shardingOption = shardConfig.getShardingOptions();
@@ -124,6 +127,11 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       try {
         final var blacklistingStore = getBlacklistingStore();
         final var shardManager = createShardManager(shardCount, blacklistingStore);
+        final var tenantShardManagers = Map.of(tenantId, shardManager);
+        shardCalculators.put(tenantId, new ShardCalculator<>(
+                tenantId,
+                shardManager,
+                new ConsistentHashBucketIdExtractor<>(tenantShardManagers)));
         this.shardManagers.put(tenantId, shardManager);
         final var shardInfoProvider = new ShardInfoProvider(tenantId);
         this.shardInfoProviders.put(tenantId, shardInfoProvider);
@@ -184,7 +192,12 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
       }
     });
+    ShardCalculatorRegistry.register(shardCalculators);
     registerBucketIdExtractor(this.shardManagers);
+  }
+
+  public ShardCalculator<String> getShardCalculator(String tenantId) {
+    return ShardCalculatorRegistry.get(tenantId);
   }
 
   @Override

@@ -19,6 +19,7 @@ package io.appform.dropwizard.sharding;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
@@ -32,6 +33,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntityWithAIId;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,17 @@ import org.junit.jupiter.api.Test;
  * Core systems are not mocked. Uses H2 for testing.
  */
 public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
+
+    @Test
+    public void exposesDefaultNamespaceCalculator() {
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+
+        assertSame(
+                ShardCalculatorRegistry.get(bundle.getDbNamespace()),
+                bundle.getShardCalculator());
+    }
 
     @Test
     public void testBundle() throws Exception {

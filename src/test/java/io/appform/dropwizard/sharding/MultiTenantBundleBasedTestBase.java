@@ -6,6 +6,7 @@ import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import io.dropwizard.Configuration;
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jersey.DropwizardResourceConfig;
@@ -15,6 +16,7 @@ import io.dropwizard.setup.AdminEnvironment;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.Getter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.util.List;
@@ -29,11 +31,19 @@ public abstract class MultiTenantBundleBasedTestBase {
   protected static class TestConfig extends Configuration {
 
     @Getter
-    private MultiTenantShardedHibernateFactory shards = new MultiTenantShardedHibernateFactory(Map.of("TENANT1",
-        ShardedHibernateFactory.builder()
-            .shardingOptions(ShardingBundleOptions.builder().build()).build(),
-        "TENANT2", ShardedHibernateFactory.builder()
-            .shardingOptions(ShardingBundleOptions.builder().build()).build()));
+    private final MultiTenantShardedHibernateFactory shards;
+
+    TestConfig() {
+      this(new MultiTenantShardedHibernateFactory(Map.of("TENANT1",
+          ShardedHibernateFactory.builder()
+              .shardingOptions(ShardingBundleOptions.builder().build()).build(),
+          "TENANT2", ShardedHibernateFactory.builder()
+              .shardingOptions(ShardingBundleOptions.builder().build()).build())));
+    }
+
+    TestConfig(MultiTenantShardedHibernateFactory shards) {
+      this.shards = shards;
+    }
   }
 
   protected final TestConfig testConfig = new TestConfig();
@@ -73,5 +83,10 @@ public abstract class MultiTenantBundleBasedTestBase {
     when(environment.admin()).thenReturn(adminEnvironment);
     when(bootstrap.getHealthCheckRegistry()).thenReturn(mock(HealthCheckRegistry.class));
     when(bootstrap.getObjectMapper()).thenReturn(mock(ObjectMapper.class));
+  }
+
+  @AfterEach
+  public void clearShardCalculatorRegistry() {
+    ShardCalculatorRegistry.clear();
   }
 }
