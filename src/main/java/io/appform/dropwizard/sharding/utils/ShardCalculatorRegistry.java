@@ -2,14 +2,17 @@ package io.appform.dropwizard.sharding.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
+/**
+ * Registry for tenant-specific shard calculators.
+ * Publishes each batch as a single immutable snapshot.
+ */
 public final class ShardCalculatorRegistry {
 
-    private static final ConcurrentMap<String, ShardCalculator<String>> REGISTRY = new ConcurrentHashMap<>();
+    private static volatile Map<String, ShardCalculator<String>> calculators = Map.of();
 
     private ShardCalculatorRegistry() {
     }
@@ -20,16 +23,20 @@ public final class ShardCalculatorRegistry {
             Objects.requireNonNull(tenantId, "tenantId");
             Objects.requireNonNull(calculator, "calculator");
         });
+        Map<String, ShardCalculator<String>> current = ShardCalculatorRegistry.calculators;
         calculators.keySet().forEach(tenantId -> {
-            if (REGISTRY.containsKey(tenantId)) {
+            if (current.containsKey(tenantId)) {
                 throw new IllegalStateException("ShardCalculator already registered for tenant: " + tenantId);
             }
         });
-        REGISTRY.putAll(calculators);
+        Map<String, ShardCalculator<String>> updated = new HashMap<>(current);
+        updated.putAll(calculators);
+        ShardCalculatorRegistry.calculators = Map.copyOf(updated);
     }
 
     public static ShardCalculator<String> get(String tenantId) {
-        ShardCalculator<String> calculator = REGISTRY.get(tenantId);
+        Map<String, ShardCalculator<String>> snapshot = calculators;
+        ShardCalculator<String> calculator = snapshot.get(tenantId);
         if (calculator == null) {
             throw new IllegalStateException("ShardCalculator has not been registered for tenant: " + tenantId);
         }
@@ -38,6 +45,6 @@ public final class ShardCalculatorRegistry {
 
     @VisibleForTesting
     public static synchronized void clear() {
-        REGISTRY.clear();
+        calculators = Map.of();
     }
 }
