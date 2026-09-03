@@ -174,7 +174,7 @@ public class MultiTenantRelationalDaoTest {
         () -> new MultiTenantRelationalDao<>(
             Map.of("TENANT1", sessionFactories.get("TENANT1")),
             RelationalEntity.class,
-            new ShardCalculatorRegistry(),
+            ShardCalculatorTestUtils.registryFor(Map.of()),
             Map.of("TENANT1", new ShardingBundleOptions()),
             Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
             new TerminalTransactionObserver()));

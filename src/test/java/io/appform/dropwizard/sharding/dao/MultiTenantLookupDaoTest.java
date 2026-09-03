@@ -249,7 +249,7 @@ public class MultiTenantLookupDaoTest {
         () -> new MultiTenantLookupDao<>(
             Map.of("TENANT1", sessionFactories.get("TENANT1")),
             TestEntity.class,
-            new ShardCalculatorRegistry(),
+            ShardCalculatorTestUtils.registryFor(Map.of()),
             Map.of("TENANT1", new ShardingBundleOptions()),
             Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
             new TerminalTransactionObserver()));

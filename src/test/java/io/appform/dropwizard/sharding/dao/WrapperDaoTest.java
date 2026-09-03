@@ -128,7 +128,7 @@ public class WrapperDaoTest {
 
     @Test
     void testConstructorRejectsMissingNamespace() {
-        ShardCalculatorRegistry emptyRegistry = new ShardCalculatorRegistry();
+        ShardCalculatorRegistry emptyRegistry = ShardCalculatorTestUtils.registryFor(Map.of());
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
