@@ -2,7 +2,9 @@ package io.appform.dropwizard.sharding.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -16,18 +18,21 @@ public final class ShardCalculatorRegistry {
 
     public synchronized void register(Map<String, ShardCalculator<String>> calculators) {
         Objects.requireNonNull(calculators, "calculators");
-        calculators.forEach((tenantId, calculator) -> {
-            Objects.requireNonNull(tenantId, "tenantId");
-            Objects.requireNonNull(calculator, "calculator");
-        });
+        Map<String, ShardCalculator<String>> validatedBatch = new LinkedHashMap<>();
+        for (Map.Entry<String, ShardCalculator<String>> entry : calculators.entrySet()) {
+            String tenantId = Objects.requireNonNull(entry.getKey(), "tenantId");
+            ShardCalculator<String> calculator = Objects.requireNonNull(entry.getValue(), "calculator");
+            validatedBatch.put(tenantId, calculator);
+        }
+        Map<String, ShardCalculator<String>> batchSnapshot = Collections.unmodifiableMap(validatedBatch);
         Map<String, ShardCalculator<String>> current = this.calculators;
-        calculators.keySet().forEach(tenantId -> {
+        batchSnapshot.keySet().forEach(tenantId -> {
             if (current.containsKey(tenantId)) {
                 throw new IllegalStateException("ShardCalculator already registered for tenant: " + tenantId);
             }
         });
         Map<String, ShardCalculator<String>> updated = new HashMap<>(current);
-        updated.putAll(calculators);
+        updated.putAll(batchSnapshot);
         this.calculators = Map.copyOf(updated);
     }
 

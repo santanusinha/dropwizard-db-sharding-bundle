@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.AbstractMap;
 import java.util.AbstractSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,7 +80,7 @@ public class ShardCalculatorRegistryTest {
     void nullTenantIdRejectsBeforePublishingAnyEntry() {
         var registry = new ShardCalculatorRegistry();
         var valid = calculatorFor("TENANT2", 2);
-        var calculators = new HashMap<String, ShardCalculator<String>>();
+        var calculators = new LinkedHashMap<String, ShardCalculator<String>>();
         calculators.put("TENANT1", calculatorFor("TENANT1", 4));
         calculators.put(null, valid);
 
@@ -94,7 +93,7 @@ public class ShardCalculatorRegistryTest {
     @Test
     void nullCalculatorRejectsBeforePublishingAnyEntry() {
         var registry = new ShardCalculatorRegistry();
-        var calculators = new HashMap<String, ShardCalculator<String>>();
+        var calculators = new LinkedHashMap<String, ShardCalculator<String>>();
         calculators.put("TENANT1", calculatorFor("TENANT1", 4));
         calculators.put("TENANT2", null);
 
@@ -119,15 +118,59 @@ public class ShardCalculatorRegistryTest {
         var existing = calculatorFor("TENANT1", 4);
         registry.register(Map.of("TENANT1", existing));
 
-        var duplicateBatch = new HashMap<String, ShardCalculator<String>>();
-        duplicateBatch.put("TENANT1", calculatorFor("TENANT1", 2));
+        var duplicateBatch = new LinkedHashMap<String, ShardCalculator<String>>();
         duplicateBatch.put("TENANT2", calculatorFor("TENANT2", 8));
+        duplicateBatch.put("TENANT1", calculatorFor("TENANT1", 2));
 
         var exception = assertThrows(IllegalStateException.class, () -> registry.register(duplicateBatch));
 
         assertEquals("ShardCalculator already registered for tenant: TENANT1", exception.getMessage());
         assertSame(existing, registry.get("TENANT1"));
         assertThrows(IllegalStateException.class, () -> registry.get("TENANT2"));
+    }
+
+    @Test
+    void registerUsesOneStableBatchWhenCallerMapChangesBetweenTraversals() {
+        var registry = new ShardCalculatorRegistry();
+        var existing = calculatorFor("TENANT1", 4);
+        var replacement = calculatorFor("TENANT1", 2);
+        var newCalculator = calculatorFor("TENANT2", 8);
+        registry.register(Map.of("TENANT1", existing));
+
+        var batch = new LinkedHashMap<String, ShardCalculator<String>>();
+        batch.put("TENANT2", newCalculator);
+        var changingBatch = new TraversalMutatingMap(
+                batch,
+                3,
+                () -> batch.put("TENANT1", replacement));
+
+        registry.register(changingBatch);
+
+        assertEquals(1, changingBatch.traversalCount());
+        assertSame(existing, registry.get("TENANT1"));
+        assertSame(newCalculator, registry.get("TENANT2"));
+    }
+
+    @Test
+    void callerMutationAfterRegisterDoesNotAffectRegistryOrDuplicateProtection() {
+        var registry = new ShardCalculatorRegistry();
+        var registered = calculatorFor("TENANT1", 4);
+        var replacement = calculatorFor("TENANT1", 2);
+        var later = calculatorFor("TENANT2", 8);
+        var batch = new LinkedHashMap<String, ShardCalculator<String>>();
+        batch.put("TENANT1", registered);
+
+        registry.register(batch);
+        batch.put("TENANT1", replacement);
+        batch.put("TENANT2", later);
+
+        assertSame(registered, registry.get("TENANT1"));
+        assertThrows(IllegalStateException.class, () -> registry.get("TENANT2"));
+        var exception = assertThrows(
+                IllegalStateException.class,
+                () -> registry.register(Map.of("TENANT1", replacement)));
+        assertEquals("ShardCalculator already registered for tenant: TENANT1", exception.getMessage());
+        assertSame(registered, registry.get("TENANT1"));
     }
 
     @Test
@@ -239,7 +282,7 @@ public class ShardCalculatorRegistryTest {
     }
 
     private static final class PublicationPausingMap extends AbstractMap<String, ShardCalculator<String>> {
-        private static final int BATCH_COPY_TRAVERSAL = 3;
+        private static final int BATCH_SNAPSHOT_TRAVERSAL = 1;
 
         private final LinkedHashMap<String, ShardCalculator<String>> delegate;
         private final CountDownLatch firstEntryTransferred;
@@ -257,7 +300,7 @@ public class ShardCalculatorRegistryTest {
 
         @Override
         public Set<Entry<String, ShardCalculator<String>>> entrySet() {
-            if (entrySetCalls.incrementAndGet() != BATCH_COPY_TRAVERSAL) {
+            if (entrySetCalls.incrementAndGet() != BATCH_SNAPSHOT_TRAVERSAL) {
                 return delegate.entrySet();
             }
             return new AbstractSet<>() {
@@ -298,6 +341,34 @@ public class ShardCalculatorRegistryTest {
         @Override
         public int size() {
             return delegate.size();
+        }
+    }
+
+    private static final class TraversalMutatingMap extends AbstractMap<String, ShardCalculator<String>> {
+        private final LinkedHashMap<String, ShardCalculator<String>> delegate;
+        private final int mutationTraversal;
+        private final Runnable mutation;
+        private final AtomicInteger entrySetCalls = new AtomicInteger();
+
+        private TraversalMutatingMap(
+                LinkedHashMap<String, ShardCalculator<String>> delegate,
+                int mutationTraversal,
+                Runnable mutation) {
+            this.delegate = delegate;
+            this.mutationTraversal = mutationTraversal;
+            this.mutation = mutation;
+        }
+
+        @Override
+        public Set<Entry<String, ShardCalculator<String>>> entrySet() {
+            if (entrySetCalls.incrementAndGet() == mutationTraversal) {
+                mutation.run();
+            }
+            return delegate.entrySet();
+        }
+
+        private int traversalCount() {
+            return entrySetCalls.get();
         }
     }
 }
