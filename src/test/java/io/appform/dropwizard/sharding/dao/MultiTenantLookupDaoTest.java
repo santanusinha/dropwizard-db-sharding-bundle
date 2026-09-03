@@ -30,6 +30,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntityWithAIId;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import java.util.function.Function;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
@@ -216,6 +217,76 @@ public class MultiTenantLookupDaoTest {
     assertEquals(
         "ShardCalculator has not been registered for tenant: UNKNOWN",
         error.getMessage());
+  }
+
+  @Test
+  public void testRegistrySupersetTenantIsRejectedAsUnknown() {
+    Map<String, ShardManager> managers = new HashMap<>(shardManager);
+    managers.put("TENANT3", new BalancedShardManager(1));
+    ShardCalculatorRegistry registryWithExtraTenant =
+        ShardCalculatorTestUtils.registryFor(managers);
+
+    MultiTenantLookupDao<TestEntity> dao = new MultiTenantLookupDao<>(
+        sessionFactories,
+        TestEntity.class,
+        registryWithExtraTenant,
+        Map.of("TENANT1", new ShardingBundleOptions(), "TENANT2",
+            new ShardingBundleOptions()),
+        Map.of("TENANT1", new ShardInfoProvider("TENANT1"), "TENANT2",
+            new ShardInfoProvider("TENANT2")),
+        new TerminalTransactionObserver());
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> dao.get("TENANT3", "testId"));
+    assertEquals("Unknown tenant: TENANT3", error.getMessage());
+  }
+
+  @Test
+  public void testConstructorRejectsMissingCalculator() {
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> new MultiTenantLookupDao<>(
+            Map.of("TENANT1", sessionFactories.get("TENANT1")),
+            TestEntity.class,
+            new ShardCalculatorRegistry(),
+            Map.of("TENANT1", new ShardingBundleOptions()),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
+            new TerminalTransactionObserver()));
+
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: TENANT1",
+        error.getMessage());
+  }
+
+  @Test
+  public void testConstructorRejectsMissingShardingOptions() {
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> new MultiTenantLookupDao<>(
+            Map.of("TENANT1", sessionFactories.get("TENANT1")),
+            TestEntity.class,
+            registry,
+            Map.of(),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
+            new TerminalTransactionObserver()));
+
+    assertEquals("Missing sharding options for tenant: TENANT1", error.getMessage());
+  }
+
+  @Test
+  public void testConstructorRejectsMissingShardInfoProvider() {
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> new MultiTenantLookupDao<>(
+            Map.of("TENANT1", sessionFactories.get("TENANT1")),
+            TestEntity.class,
+            registry,
+            Map.of("TENANT1", new ShardingBundleOptions()),
+            Map.of(),
+            new TerminalTransactionObserver()));
+
+    assertEquals("Missing shard info provider for tenant: TENANT1", error.getMessage());
   }
 
   @Test

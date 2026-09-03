@@ -436,6 +436,43 @@ public class MultiTenantCacheableLookupDaoTest {
   }
 
   @Test
+  public void testConstructorRejectsMissingCache() {
+    LookupCache<TestEntity> tenantOneCache = new LookupCache<TestEntity>() {
+      private final Map<String, TestEntity> entries = new HashMap<>();
+
+      @Override
+      public void put(String key, TestEntity entity) {
+        entries.put(key, entity);
+      }
+
+      @Override
+      public boolean exists(String key) {
+        return entries.containsKey(key);
+      }
+
+      @Override
+      public TestEntity get(String key) {
+        return entries.get(key);
+      }
+    };
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> new MultiTenantCacheableLookupDao<>(
+            sessionFactories,
+            TestEntity.class,
+            registry,
+            Map.of("TENANT1", tenantOneCache),
+            Map.of("TENANT1", new ShardingBundleOptions(), "TENANT2",
+                new ShardingBundleOptions()),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1"), "TENANT2",
+                new ShardInfoProvider("TENANT2")),
+            new TerminalTransactionObserver()));
+
+    assertEquals("Missing cache for tenant: TENANT2", error.getMessage());
+  }
+
+  @Test
   public void testSave() throws Exception {
     TestEntity testEntity = TestEntity.builder()
         .externalId("testId")

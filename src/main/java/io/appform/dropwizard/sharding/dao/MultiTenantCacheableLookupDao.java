@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import com.google.common.base.Preconditions;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.LookupCache;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
@@ -42,7 +43,7 @@ import java.util.function.Function;
 @Slf4j
 public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
 
-  private Map<String, LookupCache<T>> cache;
+  private final Map<String, LookupCache<T>> cache;
 
   /**
    * Constructs a CacheableLookupDao instance with caching support.
@@ -66,6 +67,10 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
                                        Map<String, ShardInfoProvider> shardInfoProvider,
                                        TransactionObserver observer) {
     super(sessionFactories, entityClass, registry, shardingOptions, shardInfoProvider, observer);
+    Preconditions.checkArgument(cache != null, "cache must not be null");
+    sessionFactories.keySet().forEach(tenantId -> Preconditions.checkArgument(
+        cache.get(tenantId) != null,
+        "Missing cache for tenant: " + tenantId));
     this.cache = cache;
   }
 
