@@ -113,6 +113,8 @@ class BundleMvccSnapshotTest {
 
     @Test
     void twoLiveDefaultNamespaceBundlesOwnIndependentCalculators() {
+        assertEquals(DBShardingBundleBase.DEFAULT_NAMESPACE, writeBundle.getDbNamespace());
+        assertEquals(DBShardingBundleBase.DEFAULT_NAMESPACE, readBundle.getDbNamespace());
         assertNotSame(writeBundle.getShardCalculator(), readBundle.getShardCalculator());
     }
 
