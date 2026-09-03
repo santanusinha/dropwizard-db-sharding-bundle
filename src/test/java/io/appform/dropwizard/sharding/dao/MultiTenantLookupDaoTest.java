@@ -208,13 +208,14 @@ public class MultiTenantLookupDaoTest {
   }
 
   @Test
-  public void testUnknownTenantUsesRegistryError() {
-    IllegalStateException error = assertThrows(
-        IllegalStateException.class,
+  public void testRegisteredTenantOutsideDaoIsRejected() {
+    ShardCalculatorTestUtils.register(
+        Map.of("UNKNOWN", new BalancedShardManager(1)));
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
         () -> lookupDao.get("UNKNOWN", "testId"));
-    assertEquals(
-        "ShardCalculator has not been registered for tenant: UNKNOWN",
-        error.getMessage());
+    assertEquals("Unknown tenant: UNKNOWN", error.getMessage());
   }
 
   @Test

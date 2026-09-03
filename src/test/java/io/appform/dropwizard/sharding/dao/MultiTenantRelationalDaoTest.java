@@ -132,13 +132,14 @@ public class MultiTenantRelationalDaoTest {
   }
 
   @Test
-  public void testUnknownTenantUsesRegistryError() {
-    IllegalStateException error = assertThrows(
-        IllegalStateException.class,
+  public void testRegisteredTenantOutsideDaoIsRejected() {
+    ShardCalculatorTestUtils.register(
+        Map.of("UNKNOWN", new BalancedShardManager(1)));
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
         () -> relationalDao.get("UNKNOWN", "parent", "1"));
-    assertEquals(
-        "ShardCalculator has not been registered for tenant: UNKNOWN",
-        error.getMessage());
+    assertEquals("Unknown tenant: UNKNOWN", error.getMessage());
   }
 
   @AfterEach

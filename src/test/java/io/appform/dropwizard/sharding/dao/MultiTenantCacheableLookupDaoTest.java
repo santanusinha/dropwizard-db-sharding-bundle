@@ -63,47 +63,6 @@ public class MultiTenantCacheableLookupDaoTest {
   private MultiTenantCacheableRelationalDao<Transaction> transactionDao;
   private MultiTenantCacheableRelationalDao<Audit> auditDao;
 
-  private <T> RelationalCache<T> relationalCache() {
-    return new RelationalCache<T>() {
-      private final Map<String, Object> entries = new HashMap<>();
-
-      @Override
-      public void put(String parentKey, Object key, T entity) {
-        entries.put(StringUtils.join(parentKey, key, ':'), entity);
-      }
-
-      @Override
-      public void put(String parentKey, List<T> entities) {
-        entries.put(parentKey, entities);
-      }
-
-      @Override
-      public void put(String parentKey, int first, int numResults, List<T> entities) {
-        entries.put(StringUtils.join(parentKey, first, numResults, ':'), entities);
-      }
-
-      @Override
-      public boolean exists(String parentKey, Object key) {
-        return entries.containsKey(StringUtils.join(parentKey, key, ':'));
-      }
-
-      @Override
-      public T get(String parentKey, Object key) {
-        return (T) entries.get(StringUtils.join(parentKey, key, ':'));
-      }
-
-      @Override
-      public List<T> select(String parentKey) {
-        return (List<T>) entries.get(parentKey);
-      }
-
-      @Override
-      public List<T> select(String parentKey, int first, int numResults) {
-        return (List<T>) entries.get(StringUtils.join(parentKey, first, numResults, ':'));
-      }
-    };
-  }
-
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
     configuration.setProperty("hibernate.dialect",
