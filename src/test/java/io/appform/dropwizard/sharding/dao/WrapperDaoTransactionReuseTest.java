@@ -77,6 +77,7 @@ class WrapperDaoTransactionReuseTest {
             sf.close();
         }
         sessionFactories.clear();
+        ShardCalculatorRegistry.clear();
     }
 
     private void assertReuse(SessionFactory sf, Session session, Transaction txn) {

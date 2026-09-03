@@ -115,6 +115,7 @@ public class RelationalDaoTest {
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test

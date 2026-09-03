@@ -105,6 +105,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
   public void after() {
     sessionFactories.forEach((tenantId, sessionFactory) -> sessionFactory.forEach(
         SessionFactory::close));
+    ShardCalculatorRegistry.clear();
   }
 
   @Test

@@ -35,6 +35,7 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import java.util.function.Function;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.SneakyThrows;
 import lombok.val;
@@ -46,6 +47,7 @@ import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -117,6 +119,12 @@ public class LockTest {
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
+    }
+
+    @AfterEach
+    public void after() {
+        sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test

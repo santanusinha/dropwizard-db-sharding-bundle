@@ -273,6 +273,7 @@ public class CacheableLookupDaoTest {
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test

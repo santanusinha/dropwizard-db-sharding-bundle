@@ -20,6 +20,7 @@ import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +62,12 @@ public class ParentChildTest {
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
         setupStore();
+    }
+
+    @AfterEach
+    public void after() {
+        sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @SneakyThrows

@@ -10,6 +10,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEncryptedEntity;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.val;
 import org.hibernate.SessionFactory;
@@ -85,6 +86,7 @@ public class EncryptionAtRestTest {
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test
