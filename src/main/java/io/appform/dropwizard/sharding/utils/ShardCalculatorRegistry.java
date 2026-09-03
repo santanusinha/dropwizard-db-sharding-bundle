@@ -12,18 +12,15 @@ import java.util.Objects;
  */
 public final class ShardCalculatorRegistry {
 
-    private static volatile Map<String, ShardCalculator<String>> calculators = Map.of();
+    private volatile Map<String, ShardCalculator<String>> calculators = Map.of();
 
-    private ShardCalculatorRegistry() {
-    }
-
-    public static synchronized void register(Map<String, ShardCalculator<String>> calculators) {
+    public synchronized void register(Map<String, ShardCalculator<String>> calculators) {
         Objects.requireNonNull(calculators, "calculators");
         calculators.forEach((tenantId, calculator) -> {
             Objects.requireNonNull(tenantId, "tenantId");
             Objects.requireNonNull(calculator, "calculator");
         });
-        Map<String, ShardCalculator<String>> current = ShardCalculatorRegistry.calculators;
+        Map<String, ShardCalculator<String>> current = this.calculators;
         calculators.keySet().forEach(tenantId -> {
             if (current.containsKey(tenantId)) {
                 throw new IllegalStateException("ShardCalculator already registered for tenant: " + tenantId);
@@ -31,10 +28,11 @@ public final class ShardCalculatorRegistry {
         });
         Map<String, ShardCalculator<String>> updated = new HashMap<>(current);
         updated.putAll(calculators);
-        ShardCalculatorRegistry.calculators = Map.copyOf(updated);
+        this.calculators = Map.copyOf(updated);
     }
 
-    public static ShardCalculator<String> get(String tenantId) {
+    public ShardCalculator<String> get(String tenantId) {
+        Objects.requireNonNull(tenantId, "tenantId");
         Map<String, ShardCalculator<String>> snapshot = calculators;
         ShardCalculator<String> calculator = snapshot.get(tenantId);
         if (calculator == null) {
@@ -44,7 +42,7 @@ public final class ShardCalculatorRegistry {
     }
 
     @VisibleForTesting
-    public static synchronized void clear() {
+    public synchronized void clear() {
         calculators = Map.of();
     }
 }

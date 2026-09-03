@@ -11,7 +11,8 @@ public final class ShardCalculatorTestUtils {
     private ShardCalculatorTestUtils() {
     }
 
-    public static void register(Map<String, ShardManager> shardManagers) {
+    public static ShardCalculatorRegistry registryFor(Map<String, ShardManager> shardManagers) {
+        ShardCalculatorRegistry registry = new ShardCalculatorRegistry();
         Map<String, ShardCalculator<String>> calculators = new HashMap<>();
         shardManagers.forEach((tenantId, shardManager) -> calculators.put(
                 tenantId,
@@ -19,6 +20,7 @@ public final class ShardCalculatorTestUtils {
                         tenantId,
                         shardManager,
                         new ConsistentHashBucketIdExtractor<>(Map.of(tenantId, shardManager)))));
-        ShardCalculatorRegistry.register(calculators);
+        registry.register(calculators);
+        return registry;
     }
 }

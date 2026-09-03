@@ -3,7 +3,6 @@ package io.appform.dropwizard.sharding.utils;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.AbstractMap;
@@ -30,107 +29,138 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ShardCalculatorRegistryTest {
 
-    @AfterEach
-    void tearDown() {
-        ShardCalculatorRegistry.clear();
-    }
-
     @Test
     void registerTwoCalculatorsAndReturnSameInstancePerTenant() {
+        var registry = new ShardCalculatorRegistry();
         var tenant1 = calculatorFor("TENANT1", 4);
         var tenant2 = calculatorFor("TENANT2", 2);
 
-        ShardCalculatorRegistry.register(Map.of(
+        registry.register(Map.of(
                 "TENANT1", tenant1,
                 "TENANT2", tenant2));
 
-        assertSame(tenant1, ShardCalculatorRegistry.get("TENANT1"));
-        assertSame(tenant2, ShardCalculatorRegistry.get("TENANT2"));
+        assertSame(tenant1, registry.get("TENANT1"));
+        assertSame(tenant2, registry.get("TENANT2"));
+    }
+
+    @Test
+    void separateRegistriesCanRegisterSameTenantIndependently() {
+        var firstRegistry = new ShardCalculatorRegistry();
+        var secondRegistry = new ShardCalculatorRegistry();
+        var firstCalculator = calculatorFor("TENANT1", 4);
+        var secondCalculator = calculatorFor("TENANT1", 2);
+
+        firstRegistry.register(Map.of("TENANT1", firstCalculator));
+        secondRegistry.register(Map.of("TENANT1", secondCalculator));
+
+        assertSame(firstCalculator, firstRegistry.get("TENANT1"));
+        assertSame(secondCalculator, secondRegistry.get("TENANT1"));
     }
 
     @Test
     void missingTenantThrowsExactError() {
-        var exception = assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT1"));
+        var registry = new ShardCalculatorRegistry();
+
+        var exception = assertThrows(IllegalStateException.class, () -> registry.get("TENANT1"));
 
         assertEquals("ShardCalculator has not been registered for tenant: TENANT1", exception.getMessage());
     }
 
     @Test
     void nullMapRejectsWithoutChangingRegistry() {
+        var registry = new ShardCalculatorRegistry();
         var tenant1 = calculatorFor("TENANT1", 4);
-        ShardCalculatorRegistry.register(Map.of("TENANT1", tenant1));
+        registry.register(Map.of("TENANT1", tenant1));
 
-        assertThrows(NullPointerException.class, () -> ShardCalculatorRegistry.register(null));
+        assertThrows(NullPointerException.class, () -> registry.register(null));
 
-        assertSame(tenant1, ShardCalculatorRegistry.get("TENANT1"));
+        assertSame(tenant1, registry.get("TENANT1"));
     }
 
     @Test
     void nullTenantIdRejectsBeforePublishingAnyEntry() {
+        var registry = new ShardCalculatorRegistry();
         var valid = calculatorFor("TENANT2", 2);
         var calculators = new HashMap<String, ShardCalculator<String>>();
         calculators.put("TENANT1", calculatorFor("TENANT1", 4));
         calculators.put(null, valid);
 
-        assertThrows(NullPointerException.class, () -> ShardCalculatorRegistry.register(calculators));
+        assertThrows(NullPointerException.class, () -> registry.register(calculators));
 
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT1"));
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT2"));
+        assertThrows(IllegalStateException.class, () -> registry.get("TENANT1"));
+        assertThrows(IllegalStateException.class, () -> registry.get("TENANT2"));
     }
 
     @Test
     void nullCalculatorRejectsBeforePublishingAnyEntry() {
+        var registry = new ShardCalculatorRegistry();
         var calculators = new HashMap<String, ShardCalculator<String>>();
         calculators.put("TENANT1", calculatorFor("TENANT1", 4));
         calculators.put("TENANT2", null);
 
-        assertThrows(NullPointerException.class, () -> ShardCalculatorRegistry.register(calculators));
+        assertThrows(NullPointerException.class, () -> registry.register(calculators));
 
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT1"));
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT2"));
+        assertThrows(IllegalStateException.class, () -> registry.get("TENANT1"));
+        assertThrows(IllegalStateException.class, () -> registry.get("TENANT2"));
+    }
+
+    @Test
+    void nullTenantLookupRejectsClearly() {
+        var registry = new ShardCalculatorRegistry();
+
+        var exception = assertThrows(NullPointerException.class, () -> registry.get(null));
+
+        assertEquals("tenantId", exception.getMessage());
     }
 
     @Test
     void duplicateBatchDoesNotPublishAnyNewTenant() {
+        var registry = new ShardCalculatorRegistry();
         var existing = calculatorFor("TENANT1", 4);
-        ShardCalculatorRegistry.register(Map.of("TENANT1", existing));
+        registry.register(Map.of("TENANT1", existing));
 
         var duplicateBatch = new HashMap<String, ShardCalculator<String>>();
         duplicateBatch.put("TENANT1", calculatorFor("TENANT1", 2));
         duplicateBatch.put("TENANT2", calculatorFor("TENANT2", 8));
 
-        var exception = assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.register(duplicateBatch));
+        var exception = assertThrows(IllegalStateException.class, () -> registry.register(duplicateBatch));
 
         assertEquals("ShardCalculator already registered for tenant: TENANT1", exception.getMessage());
-        assertSame(existing, ShardCalculatorRegistry.get("TENANT1"));
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT2"));
+        assertSame(existing, registry.get("TENANT1"));
+        assertThrows(IllegalStateException.class, () -> registry.get("TENANT2"));
     }
 
     @Test
-    void clearRemovesAllTenants() {
-        ShardCalculatorRegistry.register(Map.of(
+    void clearAffectsOnlyReceiver() {
+        var firstRegistry = new ShardCalculatorRegistry();
+        var secondRegistry = new ShardCalculatorRegistry();
+        var secondCalculator = calculatorFor("TENANT1", 8);
+        firstRegistry.register(Map.of(
                 "TENANT1", calculatorFor("TENANT1", 4),
                 "TENANT2", calculatorFor("TENANT2", 2)));
+        secondRegistry.register(Map.of("TENANT1", secondCalculator));
 
-        ShardCalculatorRegistry.clear();
+        firstRegistry.clear();
 
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT1"));
-        assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT2"));
+        assertThrows(IllegalStateException.class, () -> firstRegistry.get("TENANT1"));
+        assertThrows(IllegalStateException.class, () -> firstRegistry.get("TENANT2"));
+        assertSame(secondCalculator, secondRegistry.get("TENANT1"));
     }
 
     @Test
     void concurrentReadsAfterPublicationReturnSameCalculator() throws Exception {
+        var registry = new ShardCalculatorRegistry();
         var calculator = calculatorFor("TENANT1", 4);
-        ShardCalculatorRegistry.register(Map.of("TENANT1", calculator));
+        registry.register(Map.of("TENANT1", calculator));
 
         ExecutorService executor = Executors.newFixedThreadPool(4);
         try {
             CountDownLatch start = new CountDownLatch(1);
             List<Callable<ShardCalculator<String>>> tasks = List.of(
-                    readerTask(start),
-                    readerTask(start),
-                    readerTask(start),
-                    readerTask(start));
+                    readerTask(registry, start),
+                    readerTask(registry, start),
+                    readerTask(registry, start),
+                    readerTask(registry, start));
             List<Future<ShardCalculator<String>>> futures = tasks.stream()
                     .map(executor::submit)
                     .collect(Collectors.toList());
@@ -147,8 +177,9 @@ public class ShardCalculatorRegistryTest {
 
     @Test
     void batchRegistrationIsPublishedAtomically() throws Exception {
+        var registry = new ShardCalculatorRegistry();
         var oldCalculator = calculatorFor("OLD", 4);
-        ShardCalculatorRegistry.register(Map.of("OLD", oldCalculator));
+        registry.register(Map.of("OLD", oldCalculator));
 
         var batch = new LinkedHashMap<String, ShardCalculator<String>>();
         batch.put("NEW-FIRST", calculatorFor("NEW-FIRST", 2));
@@ -160,11 +191,11 @@ public class ShardCalculatorRegistryTest {
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
-            Future<?> registerFuture = executor.submit(() -> ShardCalculatorRegistry.register(pausingBatch));
+            Future<?> registerFuture = executor.submit(() -> registry.register(pausingBatch));
 
             assertTrue(firstEntryTransferred.await(5, TimeUnit.SECONDS));
-            boolean firstVisible = isRegistered("NEW-FIRST");
-            boolean lastVisible = isRegistered("NEW-LAST");
+            boolean firstVisible = isRegistered(registry, "NEW-FIRST");
+            boolean lastVisible = isRegistered(registry, "NEW-LAST");
             assertEquals(
                     firstVisible,
                     lastVisible,
@@ -173,8 +204,8 @@ public class ShardCalculatorRegistryTest {
             continuePublication.countDown();
             registerFuture.get(5, TimeUnit.SECONDS);
 
-            batch.forEach((tenantId, calculator) -> assertSame(calculator, ShardCalculatorRegistry.get(tenantId)));
-            assertSame(oldCalculator, ShardCalculatorRegistry.get("OLD"));
+            batch.forEach((tenantId, calculator) -> assertSame(calculator, registry.get(tenantId)));
+            assertSame(oldCalculator, registry.get("OLD"));
         } finally {
             continuePublication.countDown();
             executor.shutdownNow();
@@ -189,16 +220,18 @@ public class ShardCalculatorRegistryTest {
                 new ConsistentHashBucketIdExtractor<>(Map.of(tenantId, shardManager)));
     }
 
-    private Callable<ShardCalculator<String>> readerTask(CountDownLatch start) {
+    private Callable<ShardCalculator<String>> readerTask(
+            ShardCalculatorRegistry registry,
+            CountDownLatch start) {
         return () -> {
             start.await(5, TimeUnit.SECONDS);
-            return ShardCalculatorRegistry.get("TENANT1");
+            return registry.get("TENANT1");
         };
     }
 
-    private boolean isRegistered(String tenantId) {
+    private boolean isRegistered(ShardCalculatorRegistry registry, String tenantId) {
         try {
-            ShardCalculatorRegistry.get(tenantId);
+            registry.get(tenantId);
             return true;
         } catch (IllegalStateException ignored) {
             return false;
