@@ -28,7 +28,6 @@ import org.hibernate.SessionFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -45,20 +44,17 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
 
     private String dbNamespace;
     private List<DaoType> daos;
-    private final ShardCalculatorRegistry registry;
 
     /**
      * Create a relational DAO.
      *
      * @param sessionFactories List of session factories. One for each shard.
      * @param daoClass         Class for the dao.
-     * @param registry         Registry of tenant-specific shard calculators.
      */
     public WrapperDao(String dbNamespace,
                       List<SessionFactory> sessionFactories,
-                      Class<DaoType> daoClass,
-                      ShardCalculatorRegistry registry) {
-        this(dbNamespace, sessionFactories, daoClass, null, null, registry);
+                      Class<DaoType> daoClass) {
+        this(dbNamespace, sessionFactories, daoClass, null, null);
     }
 
     /**
@@ -68,17 +64,13 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
      * @param daoClass                     Class for the dao.
      * @param extraConstructorParamClasses Class names for constructor parameters to the DAO other than SessionFactory
      * @param extraConstructorParamObjects Objects for constructor parameters to the DAO other than SessionFactory
-     * @param registry                     Registry of tenant-specific shard calculators.
      */
      public WrapperDao(
              String dbNamespace,
              List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
              Class[] extraConstructorParamClasses,
-             Class[] extraConstructorParamObjects,
-             ShardCalculatorRegistry registry) {
+             Class[] extraConstructorParamObjects) {
         this.dbNamespace = dbNamespace;
-        this.registry = Objects.requireNonNull(registry, "registry");
-        this.registry.get(dbNamespace);
         this.daos = sessionFactories.stream().map((SessionFactory sessionFactory) -> {
             Enhancer enhancer = new Enhancer();
             enhancer.setUseFactory(false);
@@ -113,15 +105,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
      * @return Wrapper for parent dao
      */
     public DaoType forParent(final String parentKey) {
-        int shardId = registry.get(dbNamespace).shardId(parentKey);
-        if (shardId < 0 || shardId >= daos.size()) {
-            throw new IllegalStateException(String.format(
-                    "Calculated shard %d for tenant %s is outside configured session factory range [0, %d]",
-                    shardId,
-                    dbNamespace,
-                    daos.size() - 1));
-        }
-        return daos.get(shardId);
+        return daos.get(ShardCalculatorRegistry.get(dbNamespace).shardId(parentKey));
     }
 
     @SuppressWarnings("unchecked")

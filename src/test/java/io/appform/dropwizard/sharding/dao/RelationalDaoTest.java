@@ -60,6 +60,7 @@ import java.util.stream.IntStream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class RelationalDaoTest {
 
     private final List<SessionFactory> sessionFactories = Lists.newArrayList();
@@ -67,8 +68,6 @@ public class RelationalDaoTest {
     private RelationalDao<RelationalEntityWithAIKey> relationalWithAIDao;
 
     private ShardManager shardManager;
-    private ShardCalculatorRegistry registry;
-
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
         configuration.setProperty("hibernate.dialect",
@@ -94,20 +93,20 @@ public class RelationalDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         this.shardManager = new BalancedShardManager(sessionFactories.size());
-        registry = ShardCalculatorTestUtils.registryFor(
+        ShardCalculatorTestUtils.register(
                 Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         final TransactionObserver observer = new EntityClassThreadLocalObserver(new DaoClassLocalObserver(new TerminalTransactionObserver()));
         relationalDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        RelationalEntity.class, registry,
+                        RelationalEntity.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         relationalWithAIDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        RelationalEntityWithAIKey.class, registry,
+                        RelationalEntityWithAIKey.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
@@ -460,7 +459,7 @@ public class RelationalDaoTest {
                 .mapToObj(value -> {
                     while (true) {
                         String id = UUID.randomUUID().toString();
-                        if (registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(id)
+                        if (ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(id)
                                 == expectedShardIndex) {
                             return id;
                         }

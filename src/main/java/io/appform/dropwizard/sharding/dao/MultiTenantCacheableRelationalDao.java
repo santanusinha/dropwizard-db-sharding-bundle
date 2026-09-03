@@ -22,7 +22,6 @@ import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
@@ -51,7 +50,6 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
    * @param sessionFactories  A list of SessionFactory instances for database access across shards.
    * @param entityClass       The Class representing the type of entities managed by this
    *                          CacheableRelationalDao.
-   * @param registry          Registry of tenant-specific shard calculators.
    * @param cache             A RelationalCache instance for caching entity data.
    * @param shardInfoProvider A ShardInfoProvider for retrieving shard information.
    * @param observer          A TransactionObserver for monitoring transaction events.
@@ -61,16 +59,11 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
    */
   public MultiTenantCacheableRelationalDao(Map<String, List<SessionFactory>> sessionFactories,
       Class<T> entityClass,
-      ShardCalculatorRegistry registry,
       Map<String, RelationalCache<T>> cache,
       Map<String, ShardingBundleOptions> shardingOptions,
       Map<String, ShardInfoProvider> shardInfoProvider,
       TransactionObserver observer) {
-    super(sessionFactories, entityClass, registry, shardingOptions, shardInfoProvider, observer);
-    Preconditions.checkArgument(cache != null, "cache must not be null");
-    sessionFactories.keySet().forEach(tenantId -> Preconditions.checkArgument(
-        cache.get(tenantId) != null,
-        "Missing cache for tenant: " + tenantId));
+    super(sessionFactories, entityClass, shardingOptions, shardInfoProvider, observer);
     this.cache = cache;
   }
 
@@ -93,7 +86,6 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
    */
   @Override
   public Optional<T> get(String tenantId, String parentKey, Object key) {
-    validateTenant(tenantId);
     if (cache.get(tenantId).exists(parentKey, key)) {
       return Optional.ofNullable(cache.get(tenantId).get(parentKey, key));
     }
@@ -117,7 +109,6 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
   @Override
   public List<T> select(String tenantId, String parentKey, DetachedCriteria criteria, int first,
       int numResults) throws Exception {
-    validateTenant(tenantId);
     List<T> result = cache.get(tenantId).select(parentKey, first, numResults);
     if (result == null) {
       result = super.select(tenantId, parentKey, criteria, first, numResults);

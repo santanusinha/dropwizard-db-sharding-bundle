@@ -31,12 +31,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * internal TransactionHandler logic when a Hibernate {@link Session} + {@link Transaction} may
  * already be bound to the calling thread via {@link ManagedSessionContext}.
  */
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 class WrapperDaoTransactionReuseTest {
 
     private final List<SessionFactory> sessionFactories = new ArrayList<>();
     private WrapperDao<Order, OrderDao> dao;
-    private ShardCalculatorRegistry registry;
-
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = getConfiguration(dbName);
         configuration.addAnnotatedClass(Order.class);
@@ -63,10 +62,10 @@ class WrapperDaoTransactionReuseTest {
             sessionFactories.add(buildSessionFactory("reuse_tx_db_" + i));
         }
         ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        registry = ShardCalculatorTestUtils.registryFor(
+        ShardCalculatorTestUtils.register(
                 Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories,
-                OrderDao.class, registry);
+                OrderDao.class);
     }
 
     @AfterEach
@@ -90,7 +89,8 @@ class WrapperDaoTransactionReuseTest {
     @Test
     void testTransactionReuseAcrossMultipleDaoCalls() {
         String parentKey = "customer-tx-reuse"; // Determines shard
-        int shardId = registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(parentKey);
+        int shardId = ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
+                .shardId(parentKey);
         SessionFactory targetSessionFactory = sessionFactories.get(shardId);
 
         // Outer application layer begins and binds session + transaction.
@@ -135,7 +135,8 @@ class WrapperDaoTransactionReuseTest {
     @Test
     void testMultipleWritesReuseSameOuterTransaction() {
         String parentKey = "customer-multi-write";
-        int shardId = registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(parentKey);
+        int shardId = ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
+                .shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session outer = sf.openSession();
         ManagedSessionContext.bind(outer);
@@ -186,7 +187,8 @@ class WrapperDaoTransactionReuseTest {
         // TC to verify that inner DAO calls within an outer transaction
         // that is rolled back do not persist any data.
         String parentKey = "customer-rollback";
-        int shardId = registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(parentKey);
+        int shardId = ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
+                .shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session outer = sf.openSession();
         ManagedSessionContext.bind(outer);
@@ -240,7 +242,8 @@ class WrapperDaoTransactionReuseTest {
         assertTrue(persisted.getId() > 0);
 
         // Determine shard & verify using fresh manual session
-        int shardId = registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(parentKey);
+        int shardId = ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
+                .shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session s = sf.openSession();
         ManagedSessionContext.bind(s);

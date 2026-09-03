@@ -102,7 +102,6 @@ public class MultiTenantLookupDao<T> {
     private final Map<String, List<SessionFactory>> sessionFactories;
     private final Map<String, List<LookupDaoPriv>> daos = Maps.newHashMap();
     private final Class<T> entityClass;
-    private final ShardCalculatorRegistry registry;
     @Getter
     private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
@@ -121,7 +120,6 @@ public class MultiTenantLookupDao<T> {
      *                           shards.
      * @param entityClass        The Class representing the type of entities managed by this
      *                           LookupDao.
-     * @param registry           Registry of tenant-specific shard calculators.
      * @param shardingOptions    ShardingBundleOptions specifying additional sharding configuration
      *                           options.
      * @param shardInfoProviders A ShardInfoProvider for retrieving shard information.
@@ -133,7 +131,6 @@ public class MultiTenantLookupDao<T> {
     public MultiTenantLookupDao(
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
-            ShardCalculatorRegistry registry,
             Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
@@ -142,7 +139,6 @@ public class MultiTenantLookupDao<T> {
             daos.put(tenantId, factories.stream().map(LookupDaoPriv::new).collect(Collectors.toList()));
         });
         this.entityClass = entityClass;
-        this.registry = Objects.requireNonNull(registry, "registry");
         this.shardingOptions = shardingOptions;
         this.shardInfoProviders = shardInfoProviders;
         this.observer = observer;
@@ -166,14 +162,6 @@ public class MultiTenantLookupDao<T> {
         }
         Preconditions.checkArgument(ClassUtils.isAssignable(keyField.getType(), String.class),
                 "Key field must be a string");
-    }
-
-    protected final int shardId(String tenantId, String key) {
-        return registry.get(tenantId).shardId(key);
-    }
-
-    protected final void validateTenant(String tenantId) {
-        registry.get(tenantId);
     }
 
     /**
@@ -210,8 +198,7 @@ public class MultiTenantLookupDao<T> {
      * @throws Exception if backing dao throws
      */
     public <U> U get(String tenantId, String key, Function<T, U> handler) throws Exception {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, key);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
@@ -226,8 +213,7 @@ public class MultiTenantLookupDao<T> {
     public <U> U get(String tenantId, String key, UnaryOperator<Criteria> criteriaUpdater,
                      Function<T, U> handler)
             throws Exception {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, key);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
@@ -281,9 +267,8 @@ public class MultiTenantLookupDao<T> {
      * @throws Exception if backing dao throws
      */
     public <U> U save(String tenantId, T entity, Function<T, U> handler) throws Exception {
-        validateTenant(tenantId);
         final String key = keyField.get(entity).toString();
-        int shardId = shardId(tenantId, key);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(key);
         log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key,
                 shardId);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
@@ -300,8 +285,7 @@ public class MultiTenantLookupDao<T> {
                                       String id,
                                       UnaryOperator<T> updater,
                                       Supplier<T> entityGenerator) {
-        validateTenant(tenantId);
-        val shardId = shardId(tenantId, id);
+        val shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         val dao = daos.get(tenantId).get(shardId);
         val opContext = CreateOrUpdateByLookupKey.<T>builder()
                 .id(id)
@@ -331,8 +315,7 @@ public class MultiTenantLookupDao<T> {
      * @return True if the update was successful, false otherwise.
      */
     public boolean updateInLock(String tenantId, String id, Function<Optional<T>, T> updater) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return updateImpl(tenantId, id, dao::getLockedForWrite, updater, shardId);
     }
@@ -352,8 +335,7 @@ public class MultiTenantLookupDao<T> {
      * @return {@code true} if the entity is successfully updated, {@code false} if it does not exist.
      */
     public boolean update(String tenantId, String id, Function<Optional<T>, T> updater) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return updateImpl(tenantId, id, dao::get, updater, shardId);
     }
@@ -374,8 +356,7 @@ public class MultiTenantLookupDao<T> {
      * @return The number of entities affected by the update operation.
      */
     public int updateUsingQuery(String tenantId, String id, UpdateOperationMeta updateOperationMeta) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = UpdateByQuery.builder()
                 .updater(dao::update)
@@ -409,7 +390,6 @@ public class MultiTenantLookupDao<T> {
                                Function<String, T> getter,
                                Function<Optional<T>, T> mutator,
                                int shardId) {
-        validateTenant(tenantId);
         try {
             val dao = daos.get(tenantId).get(shardId);
             val opContext = GetAndUpdateByLookupKey.<T>builder()
@@ -441,8 +421,7 @@ public class MultiTenantLookupDao<T> {
      * @throws RuntimeException If an error occurs during entity locking or transaction management.
      */
     public LockedContext<T> lockAndGetExecutor(String tenantId, final String id) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(id),
                 DaoType.LOOKUP, entityClass, shardInfoProviders.get(tenantId), observer);
@@ -469,8 +448,7 @@ public class MultiTenantLookupDao<T> {
      */
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId, String id,
                                                UnaryOperator<Criteria> criteriaUpdater) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
@@ -505,8 +483,7 @@ public class MultiTenantLookupDao<T> {
                                                String id,
                                                UnaryOperator<Criteria> criteriaUpdater,
                                                Supplier<Boolean> entityPopulator) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
@@ -531,13 +508,12 @@ public class MultiTenantLookupDao<T> {
      */
     public LockedContext<T> saveAndGetExecutor(String tenantId, T entity) {
         String id;
-        validateTenant(tenantId);
         try {
             id = keyField.get(entity).toString();
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, dao::save,
                 DaoType.LOOKUP, entity,
@@ -556,7 +532,6 @@ public class MultiTenantLookupDao<T> {
      * @return A list of entities obtained by executing the query criteria on all available shards.
      */
     public List<T> scatterGather(String tenantId, DetachedCriteria criteria) {
-        validateTenant(tenantId);
         return IntStream.range(0, daos.get(tenantId).size())
                 .mapToObj(shardId -> {
                     try {
@@ -612,7 +587,6 @@ public class MultiTenantLookupDao<T> {
      */
     public List<T> scatterGather(String tenantId, final QuerySpec<T, T> querySpec, int start,
                                  int numRows) {
-        validateTenant(tenantId);
         return IntStream.range(0, daos.get(tenantId).size())
                 .mapToObj(shardId -> {
                     try {
@@ -661,7 +635,6 @@ public class MultiTenantLookupDao<T> {
                                       final ScrollPointer inPointer,
                                       final int pageSize,
                                       @NonNull final String sortFieldName) {
-        validateTenant(tenantId);
         log.trace("Scroll Pointer: {}", inPointer);
         val pointer = inPointer == null ? new ScrollPointer(ScrollPointer.Direction.DOWN) : inPointer;
         Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.DOWN),
@@ -700,7 +673,6 @@ public class MultiTenantLookupDao<T> {
                                     final ScrollPointer inPointer,
                                     final int pageSize,
                                     @NonNull final String sortFieldName) {
-        validateTenant(tenantId);
         val pointer = null == inPointer ? new ScrollPointer(ScrollPointer.Direction.UP) : inPointer;
         Preconditions.checkArgument(pointer.getDirection().equals(ScrollPointer.Direction.UP),
                 "An up scroll pointer needs to be passed to this method");
@@ -729,7 +701,6 @@ public class MultiTenantLookupDao<T> {
      * @throws RuntimeException If an error occurs while querying the database.
      */
     public List<Long> count(String tenantId, DetachedCriteria criteria) {
-        validateTenant(tenantId);
         return IntStream.range(0, daos.get(tenantId).size())
                 .mapToObj(shardId -> {
                     val dao = daos.get(tenantId).get(shardId);
@@ -773,7 +744,6 @@ public class MultiTenantLookupDao<T> {
     @SuppressWarnings("rawtypes")
     public <U> U run(String tenantId, DetachedCriteria criteria,
                      Function<Map<Integer, List<T>>, U> translator) {
-        validateTenant(tenantId);
         val output = IntStream.range(0, daos.get(tenantId).size())
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
@@ -803,10 +773,10 @@ public class MultiTenantLookupDao<T> {
      * @throws RuntimeException If an error occurs while querying the database.
      */
     public List<T> get(String tenantId, List<String> keys) {
-        validateTenant(tenantId);
         Map<Integer, List<String>> lookupKeysGroupByShards = keys.stream()
                 .collect(
-                        Collectors.groupingBy(key -> shardId(tenantId, key),
+                        Collectors.groupingBy(
+                                key -> ShardCalculatorRegistry.get(tenantId).shardId(key),
                                 Collectors.toList()));
         return lookupKeysGroupByShards.keySet().stream().map(shardId -> {
             try {
@@ -841,8 +811,7 @@ public class MultiTenantLookupDao<T> {
      *                          executing the handler.
      */
     public <U> U runInSession(String tenantId, String id, Function<Session, U> handler) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = RunInSession.<U>builder()
                 .handler(handler)
@@ -855,7 +824,6 @@ public class MultiTenantLookupDao<T> {
     public <U, V> V runInSession(String tenantId,
                                  BiFunction<Integer, Session, U> sessionHandler,
                                  Function<Map<Integer, U>, V> translator) {
-        validateTenant(tenantId);
         val output = IntStream.range(0, daos.get(tenantId).size())
                 .boxed()
                 .collect(Collectors.toMap(Function.identity(), shardId -> {
@@ -890,8 +858,7 @@ public class MultiTenantLookupDao<T> {
      *                          management.
      */
     public boolean delete(String tenantId, String id) {
-        validateTenant(tenantId);
-        int shardId = shardId(tenantId, id);
+        int shardId = ShardCalculatorRegistry.get(tenantId).shardId(id);
         val opContext = DeleteByLookupKey.builder()
                 .id(id)
                 .handler(daos.get(tenantId).get(shardId)::delete)
@@ -948,7 +915,6 @@ public class MultiTenantLookupDao<T> {
                                       final ScrollPointer inPointer,
                                       final int pageSize,
                                       @NonNull final String sortFieldName) {
-        validateTenant(tenantId);
         log.trace("Scroll Pointer: {}", inPointer);
         return buildScrollExecutor(tenantId).scrollDown(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
@@ -976,7 +942,6 @@ public class MultiTenantLookupDao<T> {
                                     final ScrollPointer inPointer,
                                     final int pageSize,
                                     @NonNull final String sortFieldName) {
-        validateTenant(tenantId);
         return buildScrollExecutor(tenantId).scrollUp(inQuerySpec, inPointer, pageSize, sortFieldName);
     }
 
@@ -988,7 +953,6 @@ public class MultiTenantLookupDao<T> {
                                        final UnaryOperator<DetachedCriteria> criteriaMutator,
                                        final Comparator<ScrollResultItem<T>> comparator,
                                        String methodName) {
-        validateTenant(tenantId);
         val daoIndex = new AtomicInteger();
         val results = daos.get(tenantId).stream()
                 .flatMap(dao -> {

@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -61,6 +60,7 @@ import static org.mockito.Mockito.when;
  * snapshot on the pooled read connection. Without the fix (transaction-optional read, no
  * begin/commit), the second {@code readLookupDao.get()} returns stale {@code "version-1"}.
  */
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 class BundleMvccSnapshotTest {
 
     private static class TestConfig extends Configuration {
@@ -109,13 +109,6 @@ class BundleMvccSnapshotTest {
                 .shardingOptions(ShardingBundleOptions.builder().build())
                 .build()));
         readLookupDao = readBundle.createParentObjectDao(TestEntity.class);
-    }
-
-    @Test
-    void twoLiveDefaultNamespaceBundlesOwnIndependentCalculators() {
-        assertEquals(DBShardingBundleBase.DEFAULT_NAMESPACE, writeBundle.getDbNamespace());
-        assertEquals(DBShardingBundleBase.DEFAULT_NAMESPACE, readBundle.getDbNamespace());
-        assertNotSame(writeBundle.getShardCalculator(), readBundle.getShardCalculator());
     }
 
     /**

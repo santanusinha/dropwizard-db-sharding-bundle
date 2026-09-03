@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests out functionality for {@link LookupDao#scrollDown(DetachedCriteria, ScrollPointer, int, String)}
  */
 @Slf4j
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class ScrollTest {
     private final List<SessionFactory> sessionFactories = Lists.newArrayList();
 
@@ -52,14 +53,14 @@ public class ScrollTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         val shardManager = new BalancedShardManager(sessionFactories.size());
-        val registry = ShardCalculatorTestUtils.registryFor(
+        ShardCalculatorTestUtils.register(
                 Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         val shardingOptions = new ShardingBundleOptions();
         val shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TerminalTransactionObserver();
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        ScrollTestEntity.class, registry,
+                        ScrollTestEntity.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), observer));
     }

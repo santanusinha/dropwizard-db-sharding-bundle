@@ -61,11 +61,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class MultiTenantLookupDaoTest {
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
   private Map<String, List<SessionFactory>> sessionFactories = new HashMap<>();
-  private ShardCalculatorRegistry registry;
   private MultiTenantLookupDao<TestEntity> lookupDao;
   private MultiTenantLookupDao<TestEntityWithAIId> lookupDaoForAI;
   private MultiTenantLookupDao<Phone> phoneDao;
@@ -105,7 +105,7 @@ public class MultiTenantLookupDaoTest {
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
-    registry = ShardCalculatorTestUtils.registryFor(shardManager);
+    ShardCalculatorTestUtils.register(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -114,23 +114,21 @@ public class MultiTenantLookupDaoTest {
         "TENANT2", new ShardInfoProvider("TENANT2"));
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
-    lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class, registry,
+    lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class,
         shardingOptions,
         shardInfoProvider, observer);
 
     lookupDaoForAI = new MultiTenantLookupDao<>(sessionFactories, TestEntityWithAIId.class,
-        registry,
         shardingOptions,
         shardInfoProvider, observer);
 
-    phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class, registry,
+    phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class,
         shardingOptions,
         shardInfoProvider, observer);
     transactionDao = new MultiTenantRelationalDao<>(sessionFactories, Transaction.class,
-        registry,
         shardingOptions,
         shardInfoProvider, observer);
-    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, registry,
+    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class,
         shardingOptions,
         shardInfoProvider, observer);
   }
@@ -139,6 +137,7 @@ public class MultiTenantLookupDaoTest {
   public void after() {
     sessionFactories.forEach((tenantId, sessionFactory) -> sessionFactory.forEach(
         SessionFactory::close));
+    ShardCalculatorRegistry.clear();
   }
 
   @Test
@@ -198,7 +197,7 @@ public class MultiTenantLookupDaoTest {
         .text("Some Text")
         .build());
 
-    registry.clear();
+    ShardCalculatorRegistry.clear();
 
     IllegalStateException error = assertThrows(
         IllegalStateException.class,

@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class MultiTenantRelationalReadOnlyLockedContextTest {
 
   private Map<String, List<SessionFactory>> sessionFactories = new HashMap<>();
@@ -79,7 +80,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Map<String, ShardManager> shardManager = new HashMap<>();
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
-    ShardCalculatorRegistry registry = ShardCalculatorTestUtils.registryFor(shardManager);
+    ShardCalculatorTestUtils.register(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -90,12 +91,12 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
 
     companyRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class,
-        registry, shardingOptions,
+        shardingOptions,
         shardInfoProvider, observer);
     departmentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class,
-        registry, shardingOptions,
+        shardingOptions,
         shardInfoProvider, observer);
-    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, registry,
+    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class,
         shardingOptions,
         shardInfoProvider, observer);
   }

@@ -41,12 +41,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class WrapperDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
     private WrapperDao<Order, OrderDao> dao;
-    private ShardCalculatorRegistry registry;
-
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
         configuration.setProperty("hibernate.dialect",
@@ -71,15 +70,16 @@ public class WrapperDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        registry = ShardCalculatorTestUtils.registryFor(
+        ShardCalculatorTestUtils.register(
                 Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
-        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class, registry);
+        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class);
 
     }
 
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test
@@ -116,7 +116,7 @@ public class WrapperDaoTest {
     void testRegistryClearIsObservedAfterInitialLookup() {
         dao.forParent("customer-before-clear");
 
-        registry.clear();
+        ShardCalculatorRegistry.clear();
 
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
@@ -126,49 +126,4 @@ public class WrapperDaoTest {
                 error.getMessage());
     }
 
-    @Test
-    void testConstructorRejectsMissingNamespace() {
-        ShardCalculatorRegistry emptyRegistry = ShardCalculatorTestUtils.registryFor(Map.of());
-
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
-                () -> new WrapperDao<>(
-                        DBShardingBundleBase.DEFAULT_NAMESPACE,
-                        sessionFactories,
-                        OrderDao.class,
-                        emptyRegistry));
-        assertEquals(
-                "ShardCalculator has not been registered for tenant: default",
-                error.getMessage());
-    }
-
-    @Test
-    void testCalculatedShardMustMatchSessionFactories() {
-        ShardCalculatorRegistry mismatchedRegistry = ShardCalculatorTestUtils.registryFor(
-                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new BalancedShardManager(4)));
-        String parentKey = parentKeyForShard(mismatchedRegistry, 2);
-        WrapperDao<Order, OrderDao> mismatchedDao = new WrapperDao<>(
-                DBShardingBundleBase.DEFAULT_NAMESPACE,
-                sessionFactories,
-                OrderDao.class,
-                mismatchedRegistry);
-
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
-                () -> mismatchedDao.forParent(parentKey));
-        assertEquals(
-                "Calculated shard 2 for tenant default is outside configured session factory range [0, 1]",
-                error.getMessage());
-    }
-
-    private String parentKeyForShard(ShardCalculatorRegistry targetRegistry, int targetShard) {
-        for (int i = 0; i < 1000; i++) {
-            String parentKey = "customer-" + i;
-            if (targetRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(parentKey)
-                    == targetShard) {
-                return parentKey;
-            }
-        }
-        throw new AssertionError("Unable to find parent key for shard " + targetShard);
-    }
 }

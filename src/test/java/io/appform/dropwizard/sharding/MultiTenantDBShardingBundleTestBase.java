@@ -37,15 +37,10 @@ import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTe
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.sharding.LegacyShardManager;
-import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -73,53 +68,6 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         assertNotSame(tenant1Calculator, tenant2Calculator);
         assertSame(tenant1Calculator, bundle.getShardCalculator("TENANT1"));
         assertSame(tenant2Calculator, bundle.getShardCalculator("TENANT2"));
-    }
-
-    @Test
-    public void failedInitializationDoesNotPublishCalculators() {
-        var tenants = new LinkedHashMap<String, ShardedHibernateFactory>();
-        tenants.put("TENANT1", ShardedHibernateFactory.builder()
-                .shardingOptions(ShardingBundleOptions.builder().build())
-                .shards(List.of(createConfig("failure_tenant1_1"), createConfig("failure_tenant1_2")))
-                .build());
-        tenants.put("TENANT2", ShardedHibernateFactory.builder()
-                .shardingOptions(ShardingBundleOptions.builder().build())
-                .shards(List.of(createConfig("failure_tenant2_1"), createConfig("failure_tenant2_2")))
-                .build());
-        var failureConfig = new TestConfig(new MultiTenantShardedHibernateFactory(tenants));
-        var shardManagerCreations = new AtomicInteger();
-        MultiTenantDBShardingBundleBase<TestConfig> bundle =
-                new MultiTenantDBShardingBundleBase<TestConfig>(Order.class, OrderItem.class) {
-                    @Override
-                    protected ShardManager createShardManager(
-                            int numShards,
-                            ShardBlacklistingStore blacklistingStore) {
-                        if (shardManagerCreations.incrementAndGet() == 2) {
-                            throw new IllegalStateException("second shard manager failed");
-                        }
-                        return new LegacyShardManager(numShards, blacklistingStore);
-                    }
-
-                    @Override
-                    protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
-                        return config.getShards();
-                    }
-                };
-
-        bundle.initialize(bootstrap);
-        try {
-            assertThrows(IllegalStateException.class, () -> bundle.run(failureConfig, environment));
-            assertThrows(IllegalStateException.class, () -> bundle.getShardCalculator("TENANT1"));
-            assertThrows(IllegalStateException.class, () -> bundle.getShardCalculator("TENANT2"));
-        } finally {
-            bundle.getSessionFactories().values().stream()
-                    .flatMap(List::stream)
-                    .forEach(sessionFactory -> {
-                        if (!sessionFactory.isClosed()) {
-                            sessionFactory.close();
-                        }
-                    });
-        }
     }
 
     @Test

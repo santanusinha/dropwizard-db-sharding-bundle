@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 /**
  *
  */
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public abstract class BundleBasedTestBase {
     protected static class TestConfig extends Configuration {
         @Getter
