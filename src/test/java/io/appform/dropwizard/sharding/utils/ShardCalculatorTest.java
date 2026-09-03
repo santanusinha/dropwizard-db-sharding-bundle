@@ -6,38 +6,43 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ShardCalculatorTest {
+public class ShardCalculatorTest {
 
     @Test
     void exposesOnlyTenantBoundRoutingApi() {
-        Constructor<?>[] constructors = ShardCalculator.class.getConstructors();
-        assertEquals(1, constructors.length);
+        Constructor<ShardCalculator> constructor = assertDoesNotThrow(() ->
+                ShardCalculator.class.getConstructor(
+                        String.class,
+                        io.appform.dropwizard.sharding.sharding.ShardManager.class,
+                        BucketIdExtractor.class));
         assertIterableEquals(
                 List.of(String.class, io.appform.dropwizard.sharding.sharding.ShardManager.class, BucketIdExtractor.class),
-                Arrays.asList(constructors[0].getParameterTypes()));
+                Arrays.asList(constructor.getParameterTypes()));
+        assertEquals(1, ShardCalculator.class.getConstructors().length);
 
-        Method[] declaredMethods = ShardCalculator.class.getDeclaredMethods();
-        assertEquals(2, declaredMethods.length);
-        assertTrue(Arrays.stream(declaredMethods).anyMatch(method ->
-                method.getName().equals("shardId")
-                        && method.getParameterCount() == 1));
-        assertTrue(Arrays.stream(declaredMethods).anyMatch(method ->
-                method.getName().equals("isOnValidShard")
-                        && method.getParameterCount() == 1));
-        assertFalse(Arrays.stream(declaredMethods).anyMatch(method ->
-                method.getName().equals("shardId")
-                        && method.getParameterCount() == 2));
-        assertFalse(Arrays.stream(declaredMethods).anyMatch(method ->
-                method.getName().equals("isOnValidShard")
-                        && method.getParameterCount() == 2));
+        Method shardId = assertDoesNotThrow(() -> ShardCalculator.class.getMethod("shardId", Object.class));
+        assertEquals(int.class, shardId.getReturnType());
+        assertTrue(Modifier.isPublic(shardId.getModifiers()));
+        assertFalse(Modifier.isStatic(shardId.getModifiers()));
+
+        Method isOnValidShard = assertDoesNotThrow(() -> ShardCalculator.class.getMethod("isOnValidShard", Object.class));
+        assertEquals(boolean.class, isOnValidShard.getReturnType());
+        assertTrue(Modifier.isPublic(isOnValidShard.getModifiers()));
+        assertFalse(Modifier.isStatic(isOnValidShard.getModifiers()));
+
+        assertThrows(NoSuchMethodException.class, () -> ShardCalculator.class.getMethod("shardId", String.class, Object.class));
+        assertThrows(NoSuchMethodException.class, () -> ShardCalculator.class.getMethod("isOnValidShard", String.class, Object.class));
     }
 
     @Test
