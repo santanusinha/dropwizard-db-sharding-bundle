@@ -5,47 +5,34 @@
 
 ## Problem
 
-Multi-tenant DAOs currently construct a `ShardCalculator` from the complete
-`Map<String, ShardManager>`. This duplicates calculators across DAO instances,
-forces DAO constructors to depend on shard managers, and lets each calculator
-route for every tenant.
+Multi-tenant DAOs currently construct `ShardCalculator` instances from shard
+managers. This duplicates calculators and forces DAO constructors to receive
+shard-manager dependencies used only for routing.
 
-Shard calculators belong to a bundle's lifecycle. Each calculator should route
-for one tenant, use only that tenant's `ShardManager`, and remain isolated from
-other bundle instances.
+Shard calculators should be created by the bundle, one per tenant, and
+retrieved by DAOs without adding another constructor dependency.
 
 ## Goals
 
 1. Create one tenant-bound `ShardCalculator<String>` per configured tenant.
-2. Give each `MultiTenantDBShardingBundleBase` its own calculator registry.
-3. Register a bundle's calculators only after every tenant initializes.
-4. Remove shard-manager and calculator dependencies from DAO constructors.
-5. Resolve the current tenant's calculator from the owning bundle's registry at
-   every routing operation.
-6. Expose calculators from bundle APIs, not DAO APIs.
-7. Reject missing tenants and duplicate registrations within one bundle.
-8. Let separate bundles use the same tenant ID or default namespace
-   independently.
+2. Register calculators in a static tenant-keyed registry.
+3. Remove shard managers and calculators from DAO constructors.
+4. Let each routing operation retrieve its tenant's calculator directly.
+5. Expose calculator access from bundles rather than DAOs.
 
 ## Non-Goals
 
-- Preserve source compatibility with the existing map-based
-  `ShardCalculator` API.
-- Add production unregister, replacement, or dynamic tenant-reconfiguration
-  APIs.
-- Share calculator registrations between bundle instances.
+- Preserve the existing map-based `ShardCalculator` API.
+- Inject `ShardCalculatorRegistry`, calculators, resolver functions, or
+  calculator maps into DAO constructors.
+- Validate DAO tenant-map consistency as part of this change.
+- Change relational context ownership or validation.
+- Provide atomic multi-tenant batch publication.
 
-## Architecture
+## Tenant-Bound `ShardCalculator`
 
-### Tenant-bound `ShardCalculator`
-
-`ShardCalculator<T>` owns:
-
-- one `tenantId`;
-- one `ShardManager`;
-- one `BucketIdExtractor<T>`.
-
-Its constructor becomes:
+`ShardCalculator<T>` owns one tenant ID, one `ShardManager`, and one
+`BucketIdExtractor<T>`:
 
 ```java
 public ShardCalculator(
@@ -54,204 +41,159 @@ public ShardCalculator(
         BucketIdExtractor<T> extractor)
 ```
 
-Its routing API becomes:
+Its public routing API is:
 
 ```java
 public int shardId(T key)
 public boolean isOnValidShard(T key)
 ```
 
-Both methods pass the bound tenant ID to the bucket extractor and use the bound
-shard manager. The map-based constructor and methods that accept a tenant ID
-are removed.
+Both methods pass the bound tenant ID to the extractor and use the bound shard
+manager. The map constructor, default-namespace fallback, and tenant-parameter
+overloads are removed.
 
-### `ShardCalculatorRegistry`
+## Static `ShardCalculatorRegistry`
 
-`ShardCalculatorRegistry` is a normal final class. Every
-`MultiTenantDBShardingBundleBase` owns one final instance. Each instance stores
-its calculators in a volatile immutable snapshot:
+`ShardCalculatorRegistry` is a static utility backed by:
 
 ```java
-private volatile Map<String, ShardCalculator<String>> calculators = Map.of();
+private static final ConcurrentMap<String, ShardCalculator<String>>
+        CALCULATORS = new ConcurrentHashMap<>();
 ```
 
-It exposes instance methods:
+It exposes:
 
 ```java
-public synchronized void register(
-        Map<String, ShardCalculator<String>> calculators)
-public ShardCalculator<String> get(String tenantId)
+public static void register(
+        String tenantId,
+        ShardCalculator<String> calculator)
+public static ShardCalculator<String> get(String tenantId)
 @VisibleForTesting
-public synchronized void clear()
+public static void clear()
 ```
 
-Registration is synchronized and all-or-nothing:
+`register` validates its arguments and stores the calculator with `put`.
+Registering the same tenant again replaces the previous calculator. This
+supports tests and applications that initialize more than one bundle with the
+same namespace.
 
-1. Validate the input map, tenant IDs, and calculators.
-2. Capture the current immutable snapshot.
-3. Check every tenant ID for an existing registration in this registry. If any
-   tenant exists, throw `IllegalStateException` without publishing the batch.
-4. Build an immutable merged snapshot without changing the published state.
-5. Publish the complete batch with one volatile assignment.
-
-`get(tenantId)` captures the volatile snapshot once and performs its lookup
-against that snapshot. It throws:
+`get` throws:
 
 ```text
 ShardCalculator has not been registered for tenant: <tenantId>
 ```
 
-The registry never overwrites registrations. A test may clear its own isolated
-registry when it must prove that a DAO resolves the calculator again. No shared
-test cleanup is required.
+The registry stores calculator references directly. It does not copy the
+registry or create calculator snapshots during reads or writes.
 
-Duplicate detection is local to one registry. Two live bundles may register
-the same tenant ID, including the default namespace, without conflict.
+## Bundle Lifecycle
 
-### Bundle lifecycle
-
-`MultiTenantDBShardingBundleBase` owns:
+`MultiTenantDBShardingBundleBase.run()` creates a tenant-bound calculator after
+creating each tenant's `ShardManager`:
 
 ```java
-private final ShardCalculatorRegistry shardCalculatorRegistry =
-        new ShardCalculatorRegistry();
+ShardCalculatorRegistry.register(
+        tenantId,
+        new ShardCalculator<>(
+                tenantId,
+                shardManager,
+                new ConsistentHashBucketIdExtractor<>(
+                        Map.of(tenantId, shardManager))));
 ```
 
-`run()` continues to initialize each tenant's session factories, shard manager,
-observers, and administrative tasks. It also builds a tenant-bound calculator
-for each tenant in a local map. The bundle publishes that map to its registry
-only after the tenant loop completes successfully. A failed tenant
-initialization therefore leaves that bundle's registry unchanged.
+Each calculator contains only its tenant's manager. The bundle does not retain
+a calculator map or registry instance.
 
-The bundle exposes:
+The multi-tenant bundle exposes:
 
 ```java
 public ShardCalculator<String> getShardCalculator(String tenantId)
 ```
 
-The method delegates to the bundle's registry. DAO factories pass the same
-registry instance to every DAO they create.
-
-`DBShardingBundleBase` exposes:
+The single-tenant bundle exposes:
 
 ```java
 public ShardCalculator<String> getShardCalculator()
 ```
 
-It delegates to its multi-tenant bundle with `DEFAULT_NAMESPACE`. Its DAO
-factories also delegate, so single-tenant wrappers receive the delegate
-bundle's registry.
+Both methods delegate to the static registry.
 
-### DAO routing
+## DAO Routing
 
-`MultiTenantLookupDao`, `MultiTenantCacheableLookupDao`,
-`MultiTenantRelationalDao`, and `MultiTenantCacheableRelationalDao` receive one
-`ShardCalculatorRegistry` in their constructors. They do not receive or retain
-a `ShardManager`, calculator, calculator map, resolver, or scope token.
+DAO constructors do not accept a `ShardManager`, shard-manager map,
+`ShardCalculator`, `ShardCalculatorRegistry`, calculator map, or resolver.
 
-Every operation that needs a shard queries the passed registry before selecting
-a tenant-specific DAO:
+Every operation that calculates a shard calls the registry directly:
 
 ```java
-int shardId = registry.get(tenantId).shardId(key);
+int shardId = ShardCalculatorRegistry.get(tenantId).shardId(key);
 ```
 
-DAOs retain the registry but never cache a returned calculator. This lookup
-order makes an unknown tenant fail with the registry's `IllegalStateException`,
-not a null dereference from another tenant-indexed map.
+This applies to:
 
-Cacheable DAOs validate the tenant through the registry before a cache lookup
-that might otherwise dereference a missing tenant entry.
+- `MultiTenantLookupDao`;
+- `MultiTenantRelationalDao`;
+- inherited cacheable DAO routing;
+- `WrapperDao`, using its fixed `dbNamespace`.
 
-`WrapperDao` receives its fixed `dbNamespace` and the registry. Each
-`forParent(parentKey)` call resolves:
+Cacheable DAO behavior otherwise remains unchanged. This feature does not add
+tenant-map validation before cache access.
 
-```java
-int shardId = registry.get(dbNamespace).shardId(parentKey);
-```
+Relational operations that already receive a context with a shard ID and
+session factory remain unchanged. This feature does not add context ownership
+validation.
 
-### Public API changes
+## Public API Changes
 
-Calculator access moves from DAOs to bundles:
+- Remove shard-manager constructor parameters from multi-tenant and wrapper
+  DAOs.
+- Do not add registry constructor parameters.
+- Remove DAO calculator fields and calculator accessors.
+- Remove `ShardedDao`, whose only contract is DAO-level calculator access.
+- Add calculator accessors to bundle classes.
 
-- Remove calculator fields and `getShardCalculator()` methods from
-  `MultiTenantLookupDao`, `MultiTenantRelationalDao`, and `WrapperDao`.
-- Remove delegating calculator accessors from `LookupDao` and `RelationalDao`.
-- Remove `ShardedDao`, whose only contract is the DAO-level calculator
-  accessor.
-- Add tenant-aware access to `MultiTenantDBShardingBundleBase`.
-- Add default-namespace access to `DBShardingBundleBase`.
+These are intentional breaking changes. No compatibility layer remains.
 
-These are intentional breaking changes. No deprecated compatibility layer will
-remain.
+## Error Handling
 
-## Error handling
-
-- Missing tenant: `registry.get(tenantId)` throws `IllegalStateException` with
-  the tenant ID.
-- Duplicate tenant in one registry: batch registration throws
-  `IllegalStateException` with the conflicting tenant ID and publishes none of
-  the batch.
-- Invalid registration input: reject null maps, tenant IDs, and calculators
-  before changing registry state.
-- Bundle initialization failure: publish no calculators from that bundle.
-- Separate bundle instances: registrations never conflict, even when tenant
-  IDs match.
+- Null registry inputs are rejected with `Objects.requireNonNull`.
+- Missing tenants fail through `ShardCalculatorRegistry.get(tenantId)`.
+- Duplicate registration replaces the previous calculator.
+- Existing DAO and context errors remain outside this feature's scope.
 
 ## Testing
 
 ### `ShardCalculatorTest`
 
-- A calculator routes through its bound tenant and shard manager.
-- Two calculators with different shard managers route independently.
-- `isOnValidShard` uses the bound tenant.
+- Verifies the calculator passes its bound tenant to the extractor.
+- Verifies calculators with different managers route independently.
+- Verifies only the tenant-bound public API remains.
 
 ### `ShardCalculatorRegistryTest`
 
-- Register and retrieve multiple tenant calculators.
-- Reject an unknown tenant with the exact error.
-- Reject duplicate tenants without partially publishing a batch.
-- Prove two registry instances can register the same tenant independently.
-- Support concurrent reads after successful registration.
-- Pause an insertion-ordered map during batch-copy traversal and assert that a
-  reader cannot observe the first new tenant while the last tenant remains
-  missing. The test passes only when registration publishes one completed
-  immutable snapshot.
+- Registers and retrieves separate tenant calculators.
+- Verifies same-tenant registration overwrites the previous calculator.
+- Verifies the exact missing-tenant error.
+- Verifies `clear()` removes all entries.
+- Verifies concurrent reads of registered calculators.
 
 ### Bundle tests
 
-- A two-tenant bundle registers distinct calculators.
-- Each calculator uses only its tenant's shard manager.
-- Bundle-level accessors return the registered calculators.
-- Single-tenant bundle access uses `DEFAULT_NAMESPACE`.
-- A failed bundle initialization publishes no calculator batch.
-- Two live bundles expose different calculators for the same namespace without
-  collision.
-- `BundleMvccSnapshotTest` continues to pass with two live default-namespace
-  bundles.
+- Verify each configured tenant is registered.
+- Verify bundle-level accessors return registry calculators.
+- Verify two bundles using the default namespace can initialize because later
+  registration overwrites the shared entry.
 
 ### DAO tests
 
-- Lookup, relational, cacheable, and wrapper routing use the correct tenant
-  calculator.
-- Operations query the passed registry each time.
-- Unknown tenants fail with the registry error.
-- Constructors accept the registry but no shard manager, calculator,
-  calculator map, or scope token.
-- Direct DAO tests create an isolated registry with
-  `ShardCalculatorTestUtils.registryFor(...)`.
+- Register tenant calculators in setup and clear the static registry in
+  teardown.
+- Verify lookup, relational, cacheable, and wrapper routing uses the correct
+  tenant calculator.
+- Verify DAO constructors no longer accept shard managers or registries.
+- Keep existing relational context behavior unchanged.
 
-### Final verification
-
-- Run focused tests while implementing each change.
-- Run the complete Maven test suite.
-- Run `git diff --check`.
-- Confirm registry methods and state belong to instances.
-- Confirm DAO constructors depend on `ShardCalculatorRegistry` but not shard
-  managers or calculators.
-- Confirm no shared registry cleanup remains.
-
-## Expected file impact
+## Expected File Impact
 
 | Action | Area |
 | --- | --- |
@@ -259,5 +201,5 @@ remain.
 | Modify | `utils/ShardCalculator.java` and its tests |
 | Modify | `MultiTenantDBShardingBundleBase` and `DBShardingBundleBase` |
 | Modify | Multi-tenant lookup, relational, cacheable, and wrapper DAOs |
-| Modify | Single-tenant DAO wrappers and affected tests |
+| Modify | Affected DAO and bundle tests |
 | Delete | `dao/ShardedDao.java` |
