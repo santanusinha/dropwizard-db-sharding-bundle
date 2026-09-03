@@ -40,7 +40,6 @@ import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.sharding.LegacyShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,8 +71,8 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         var tenant2Calculator = bundle.getShardCalculator("TENANT2");
 
         assertNotSame(tenant1Calculator, tenant2Calculator);
-        assertSame(tenant1Calculator, ShardCalculatorRegistry.get("TENANT1"));
-        assertSame(tenant2Calculator, ShardCalculatorRegistry.get("TENANT2"));
+        assertSame(tenant1Calculator, bundle.getShardCalculator("TENANT1"));
+        assertSame(tenant2Calculator, bundle.getShardCalculator("TENANT2"));
     }
 
     @Test
@@ -110,8 +109,8 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         bundle.initialize(bootstrap);
         try {
             assertThrows(IllegalStateException.class, () -> bundle.run(failureConfig, environment));
-            assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT1"));
-            assertThrows(IllegalStateException.class, () -> ShardCalculatorRegistry.get("TENANT2"));
+            assertThrows(IllegalStateException.class, () -> bundle.getShardCalculator("TENANT1"));
+            assertThrows(IllegalStateException.class, () -> bundle.getShardCalculator("TENANT2"));
         } finally {
             bundle.getSessionFactories().values().stream()
                     .flatMap(List::stream)

@@ -33,7 +33,6 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntityWithAIId;
-import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -59,9 +58,12 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
         bundle.initialize(bootstrap);
         bundle.run(testConfig, environment);
 
-        assertSame(
-                ShardCalculatorRegistry.get(bundle.getDbNamespace()),
-                bundle.getShardCalculator());
+        var calculator = bundle.getShardCalculator();
+
+        assertSame(calculator, bundle.getShardCalculator());
+        int shardId = calculator.shardId("routing-key");
+        assertTrue(shardId >= 0 && shardId < bundle.getSessionFactories().size());
+        assertTrue(calculator.isOnValidShard("routing-key"));
     }
 
     @Test

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -78,6 +79,8 @@ class BundleMvccSnapshotTest {
     private final AdminEnvironment adminEnvironment = mock(AdminEnvironment.class);
     private final Bootstrap<?> bootstrap = mock(Bootstrap.class);
 
+    private DBShardingBundleBase<TestConfig> writeBundle;
+    private DBShardingBundleBase<TestConfig> readBundle;
     private LookupDao<TestEntity> writeLookupDao;
     private LookupDao<TestEntity> readLookupDao;
 
@@ -94,18 +97,23 @@ class BundleMvccSnapshotTest {
         String dbUrl = "jdbc:h2:mem:mvcc_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
 
         // writeBundle: creates schema; owns all inserts and updates
-        val writeBundle = initBundle(new TestConfig(ShardedHibernateFactory.builder()
+        writeBundle = initBundle(new TestConfig(ShardedHibernateFactory.builder()
                 .shards(List.of(buildWriteDataSourceFactory(dbUrl)))
                 .shardingOptions(ShardingBundleOptions.builder().build())
                 .build()));
         writeLookupDao = writeBundle.createParentObjectDao(TestEntity.class);
 
         // readBundle: autoCommit=false, pool_size=1, REPEATABLE_READ — exactly like production
-        val readBundle = initBundle(new TestConfig(ShardedHibernateFactory.builder()
+        readBundle = initBundle(new TestConfig(ShardedHibernateFactory.builder()
                 .shards(List.of(buildReadDataSourceFactory(dbUrl)))
                 .shardingOptions(ShardingBundleOptions.builder().build())
                 .build()));
         readLookupDao = readBundle.createParentObjectDao(TestEntity.class);
+    }
+
+    @Test
+    void twoLiveDefaultNamespaceBundlesOwnIndependentCalculators() {
+        assertNotSame(writeBundle.getShardCalculator(), readBundle.getShardCalculator());
     }
 
     /**

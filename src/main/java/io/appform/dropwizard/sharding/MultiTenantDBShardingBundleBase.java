@@ -95,6 +95,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   private Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
 
+  private final ShardCalculatorRegistry shardCalculatorRegistry = new ShardCalculatorRegistry();
+
   protected MultiTenantDBShardingBundleBase(
       Class<?> entity,
       Class<?>... entities) {
@@ -192,12 +194,12 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
       }
     });
-    ShardCalculatorRegistry.register(shardCalculators);
+    shardCalculatorRegistry.register(shardCalculators);
     registerBucketIdExtractor(this.shardManagers);
   }
 
   public ShardCalculator<String> getShardCalculator(String tenantId) {
-    return ShardCalculatorRegistry.get(tenantId);
+    return shardCalculatorRegistry.get(tenantId);
   }
 
   @Override
