@@ -29,6 +29,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -47,6 +49,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
@@ -54,6 +57,7 @@ public class MultiTenantCacheableLookupDaoTest {
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
   private Map<String, List<SessionFactory>> sessionFactories = new HashMap<>();
+  private ShardCalculatorRegistry registry;
   private MultiTenantCacheableLookupDao<TestEntity> lookupDao;
   private MultiTenantCacheableLookupDao<Phone> phoneDao;
   private MultiTenantCacheableRelationalDao<Transaction> transactionDao;
@@ -90,6 +94,7 @@ public class MultiTenantCacheableLookupDaoTest {
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    registry = ShardCalculatorTestUtils.registryFor(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -99,7 +104,7 @@ public class MultiTenantCacheableLookupDaoTest {
       lookupDao = new MultiTenantCacheableLookupDao<>(
               sessionFactories,
               TestEntity.class,
-              shardManager,
+              registry,
               Map.of("TENANT1", new LookupCache<TestEntity>() {
 
                           private Map<String, TestEntity> cache = new HashMap<>();
@@ -141,7 +146,7 @@ public class MultiTenantCacheableLookupDaoTest {
               shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     phoneDao = new MultiTenantCacheableLookupDao<>(sessionFactories,
         Phone.class,
-        shardManager,
+        registry,
         Map.of("TENANT1",
             new LookupCache<Phone>() {
 
@@ -418,6 +423,16 @@ public class MultiTenantCacheableLookupDaoTest {
   public void after() {
     sessionFactories.forEach((tenantId, sessionFactory) -> sessionFactory.forEach(
         SessionFactory::close));
+  }
+
+  @Test
+  public void testUnknownTenantUsesRegistryError() {
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> lookupDao.get("UNKNOWN", "testId"));
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: UNKNOWN",
+        error.getMessage());
   }
 
   @Test

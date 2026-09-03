@@ -23,7 +23,7 @@ import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.exceptions.DaoFwdException;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
 
@@ -52,7 +52,7 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    *
    * @param sessionFactories  A list of SessionFactory instances for database access.
    * @param entityClass       The Class representing the entity type handled by the DAO.
-   * @param shardManagers     A map of ShardManager to instantiate ShardCalculator.
+   * @param registry          Registry of tenant-specific shard calculators.
    * @param cache             The LookupCache implementation for caching entities.
    * @param shardingOptions   ShardingBundleOptions for configuring sharding behavior.
    * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
@@ -60,12 +60,12 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    */
   public MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
                                        Class<T> entityClass,
-                                       Map<String, ShardManager> shardManagers,
+                                       ShardCalculatorRegistry registry,
                                        Map<String, LookupCache<T>> cache,
                                        Map<String, ShardingBundleOptions> shardingOptions,
                                        Map<String, ShardInfoProvider> shardInfoProvider,
                                        TransactionObserver observer) {
-    super(sessionFactories, entityClass, shardManagers, shardingOptions, shardInfoProvider, observer);
+    super(sessionFactories, entityClass, registry, shardingOptions, shardInfoProvider, observer);
     this.cache = cache;
   }
 
@@ -88,6 +88,7 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    */
   @Override
   public Optional<T> get(String tenantId, String key) throws Exception {
+    validateTenant(tenantId);
     if (cache.get(tenantId).exists(key)) {
       return Optional.of(cache.get(tenantId).get(key));
     }
@@ -160,6 +161,7 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    */
   @Override
   public boolean exists(String tenantId, String key) throws Exception {
+    validateTenant(tenantId);
     if (cache.get(tenantId).exists(key)) {
       return true;
     }
