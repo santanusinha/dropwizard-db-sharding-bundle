@@ -31,6 +31,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -52,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class CacheableLookupDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
@@ -88,13 +91,14 @@ public class CacheableLookupDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        ShardCalculatorTestUtils.register(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         final ShardingBundleOptions shardingBundleOptions = new ShardingBundleOptions();
         lookupDao = new CacheableLookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantCacheableLookupDao<>(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         TestEntity.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new LookupCache<TestEntity>() {
 
                             private Map<String, TestEntity> cache = new HashMap<>();
@@ -121,7 +125,6 @@ public class CacheableLookupDaoTest {
                 new MultiTenantCacheableLookupDao<>(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Phone.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new LookupCache<Phone>() {
 
                             private Map<String, Phone> cache = new HashMap<>();
@@ -148,7 +151,6 @@ public class CacheableLookupDaoTest {
                 new MultiTenantCacheableRelationalDao<>(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Transaction.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new RelationalCache<Transaction>() {
 
                             private Map<String, Object> cache = new HashMap<>();
@@ -215,7 +217,6 @@ public class CacheableLookupDaoTest {
         auditDao = new CacheableRelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantCacheableRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Audit.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new RelationalCache<Audit>() {
 
                             private Map<String, Object> cache = new HashMap<>();
@@ -272,6 +273,7 @@ public class CacheableLookupDaoTest {
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test

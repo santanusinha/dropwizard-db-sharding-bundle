@@ -25,6 +25,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
@@ -34,14 +36,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class WrapperDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
     private WrapperDao<Order, OrderDao> dao;
-
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
         configuration.setProperty("hibernate.dialect",
@@ -66,13 +70,16 @@ public class WrapperDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class, shardManager);
+        ShardCalculatorTestUtils.register(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
+        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class);
 
     }
 
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test
@@ -104,4 +111,19 @@ public class WrapperDaoTest {
         assertEquals(saveResult.getId(), result.getId());
         assertEquals(saveResult.getId(), result.getId());
     }
+
+    @Test
+    void testRegistryClearIsObservedAfterInitialLookup() {
+        dao.forParent("customer-before-clear");
+
+        ShardCalculatorRegistry.clear();
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> dao.forParent("customer-after-clear"));
+        assertEquals(
+                "ShardCalculator has not been registered for tenant: default",
+                error.getMessage());
+    }
+
 }

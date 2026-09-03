@@ -19,6 +19,7 @@ package io.appform.dropwizard.sharding;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
@@ -50,6 +51,20 @@ import org.junit.jupiter.api.Test;
  * Core systems are not mocked. Uses H2 for testing.
  */
 public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
+
+    @Test
+    public void exposesDefaultNamespaceCalculator() {
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+
+        var calculator = bundle.getShardCalculator();
+
+        assertSame(calculator, bundle.getShardCalculator());
+        int shardId = calculator.shardId("routing-key");
+        assertTrue(shardId >= 0 && shardId < bundle.getSessionFactories().size());
+        assertTrue(calculator.isOnValidShard("routing-key"));
+    }
 
     @Test
     public void testBundle() throws Exception {

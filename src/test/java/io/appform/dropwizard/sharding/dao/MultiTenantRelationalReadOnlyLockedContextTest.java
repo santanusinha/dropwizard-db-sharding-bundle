@@ -9,6 +9,8 @@ import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class MultiTenantRelationalReadOnlyLockedContextTest {
 
   private Map<String, List<SessionFactory>> sessionFactories = new HashMap<>();
@@ -77,6 +80,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Map<String, ShardManager> shardManager = new HashMap<>();
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    ShardCalculatorTestUtils.register(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -87,12 +91,12 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
 
     companyRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class,
-        shardManager, shardingOptions,
+        shardingOptions,
         shardInfoProvider, observer);
     departmentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class,
-        shardManager, shardingOptions,
+        shardingOptions,
         shardInfoProvider, observer);
-    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardManager,
+    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class,
         shardingOptions,
         shardInfoProvider, observer);
   }
@@ -101,6 +105,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
   public void after() {
     sessionFactories.forEach((tenantId, sessionFactory) -> sessionFactory.forEach(
         SessionFactory::close));
+    ShardCalculatorRegistry.clear();
   }
 
   @Test

@@ -24,16 +24,25 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public abstract class MultiTenantBundleBasedTestBase {
 
   protected static class TestConfig extends Configuration {
 
     @Getter
-    private MultiTenantShardedHibernateFactory shards = new MultiTenantShardedHibernateFactory(Map.of("TENANT1",
-        ShardedHibernateFactory.builder()
-            .shardingOptions(ShardingBundleOptions.builder().build()).build(),
-        "TENANT2", ShardedHibernateFactory.builder()
-            .shardingOptions(ShardingBundleOptions.builder().build()).build()));
+    private final MultiTenantShardedHibernateFactory shards;
+
+    TestConfig() {
+      this(new MultiTenantShardedHibernateFactory(Map.of("TENANT1",
+          ShardedHibernateFactory.builder()
+              .shardingOptions(ShardingBundleOptions.builder().build()).build(),
+          "TENANT2", ShardedHibernateFactory.builder()
+              .shardingOptions(ShardingBundleOptions.builder().build()).build())));
+    }
+
+    TestConfig(MultiTenantShardedHibernateFactory shards) {
+      this.shards = shards;
+    }
   }
 
   protected final TestConfig testConfig = new TestConfig();
