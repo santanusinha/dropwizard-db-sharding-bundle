@@ -17,51 +17,31 @@
 
 package io.appform.dropwizard.sharding.utils;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import lombok.extern.slf4j.Slf4j;
 
-import java.util.Map;
 import java.util.Objects;
 
 /**
  * Utility class for calculating shards.
  */
-@Slf4j
 public class ShardCalculator<T> {
 
     private final String tenantId;
-    private final Map<String, ShardManager> shardManagers;
+    private final ShardManager shardManager;
     private final BucketIdExtractor<T> extractor;
 
     public ShardCalculator(String tenantId, ShardManager shardManager, BucketIdExtractor<T> extractor) {
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
-        this.shardManagers = Map.of(tenantId, Objects.requireNonNull(shardManager, "shardManager"));
-        this.extractor = Objects.requireNonNull(extractor, "extractor");
-    }
-
-    public ShardCalculator(Map<String, ShardManager> shardManagers, BucketIdExtractor<T> extractor) {
-        this.tenantId = null;
-        this.shardManagers = Objects.requireNonNull(shardManagers, "shardManagers");
+        this.shardManager = Objects.requireNonNull(shardManager, "shardManager");
         this.extractor = Objects.requireNonNull(extractor, "extractor");
     }
 
     public int shardId(T key) {
-        return shardId(tenantId == null ? DBShardingBundleBase.DEFAULT_NAMESPACE : tenantId, key);
-    }
-
-    public int shardId(String tenantId, T key) {
-        int bucketId = extractor.bucketId(tenantId, key);
-        return shardManagers.get(tenantId).shardForBucket(bucketId);
+        return shardManager.shardForBucket(extractor.bucketId(tenantId, key));
     }
 
     public boolean isOnValidShard(T key) {
-        return isOnValidShard(tenantId == null ? DBShardingBundleBase.DEFAULT_NAMESPACE : tenantId, key);
-    }
-
-    public boolean isOnValidShard(String tenantId, T key) {
-        int bucketId = extractor.bucketId(tenantId, key);
-        return shardManagers.get(tenantId).isMappedToValidShard(bucketId);
+        return shardManager.isMappedToValidShard(extractor.bucketId(tenantId, key));
     }
 }

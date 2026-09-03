@@ -4,10 +4,41 @@ import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ShardCalculatorTest {
+
+    @Test
+    void exposesOnlyTenantBoundRoutingApi() {
+        Constructor<?>[] constructors = ShardCalculator.class.getConstructors();
+        assertEquals(1, constructors.length);
+        assertIterableEquals(
+                List.of(String.class, io.appform.dropwizard.sharding.sharding.ShardManager.class, BucketIdExtractor.class),
+                Arrays.asList(constructors[0].getParameterTypes()));
+
+        Method[] declaredMethods = ShardCalculator.class.getDeclaredMethods();
+        assertEquals(2, declaredMethods.length);
+        assertTrue(Arrays.stream(declaredMethods).anyMatch(method ->
+                method.getName().equals("shardId")
+                        && method.getParameterCount() == 1));
+        assertTrue(Arrays.stream(declaredMethods).anyMatch(method ->
+                method.getName().equals("isOnValidShard")
+                        && method.getParameterCount() == 1));
+        assertFalse(Arrays.stream(declaredMethods).anyMatch(method ->
+                method.getName().equals("shardId")
+                        && method.getParameterCount() == 2));
+        assertFalse(Arrays.stream(declaredMethods).anyMatch(method ->
+                method.getName().equals("isOnValidShard")
+                        && method.getParameterCount() == 2));
+    }
 
     @Test
     void routesWithBoundTenantAndManager() {
