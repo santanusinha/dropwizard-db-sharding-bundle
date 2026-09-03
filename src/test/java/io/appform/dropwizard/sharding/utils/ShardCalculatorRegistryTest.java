@@ -6,8 +6,6 @@ import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtrac
 import org.junit.jupiter.api.Test;
 
 import java.util.AbstractMap;
-import java.util.AbstractSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,15 +16,23 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ShardCalculatorRegistryTest {
+
+    private static final int PUBLICATION_RACE_ITERATIONS = 5;
+    private static final int PUBLICATION_BATCH_SIZE = 50_000;
+    private static final int PUBLICATION_READER_COUNT = 4;
 
     @Test
     void registerTwoCalculatorsAndReturnSameInstancePerTenant() {
@@ -220,39 +226,103 @@ public class ShardCalculatorRegistryTest {
 
     @Test
     void batchRegistrationIsPublishedAtomically() throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(PUBLICATION_READER_COUNT);
+        try {
+            for (int iteration = 0; iteration < PUBLICATION_RACE_ITERATIONS; iteration++) {
+                assertBatchPublicationIsAtomic(executor, iteration);
+            }
+        } finally {
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    private void assertBatchPublicationIsAtomic(
+            ExecutorService executor,
+            int iteration) throws Exception {
         var registry = new ShardCalculatorRegistry();
         var oldCalculator = calculatorFor("OLD", 4);
+        var batchCalculator = calculatorFor("BATCH", 8);
         registry.register(Map.of("OLD", oldCalculator));
 
         var batch = new LinkedHashMap<String, ShardCalculator<String>>();
-        batch.put("NEW-FIRST", calculatorFor("NEW-FIRST", 2));
-        batch.put("NEW-MIDDLE", calculatorFor("NEW-MIDDLE", 4));
-        batch.put("NEW-LAST", calculatorFor("NEW-LAST", 8));
-        var firstEntryTransferred = new CountDownLatch(1);
-        var continuePublication = new CountDownLatch(1);
-        var pausingBatch = new PublicationPausingMap(batch, firstEntryTransferred, continuePublication);
-
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        try {
-            Future<?> registerFuture = executor.submit(() -> registry.register(pausingBatch));
-
-            assertTrue(firstEntryTransferred.await(5, TimeUnit.SECONDS));
-            boolean firstVisible = isRegistered(registry, "NEW-FIRST");
-            boolean lastVisible = isRegistered(registry, "NEW-LAST");
-            assertEquals(
-                    firstVisible,
-                    lastVisible,
-                    "A reader must not observe one tenant from a batch while another remains missing");
-
-            continuePublication.countDown();
-            registerFuture.get(5, TimeUnit.SECONDS);
-
-            batch.forEach((tenantId, calculator) -> assertSame(calculator, registry.get(tenantId)));
-            assertSame(oldCalculator, registry.get("OLD"));
-        } finally {
-            continuePublication.countDown();
-            executor.shutdownNow();
+        for (int index = 0; index < PUBLICATION_BATCH_SIZE; index++) {
+            batch.put(batchTenantId(iteration, index), batchCalculator);
         }
+        List<String> observedTenants = List.of(
+                batchTenantId(iteration, 0),
+                batchTenantId(iteration, PUBLICATION_BATCH_SIZE / 4),
+                batchTenantId(iteration, PUBLICATION_BATCH_SIZE / 2),
+                batchTenantId(iteration, PUBLICATION_BATCH_SIZE * 3 / 4),
+                batchTenantId(iteration, PUBLICATION_BATCH_SIZE - 1));
+        var readersReady = new CountDownLatch(PUBLICATION_READER_COUNT);
+        var startReaders = new CountDownLatch(1);
+        var readersObserving = new CountDownLatch(PUBLICATION_READER_COUNT);
+        var registrationComplete = new AtomicBoolean();
+        var partialPublication = new AtomicReference<String>();
+        List<Future<Void>> readers = IntStream.range(0, PUBLICATION_READER_COUNT)
+                .mapToObj(ignored -> executor.submit(publicationObserver(
+                        registry,
+                        observedTenants,
+                        readersReady,
+                        startReaders,
+                        readersObserving,
+                        registrationComplete,
+                        partialPublication)))
+                .collect(Collectors.toList());
+
+        assertTrue(readersReady.await(5, TimeUnit.SECONDS));
+        startReaders.countDown();
+        assertTrue(readersObserving.await(5, TimeUnit.SECONDS));
+        try {
+            registry.register(batch);
+        } finally {
+            registrationComplete.set(true);
+        }
+        for (Future<Void> reader : readers) {
+            reader.get(5, TimeUnit.SECONDS);
+        }
+
+        assertNull(
+                partialPublication.get(),
+                "A reader must not observe one tenant from a batch while another remains missing");
+        for (String tenantId : observedTenants) {
+            assertSame(batchCalculator, registry.get(tenantId));
+        }
+        assertSame(oldCalculator, registry.get("OLD"));
+    }
+
+    private Callable<Void> publicationObserver(
+            ShardCalculatorRegistry registry,
+            List<String> observedTenants,
+            CountDownLatch readersReady,
+            CountDownLatch startReaders,
+            CountDownLatch readersObserving,
+            AtomicBoolean registrationComplete,
+            AtomicReference<String> partialPublication) {
+        return () -> {
+            readersReady.countDown();
+            assertTrue(startReaders.await(5, TimeUnit.SECONDS));
+            readersObserving.countDown();
+            do {
+                String visibleTenant = null;
+                for (String tenantId : observedTenants) {
+                    if (isRegistered(registry, tenantId)) {
+                        visibleTenant = tenantId;
+                    } else if (visibleTenant != null) {
+                        partialPublication.compareAndSet(
+                                null,
+                                visibleTenant + " was visible while " + tenantId + " was absent");
+                        return null;
+                    }
+                }
+            } while (!registrationComplete.get() && partialPublication.get() == null);
+            return null;
+        };
+    }
+
+    private String batchTenantId(int iteration, int index) {
+        return "NEW-" + iteration + "-" + index;
     }
 
     private ShardCalculator<String> calculatorFor(String tenantId, int shardCount) {
@@ -278,69 +348,6 @@ public class ShardCalculatorRegistryTest {
             return true;
         } catch (IllegalStateException ignored) {
             return false;
-        }
-    }
-
-    private static final class PublicationPausingMap extends AbstractMap<String, ShardCalculator<String>> {
-        private static final int BATCH_SNAPSHOT_TRAVERSAL = 1;
-
-        private final LinkedHashMap<String, ShardCalculator<String>> delegate;
-        private final CountDownLatch firstEntryTransferred;
-        private final CountDownLatch continuePublication;
-        private final AtomicInteger entrySetCalls = new AtomicInteger();
-
-        private PublicationPausingMap(
-                LinkedHashMap<String, ShardCalculator<String>> delegate,
-                CountDownLatch firstEntryTransferred,
-                CountDownLatch continuePublication) {
-            this.delegate = delegate;
-            this.firstEntryTransferred = firstEntryTransferred;
-            this.continuePublication = continuePublication;
-        }
-
-        @Override
-        public Set<Entry<String, ShardCalculator<String>>> entrySet() {
-            if (entrySetCalls.incrementAndGet() != BATCH_SNAPSHOT_TRAVERSAL) {
-                return delegate.entrySet();
-            }
-            return new AbstractSet<>() {
-                @Override
-                public Iterator<Entry<String, ShardCalculator<String>>> iterator() {
-                    var entries = List.copyOf(delegate.entrySet());
-                    return new Iterator<>() {
-                        private int index;
-
-                        @Override
-                        public boolean hasNext() {
-                            return index < entries.size();
-                        }
-
-                        @Override
-                        public Entry<String, ShardCalculator<String>> next() {
-                            if (index == 1) {
-                                firstEntryTransferred.countDown();
-                                try {
-                                    assertTrue(continuePublication.await(5, TimeUnit.SECONDS));
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                    throw new AssertionError(e);
-                                }
-                            }
-                            return entries.get(index++);
-                        }
-                    };
-                }
-
-                @Override
-                public int size() {
-                    return delegate.size();
-                }
-            };
-        }
-
-        @Override
-        public int size() {
-            return delegate.size();
         }
     }
 

@@ -306,70 +306,43 @@ class ShardCalculatorRegistryTest {
 
     @Test
     void batchRegistrationIsPublishedAtomically() throws Exception {
-        var registry = new ShardCalculatorRegistry();
-        var oldCalculator = calculatorFor("OLD", 4);
-        registry.register(Map.of("OLD", oldCalculator));
-
-        var batch = new LinkedHashMap<String, ShardCalculator<String>>();
-        batch.put("NEW-FIRST", calculatorFor("NEW-FIRST", 2));
-        batch.put("NEW-MIDDLE", calculatorFor("NEW-MIDDLE", 4));
-        batch.put("NEW-LAST", calculatorFor("NEW-LAST", 8));
-        var firstEntryTransferred = new CountDownLatch(1);
-        var continuePublication = new CountDownLatch(1);
-        var pausingBatch = new PublicationPausingMap(
-                batch,
-                firstEntryTransferred,
-                continuePublication);
-        var executor = Executors.newSingleThreadExecutor();
+        var executor = Executors.newFixedThreadPool(4);
         try {
-            var registration = executor.submit(
-                    () -> registry.register(pausingBatch));
-
-            assertTrue(firstEntryTransferred.await(5, TimeUnit.SECONDS));
-            boolean firstVisible = isRegistered(
-                    registry,
-                    "NEW-FIRST");
-            boolean lastVisible = isRegistered(registry, "NEW-LAST");
-            assertEquals(
-                    firstVisible,
-                    lastVisible,
-                    "A reader must not observe one tenant from a batch "
-                            + "while another remains missing");
-
-            continuePublication.countDown();
-            registration.get(5, TimeUnit.SECONDS);
-            batch.forEach((tenantId, calculator) -> assertSame(
-                    calculator,
-                    registry.get(tenantId)));
-            assertSame(oldCalculator, registry.get("OLD"));
+            for (int iteration = 0; iteration < 5; iteration++) {
+                assertBatchPublicationIsAtomic(executor, iteration);
+            }
         } finally {
-            continuePublication.countDown();
             executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
         }
     }
 }
 ```
 
-Retain the existing `PublicationPausingMap`, but pass the registry into
-`isRegistered`:
+Build each race iteration from a 50,000-entry `LinkedHashMap`. Start four
+readers together and wait until all are observing before registration begins.
+Each reader continuously checks the first, quarter, middle, three-quarter, and
+last tenants in publication order:
 
 ```java
-private boolean isRegistered(
-        ShardCalculatorRegistry registry,
-        String tenantId) {
-    try {
-        registry.get(tenantId);
-        return true;
-    } catch (IllegalStateException ignored) {
-        return false;
+String visibleTenant = null;
+for (String tenantId : observedTenants) {
+    if (isRegistered(registry, tenantId)) {
+        visibleTenant = tenantId;
+    } else if (visibleTenant != null) {
+        partialPublication.compareAndSet(
+                null,
+                visibleTenant + " was visible while " + tenantId + " was absent");
     }
 }
 ```
 
-The pausing iterator must still stop during the batch-copy traversal. Against
-entry-by-entry publication, the first tenant becomes visible while the last is
-absent. Against one immutable-snapshot assignment, both remain absent until
-the copy completes. Add the imports required by these tests.
+Scanning in publication order avoids treating the single immutable-snapshot
+transition as a partial state: after any observed tenant is visible, every
+later lookup must also be visible. Both direct caller-map publication and
+defensive-snapshot-then-entry-by-entry publication expose an earlier tenant
+while a later tenant is absent. Bound every latch/future wait and always stop
+and await the reader executor.
 
 - [ ] **Step 2: Run the registry tests and verify the instance API is missing**
 
