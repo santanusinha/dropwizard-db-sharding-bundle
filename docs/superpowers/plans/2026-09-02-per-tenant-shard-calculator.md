@@ -2,11 +2,21 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Create one tenant-bound shard calculator per configured tenant, publish calculators through an atomic JVM-wide registry, and remove shard-manager and calculator dependencies from DAO APIs.
+**Goal:** Create one tenant-bound shard calculator per configured tenant, publish calculators through a bundle-owned registry, and remove shard-manager and calculator dependencies from DAO APIs.
 
-**Architecture:** `MultiTenantDBShardingBundleBase` builds all tenant calculators after tenant initialization and registers them as one batch. DAOs resolve `ShardCalculatorRegistry.get(tenantId)` at each routing operation, while bundles own the public calculator accessors. The work deliberately removes the old multi-tenant calculator API and DAO-level calculator access.
+**Architecture:** Each `MultiTenantDBShardingBundleBase` owns one final `ShardCalculatorRegistry`. The bundle builds tenant calculators locally and publishes them to its registry in one immutable snapshot after initialization succeeds. DAOs receive that registry, query it for every routing operation, and never cache calculators.
 
 **Tech Stack:** Java 11+, Maven, JUnit 5, Guava, Dropwizard, Hibernate, Mockito
+
+## Global Constraints
+
+- Each bundle owns its registry; registrations never cross bundle boundaries.
+- Registration publishes one volatile immutable snapshot after the complete batch validates.
+- Duplicate tenant IDs fail only within one registry.
+- DAO constructors accept `ShardCalculatorRegistry` as their only routing dependency.
+- DAOs never receive or cache shard managers, calculators, calculator maps, resolvers, or scope tokens.
+- Direct DAO tests create isolated registries with `ShardCalculatorTestUtils.registryFor(...)`.
+- Preserve TDD, focused test commands, compile-safe task ordering, and one commit per task.
 
 ---
 
@@ -14,24 +24,25 @@
 
 | Action | File | Responsibility |
 | --- | --- | --- |
-| Create | `src/main/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistry.java` | Store tenant calculators and publish registration batches atomically |
-| Create | `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistryTest.java` | Verify registry lifecycle, errors, and atomicity |
+| Create | `src/main/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistry.java` | Store one bundle's tenant calculators and publish registration batches atomically |
+| Create | `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistryTest.java` | Verify instance isolation, errors, concurrency, and atomic publication |
 | Create | `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorTest.java` | Verify tenant-bound routing |
-| Create | `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorTestUtils.java` | Register calculators consistently in DAO fixtures |
+| Create | `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorTestUtils.java` | Build isolated registries for direct DAO tests |
 | Modify | `src/main/java/io/appform/dropwizard/sharding/utils/ShardCalculator.java` | Convert calculator ownership from a tenant map to one tenant |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java` | Build, register, expose, and use tenant calculators |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/DBShardingBundleBase.java` | Expose the default namespace calculator |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantLookupDao.java` | Resolve tenant calculators for lookup routing |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableLookupDao.java` | Remove the shard-manager constructor parameter |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java` | Own, populate, expose, and pass one registry |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/DBShardingBundleBase.java` | Expose the delegate bundle's default-namespace calculator |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantLookupDao.java` | Resolve tenant calculators through the passed registry |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableLookupDao.java` | Pass and validate through the registry |
 | Modify | `src/main/java/io/appform/dropwizard/sharding/dao/LookupDao.java` | Remove DAO-level calculator access |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantRelationalDao.java` | Resolve tenant calculators for relational routing |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableRelationalDao.java` | Remove the shard-manager constructor parameter |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantRelationalDao.java` | Resolve tenant calculators through the passed registry |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableRelationalDao.java` | Pass and validate through the registry |
 | Modify | `src/main/java/io/appform/dropwizard/sharding/dao/RelationalDao.java` | Remove DAO-level calculator access |
-| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/WrapperDao.java` | Resolve its namespace calculator per `forParent` call |
+| Modify | `src/main/java/io/appform/dropwizard/sharding/dao/WrapperDao.java` | Resolve its namespace calculator for every `forParent` call |
 | Delete | `src/main/java/io/appform/dropwizard/sharding/dao/ShardedDao.java` | Remove the obsolete DAO calculator contract |
-| Modify | `src/test/java/io/appform/dropwizard/sharding/MultiTenantBundleBasedTestBase.java` | Clear registry state between bundle tests |
-| Modify | `src/test/java/io/appform/dropwizard/sharding/BundleBasedTestBase.java` | Clear registry state between single-tenant bundle tests |
-| Modify | DAO tests listed in Tasks 4-7 | Register calculators, use reduced constructors, and remove DAO accessor usage |
+| Modify | `src/test/java/io/appform/dropwizard/sharding/BundleBasedTestBase.java` | Remove shared registry cleanup |
+| Modify | `src/test/java/io/appform/dropwizard/sharding/MultiTenantBundleBasedTestBase.java` | Remove shared registry cleanup |
+| Modify | `src/test/java/io/appform/dropwizard/sharding/BundleMvccSnapshotTest.java` | Cover two live default-namespace bundles with independent calculators |
+| Modify | DAO tests listed in Tasks 4-6 | Create and pass isolated registry instances |
 
 ## Task 1: Add tenant-bound calculator behavior
 
@@ -163,47 +174,71 @@ git commit -m "refactor: add tenant-bound shard calculators" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-## Task 2: Add atomic tenant calculator registry
+## Task 2: Add an atomic instance registry
 
 **Files:**
 - Create: `src/main/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistry.java`
 - Create: `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistryTest.java`
 - Create: `src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorTestUtils.java`
 
-- [ ] **Step 1: Write failing registry tests**
+**Interfaces:**
+- Consumes: `ShardCalculator(String, ShardManager, BucketIdExtractor)` from Task 1.
+- Produces: `new ShardCalculatorRegistry()`, `registry.register(Map<String, ShardCalculator<String>>)`, `registry.get(String)`, test-only `registry.clear()`, and `ShardCalculatorTestUtils.registryFor(Map<String, ShardManager>)`.
 
-Cover retrieval, missing tenants, duplicate rejection, clearing, concurrent
-reads, and atomic batch visibility. For the atomic regression, use a custom
-insertion-ordered map that allows the two validation traversals to complete,
-then pauses the third traversal before its second entry. While registration is
-paused, compare the visibility of the first and last new tenants:
+- [ ] **Step 1: Write failing instance-registry tests**
+
+Create a fresh registry in each test. Cover retrieval, missing tenants, invalid
+input, duplicate rejection, clearing, concurrent reads, atomic batch
+visibility, and independent use of the same tenant ID:
 
 ```java
 class ShardCalculatorRegistryTest {
 
-    @AfterEach
-    void tearDown() {
-        ShardCalculatorRegistry.clear();
+    @Test
+    void twoRegistriesCanRegisterTheSameTenantIndependently() {
+        var firstRegistry = new ShardCalculatorRegistry();
+        var secondRegistry = new ShardCalculatorRegistry();
+        var firstCalculator = calculatorFor("TENANT1", 2);
+        var secondCalculator = calculatorFor("TENANT1", 4);
+
+        firstRegistry.register(Map.of("TENANT1", firstCalculator));
+        secondRegistry.register(Map.of("TENANT1", secondCalculator));
+
+        assertSame(firstCalculator, firstRegistry.get("TENANT1"));
+        assertSame(secondCalculator, secondRegistry.get("TENANT1"));
+        assertNotSame(
+                firstRegistry.get("TENANT1"),
+                secondRegistry.get("TENANT1"));
     }
 
     @Test
-    void registersAndReturnsEachTenantCalculator() {
-        var tenant1 = calculatorFor("TENANT1", 2);
-        var tenant2 = calculatorFor("TENANT2", 4);
+    void duplicateBatchPublishesNothingInThatRegistry() {
+        var registry = new ShardCalculatorRegistry();
+        var existing = calculatorFor("TENANT1", 2);
+        registry.register(Map.of("TENANT1", existing));
 
-        ShardCalculatorRegistry.register(Map.of(
-                "TENANT1", tenant1,
-                "TENANT2", tenant2));
+        var error = assertThrows(
+                IllegalStateException.class,
+                () -> registry.register(Map.of(
+                        "TENANT1", calculatorFor("TENANT1", 4),
+                        "TENANT2", calculatorFor("TENANT2", 4))));
 
-        assertSame(tenant1, ShardCalculatorRegistry.get("TENANT1"));
-        assertSame(tenant2, ShardCalculatorRegistry.get("TENANT2"));
+        assertEquals(
+                "ShardCalculator already registered for tenant: TENANT1",
+                error.getMessage());
+        assertSame(existing, registry.get("TENANT1"));
+        assertThrows(
+                IllegalStateException.class,
+                () -> registry.get("TENANT2"));
     }
 
     @Test
     void missingTenantIncludesTenantId() {
+        var registry = new ShardCalculatorRegistry();
+
         var error = assertThrows(
                 IllegalStateException.class,
-                () -> ShardCalculatorRegistry.get("UNKNOWN"));
+                () -> registry.get("UNKNOWN"));
 
         assertEquals(
                 "ShardCalculator has not been registered for tenant: UNKNOWN",
@@ -212,51 +247,68 @@ class ShardCalculatorRegistryTest {
 
     @Test
     void rejectsNullRegistrationInputsBeforePublishing() {
-        assertThrows(
-                NullPointerException.class,
-                () -> ShardCalculatorRegistry.register(null));
+        var registry = new ShardCalculatorRegistry();
+        assertThrows(NullPointerException.class, () -> registry.register(null));
 
         var calculators = new HashMap<String, ShardCalculator<String>>();
         calculators.put(null, calculatorFor("TENANT1", 2));
         assertThrows(
                 NullPointerException.class,
-                () -> ShardCalculatorRegistry.register(calculators));
+                () -> registry.register(calculators));
 
         calculators.clear();
         calculators.put("TENANT1", null);
         assertThrows(
                 NullPointerException.class,
-                () -> ShardCalculatorRegistry.register(calculators));
+                () -> registry.register(calculators));
 
         assertThrows(
                 IllegalStateException.class,
-                () -> ShardCalculatorRegistry.get("TENANT1"));
+                () -> registry.get("TENANT1"));
     }
 
     @Test
-    void duplicateBatchPublishesNothing() {
-        var existing = calculatorFor("TENANT1", 2);
-        ShardCalculatorRegistry.register(Map.of("TENANT1", existing));
+    void clearRemovesOnlyThatRegistryEntries() {
+        var firstRegistry = new ShardCalculatorRegistry();
+        var secondRegistry = new ShardCalculatorRegistry();
+        var secondCalculator = calculatorFor("TENANT1", 4);
+        firstRegistry.register(Map.of(
+                "TENANT1",
+                calculatorFor("TENANT1", 2)));
+        secondRegistry.register(Map.of("TENANT1", secondCalculator));
 
-        var error = assertThrows(
-                IllegalStateException.class,
-                () -> ShardCalculatorRegistry.register(Map.of(
-                        "TENANT1", calculatorFor("TENANT1", 4),
-                        "TENANT2", calculatorFor("TENANT2", 4))));
+        firstRegistry.clear();
 
-        assertEquals(
-                "ShardCalculator already registered for tenant: TENANT1",
-                error.getMessage());
-        assertSame(existing, ShardCalculatorRegistry.get("TENANT1"));
         assertThrows(
                 IllegalStateException.class,
-                () -> ShardCalculatorRegistry.get("TENANT2"));
+                () -> firstRegistry.get("TENANT1"));
+        assertSame(secondCalculator, secondRegistry.get("TENANT1"));
+    }
+
+    @Test
+    void concurrentReadsReturnPublishedCalculator() throws Exception {
+        var registry = new ShardCalculatorRegistry();
+        var calculator = calculatorFor("TENANT1", 2);
+        registry.register(Map.of("TENANT1", calculator));
+        var executor = Executors.newFixedThreadPool(4);
+        try {
+            var reads = IntStream.range(0, 20)
+                    .mapToObj(ignored -> executor.submit(
+                            () -> registry.get("TENANT1")))
+                    .collect(Collectors.toList());
+            for (var read : reads) {
+                assertSame(calculator, read.get(5, TimeUnit.SECONDS));
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test
     void batchRegistrationIsPublishedAtomically() throws Exception {
+        var registry = new ShardCalculatorRegistry();
         var oldCalculator = calculatorFor("OLD", 4);
-        ShardCalculatorRegistry.register(Map.of("OLD", oldCalculator));
+        registry.register(Map.of("OLD", oldCalculator));
 
         var batch = new LinkedHashMap<String, ShardCalculator<String>>();
         batch.put("NEW-FIRST", calculatorFor("NEW-FIRST", 2));
@@ -271,11 +323,13 @@ class ShardCalculatorRegistryTest {
         var executor = Executors.newSingleThreadExecutor();
         try {
             var registration = executor.submit(
-                    () -> ShardCalculatorRegistry.register(pausingBatch));
+                    () -> registry.register(pausingBatch));
 
             assertTrue(firstEntryTransferred.await(5, TimeUnit.SECONDS));
-            boolean firstVisible = isRegistered("NEW-FIRST");
-            boolean lastVisible = isRegistered("NEW-LAST");
+            boolean firstVisible = isRegistered(
+                    registry,
+                    "NEW-FIRST");
+            boolean lastVisible = isRegistered(registry, "NEW-LAST");
             assertEquals(
                     firstVisible,
                     lastVisible,
@@ -286,145 +340,38 @@ class ShardCalculatorRegistryTest {
             registration.get(5, TimeUnit.SECONDS);
             batch.forEach((tenantId, calculator) -> assertSame(
                     calculator,
-                    ShardCalculatorRegistry.get(tenantId)));
-            assertSame(oldCalculator, ShardCalculatorRegistry.get("OLD"));
+                    registry.get(tenantId)));
+            assertSame(oldCalculator, registry.get("OLD"));
         } finally {
             continuePublication.countDown();
             executor.shutdownNow();
         }
     }
+}
+```
 
-    @Test
-    void clearRemovesEveryTenant() {
-        ShardCalculatorRegistry.register(Map.of(
-                "TENANT1", calculatorFor("TENANT1", 2),
-                "TENANT2", calculatorFor("TENANT2", 4)));
+Retain the existing `PublicationPausingMap`, but pass the registry into
+`isRegistered`:
 
-        ShardCalculatorRegistry.clear();
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> ShardCalculatorRegistry.get("TENANT1"));
-        assertThrows(
-                IllegalStateException.class,
-                () -> ShardCalculatorRegistry.get("TENANT2"));
-    }
-
-    @Test
-    void concurrentReadsReturnPublishedCalculator() throws Exception {
-        var calculator = calculatorFor("TENANT1", 2);
-        ShardCalculatorRegistry.register(Map.of("TENANT1", calculator));
-        var executor = Executors.newFixedThreadPool(4);
-        try {
-            var reads = IntStream.range(0, 20)
-                    .mapToObj(ignored -> executor.submit(
-                            () -> ShardCalculatorRegistry.get("TENANT1")))
-                    .collect(Collectors.toList());
-            for (var read : reads) {
-                assertSame(calculator, read.get(5, TimeUnit.SECONDS));
-            }
-        } finally {
-            executor.shutdownNow();
-        }
-    }
-
-    private ShardCalculator<String> calculatorFor(
-            String tenantId,
-            int shardCount) {
-        var manager = new BalancedShardManager(shardCount);
-        return new ShardCalculator<>(
-                tenantId,
-                manager,
-                new ConsistentHashBucketIdExtractor<>(
-                        Map.of(tenantId, manager)));
-    }
-
-    private boolean isRegistered(String tenantId) {
-        try {
-            ShardCalculatorRegistry.get(tenantId);
-            return true;
-        } catch (IllegalStateException ignored) {
-            return false;
-        }
-    }
-
-    private static final class PublicationPausingMap
-            extends AbstractMap<String, ShardCalculator<String>> {
-        private static final int BATCH_COPY_TRAVERSAL = 3;
-
-        private final LinkedHashMap<String, ShardCalculator<String>> delegate;
-        private final CountDownLatch firstEntryTransferred;
-        private final CountDownLatch continuePublication;
-        private final AtomicInteger entrySetCalls = new AtomicInteger();
-
-        private PublicationPausingMap(
-                LinkedHashMap<String, ShardCalculator<String>> delegate,
-                CountDownLatch firstEntryTransferred,
-                CountDownLatch continuePublication) {
-            this.delegate = delegate;
-            this.firstEntryTransferred = firstEntryTransferred;
-            this.continuePublication = continuePublication;
-        }
-
-        @Override
-        public Set<Entry<String, ShardCalculator<String>>> entrySet() {
-            if (entrySetCalls.incrementAndGet() != BATCH_COPY_TRAVERSAL) {
-                return delegate.entrySet();
-            }
-            return new AbstractSet<>() {
-                @Override
-                public Iterator<Entry<String, ShardCalculator<String>>>
-                        iterator() {
-                    var entries = List.copyOf(delegate.entrySet());
-                    return new Iterator<>() {
-                        private int index;
-
-                        @Override
-                        public boolean hasNext() {
-                            return index < entries.size();
-                        }
-
-                        @Override
-                        public Entry<String, ShardCalculator<String>> next() {
-                            if (index == 1) {
-                                firstEntryTransferred.countDown();
-                                try {
-                                    assertTrue(continuePublication.await(
-                                            5,
-                                            TimeUnit.SECONDS));
-                                } catch (InterruptedException e) {
-                                    Thread.currentThread().interrupt();
-                                    throw new AssertionError(e);
-                                }
-                            }
-                            return entries.get(index++);
-                        }
-                    };
-                }
-
-                @Override
-                public int size() {
-                    return delegate.size();
-                }
-            };
-        }
-
-        @Override
-        public int size() {
-            return delegate.size();
-        }
+```java
+private boolean isRegistered(
+        ShardCalculatorRegistry registry,
+        String tenantId) {
+    try {
+        registry.get(tenantId);
+        return true;
+    } catch (IllegalStateException ignored) {
+        return false;
     }
 }
 ```
 
-The pausing entry-set iterator signals `firstEntryTransferred` before returning
-its second entry, then waits up to five seconds for `continuePublication`.
-Against a live `ConcurrentHashMap.putAll`, the first tenant is visible and the
-last is absent, so the equality assertion fails. Against immutable
-copy-on-write publication, both tenants remain absent until the completed
-snapshot is assigned. Add the imports required by the code above.
+The pausing iterator must still stop during the batch-copy traversal. Against
+entry-by-entry publication, the first tenant becomes visible while the last is
+absent. Against one immutable-snapshot assignment, both remain absent until
+the copy completes. Add the imports required by these tests.
 
-- [ ] **Step 2: Run the registry tests and verify the class is missing**
+- [ ] **Step 2: Run the registry tests and verify the instance API is missing**
 
 Run:
 
@@ -432,30 +379,27 @@ Run:
 mvn -q -o -Dtest=ShardCalculatorRegistryTest test
 ```
 
-Expected: test compilation fails because `ShardCalculatorRegistry` does not exist.
+Expected: test compilation fails because the constructible instance registry
+and its instance methods do not exist.
 
-- [ ] **Step 3: Implement atomic registration**
+- [ ] **Step 3: Implement the bundle-local registry type**
 
-Create a final utility class:
+Create a normal final class with instance state:
 
 ```java
 public final class ShardCalculatorRegistry {
 
-    private static volatile Map<String, ShardCalculator<String>> calculators =
+    private volatile Map<String, ShardCalculator<String>> calculators =
             Map.of();
 
-    private ShardCalculatorRegistry() {
-    }
-
-    public static synchronized void register(
+    public synchronized void register(
             Map<String, ShardCalculator<String>> calculators) {
         Objects.requireNonNull(calculators, "calculators");
         calculators.forEach((tenantId, calculator) -> {
             Objects.requireNonNull(tenantId, "tenantId");
             Objects.requireNonNull(calculator, "calculator");
         });
-        Map<String, ShardCalculator<String>> current =
-                ShardCalculatorRegistry.calculators;
+        Map<String, ShardCalculator<String>> current = this.calculators;
         calculators.keySet().forEach(tenantId -> {
             if (current.containsKey(tenantId)) {
                 throw new IllegalStateException(
@@ -463,12 +407,13 @@ public final class ShardCalculatorRegistry {
                                 + tenantId);
             }
         });
-        Map<String, ShardCalculator<String>> updated = new HashMap<>(current);
+        Map<String, ShardCalculator<String>> updated =
+                new HashMap<>(current);
         updated.putAll(calculators);
-        ShardCalculatorRegistry.calculators = Map.copyOf(updated);
+        this.calculators = Map.copyOf(updated);
     }
 
-    public static ShardCalculator<String> get(String tenantId) {
+    public ShardCalculator<String> get(String tenantId) {
         Map<String, ShardCalculator<String>> snapshot = calculators;
         var calculator = snapshot.get(tenantId);
         if (calculator == null) {
@@ -480,18 +425,18 @@ public final class ShardCalculatorRegistry {
     }
 
     @VisibleForTesting
-    public static synchronized void clear() {
+    public synchronized void clear() {
         calculators = Map.of();
     }
 }
 ```
 
-Use Guava's `VisibleForTesting`. Registration validates against one captured
-snapshot, builds an immutable merged copy, and publishes it with one volatile
-assignment. `get` captures one snapshot, and `clear` publishes the empty
-snapshot. Do not mutate a live concurrent map entry by entry.
+Registration validates one captured snapshot, builds an immutable merged copy,
+and publishes it with one volatile assignment. `get` captures one snapshot.
+`clear` affects only the receiver and exists for isolated tests that need to
+change registry contents between two DAO operations.
 
-- [ ] **Step 4: Add the shared test registration helper**
+- [ ] **Step 4: Add the isolated test-registry helper**
 
 Create:
 
@@ -501,8 +446,9 @@ public final class ShardCalculatorTestUtils {
     private ShardCalculatorTestUtils() {
     }
 
-    public static void register(
+    public static ShardCalculatorRegistry registryFor(
             Map<String, ShardManager> shardManagers) {
+        var registry = new ShardCalculatorRegistry();
         var calculators = shardManagers.entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
@@ -513,7 +459,8 @@ public final class ShardCalculatorTestUtils {
                                         Map.of(
                                                 entry.getKey(),
                                                 entry.getValue())))));
-        ShardCalculatorRegistry.register(calculators);
+        registry.register(calculators);
+        return registry;
     }
 }
 ```
@@ -536,23 +483,31 @@ Expected: PASS.
 git add src/main/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistry.java \
         src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistryTest.java \
         src/test/java/io/appform/dropwizard/sharding/utils/ShardCalculatorTestUtils.java
-git commit -m "feat: add tenant shard calculator registry" \
+git commit -m "feat: add bundle-local shard calculator registry" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-## Task 3: Register calculators from the bundle
+## Task 3: Make each bundle own its registry
 
 **Files:**
-- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:85-190,212-273`
+- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:85-290`
 - Modify: `src/main/java/io/appform/dropwizard/sharding/DBShardingBundleBase.java:120-220`
-- Modify: `src/test/java/io/appform/dropwizard/sharding/MultiTenantBundleBasedTestBase.java`
-- Modify: `src/test/java/io/appform/dropwizard/sharding/BundleBasedTestBase.java`
 - Modify: `src/test/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleTestBase.java`
 - Modify: `src/test/java/io/appform/dropwizard/sharding/DBShardingBundleTestBase.java`
+- Modify: `src/test/java/io/appform/dropwizard/sharding/BundleBasedTestBase.java`
+- Modify: `src/test/java/io/appform/dropwizard/sharding/MultiTenantBundleBasedTestBase.java`
+- Modify: `src/test/java/io/appform/dropwizard/sharding/BundleMvccSnapshotTest.java`
 
-- [ ] **Step 1: Add failing bundle accessor and per-tenant tests**
+**Interfaces:**
+- Consumes: the registry instance API from Task 2.
+- Produces: one final registry per `MultiTenantDBShardingBundleBase`,
+  `getShardCalculator(String tenantId)`, and the single-tenant
+  `getShardCalculator()` accessor.
 
-In `MultiTenantDBShardingBundleTestBase`, add:
+- [ ] **Step 1: Rewrite bundle tests for instance ownership**
+
+In `MultiTenantDBShardingBundleTestBase`, keep the distinct-calculator
+assertion but remove class-qualified registry access:
 
 ```java
 @Test
@@ -565,91 +520,23 @@ void registersOneCalculatorPerTenant() {
     var tenant2 = bundle.getShardCalculator("TENANT2");
 
     assertNotSame(tenant1, tenant2);
-    assertSame(tenant1, ShardCalculatorRegistry.get("TENANT1"));
-    assertSame(tenant2, ShardCalculatorRegistry.get("TENANT2"));
+    assertSame(tenant1, bundle.getShardCalculator("TENANT1"));
+    assertSame(tenant2, bundle.getShardCalculator("TENANT2"));
 }
 ```
 
-Add a test-only bundle whose second shard-manager creation fails. Use an
-insertion-ordered tenant map so one tenant completes before the failure:
+In the existing failed-initialization test, query the failed bundle:
 
 ```java
-@Test
-void failedInitializationDoesNotPublishCalculators() {
-    var tenants = new LinkedHashMap<String, ShardedHibernateFactory>();
-    tenants.put("TENANT1", ShardedHibernateFactory.builder()
-            .shards(List.of(createConfig("publish_guard_1")))
-            .shardingOptions(ShardingBundleOptions.builder().build())
-            .build());
-    tenants.put("TENANT2", ShardedHibernateFactory.builder()
-            .shards(List.of(createConfig("publish_guard_2")))
-            .shardingOptions(ShardingBundleOptions.builder().build())
-            .build());
-    var failingConfig = new TestConfig(
-            new MultiTenantShardedHibernateFactory(tenants));
-    var managerCreations = new AtomicInteger();
-    var bundle = new MultiTenantDBShardingBundleBase<TestConfig>(
-            Order.class) {
-        @Override
-        protected ShardManager createShardManager(
-                int numShards,
-                ShardBlacklistingStore blacklistingStore) {
-            if (managerCreations.incrementAndGet() == 2) {
-                throw new IllegalStateException("second tenant failed");
-            }
-            return new BalancedShardManager(
-                    numShards,
-                    blacklistingStore);
-        }
-
-        @Override
-        protected MultiTenantShardedHibernateFactory getConfig(
-                TestConfig config) {
-            return config.getShards();
-        }
-    };
-
-    bundle.initialize(bootstrap);
-    assertThrows(
-            IllegalStateException.class,
-            () -> bundle.run(failingConfig, environment));
-    assertThrows(
-            IllegalStateException.class,
-            () -> ShardCalculatorRegistry.get("TENANT1"));
-    assertThrows(
-            IllegalStateException.class,
-            () -> ShardCalculatorRegistry.get("TENANT2"));
-}
+assertThrows(
+        IllegalStateException.class,
+        () -> bundle.getShardCalculator("TENANT1"));
+assertThrows(
+        IllegalStateException.class,
+        () -> bundle.getShardCalculator("TENANT2"));
 ```
 
-Change `MultiTenantBundleBasedTestBase.TestConfig` to retain its current
-default while accepting an explicit factory:
-
-```java
-@Getter
-private final MultiTenantShardedHibernateFactory shards;
-
-TestConfig() {
-    this(new MultiTenantShardedHibernateFactory(Map.of(
-            "TENANT1", ShardedHibernateFactory.builder()
-                    .shardingOptions(
-                            ShardingBundleOptions.builder().build())
-                    .build(),
-            "TENANT2", ShardedHibernateFactory.builder()
-                    .shardingOptions(
-                            ShardingBundleOptions.builder().build())
-                    .build())));
-}
-
-TestConfig(MultiTenantShardedHibernateFactory shards) {
-    this.shards = shards;
-}
-```
-
-The anonymous bundle uses `BundleCommonBase`'s existing no-op blacklisting
-store; do not add another override.
-
-In `DBShardingBundleTestBase`, add:
+In `DBShardingBundleTestBase`, rewrite the default accessor test:
 
 ```java
 @Test
@@ -659,35 +546,71 @@ void exposesDefaultNamespaceCalculator() {
     bundle.run(testConfig, environment);
 
     assertSame(
-            ShardCalculatorRegistry.get(bundle.getDbNamespace()),
+            bundle.getShardCalculator(),
             bundle.getShardCalculator());
 }
 ```
 
-Import `ShardCalculatorRegistry`, `assertNotSame`, and `assertSame`.
+- [ ] **Step 2: Add two-live-bundle regression coverage**
 
-- [ ] **Step 2: Run bundle tests and verify accessors are missing**
+In `BundleMvccSnapshotTest`, retain both initialized bundles as fields:
+
+```java
+private DBShardingBundleBase<TestConfig> writeBundle;
+private DBShardingBundleBase<TestConfig> readBundle;
+```
+
+Assign these fields in `setUp()` instead of local variables, then add:
+
+```java
+@Test
+void twoLiveDefaultNamespaceBundlesOwnIndependentCalculators() {
+    assertEquals(
+            DBShardingBundleBase.DEFAULT_NAMESPACE,
+            writeBundle.getDbNamespace());
+    assertEquals(
+            DBShardingBundleBase.DEFAULT_NAMESPACE,
+            readBundle.getDbNamespace());
+    assertNotSame(
+            writeBundle.getShardCalculator(),
+            readBundle.getShardCalculator());
+}
+```
+
+This test proves that two live bundles can expose different calculator
+instances for the same namespace without registration collision. Keep both
+existing MVCC tests unchanged.
+
+- [ ] **Step 3: Run bundle tests and verify ownership is missing**
 
 Run:
 
 ```bash
 mvn -q -o \
-  -Dtest=MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest \
+  -Dtest=MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest,BundleMvccSnapshotTest \
   test
 ```
 
-Expected: test compilation fails because bundle calculator accessors do not exist.
+Expected: test compilation fails because the bundle-owned accessor and
+registration behavior do not exist yet.
 
-- [ ] **Step 3: Build calculators privately and register after the tenant loop**
+- [ ] **Step 4: Add the final registry field and delayed registration**
 
-Add a local map at the start of `run()`:
+In `MultiTenantDBShardingBundleBase`, add:
+
+```java
+private final ShardCalculatorRegistry shardCalculatorRegistry =
+        new ShardCalculatorRegistry();
+```
+
+Keep calculator construction local to `run()`:
 
 ```java
 final Map<String, ShardCalculator<String>> shardCalculators =
         Maps.newHashMap();
 ```
 
-After each tenant's `ShardManager` is created, build but do not register:
+After each tenant's `ShardManager` is created, build but do not publish:
 
 ```java
 shardCalculators.put(
@@ -703,23 +626,24 @@ After `tenantedConfig.getTenants().forEach(...)` completes, publish the batch
 before `registerBucketIdExtractor(...)`:
 
 ```java
-ShardCalculatorRegistry.register(shardCalculators);
+shardCalculatorRegistry.register(shardCalculators);
 registerBucketIdExtractor(this.shardManagers);
 ```
 
-This placement is required. Do not register inside the tenant loop.
+Do not publish inside the tenant loop. If any tenant fails, the local map is
+discarded and the bundle's registry remains unchanged.
 
-- [ ] **Step 4: Add bundle-level accessors**
+- [ ] **Step 5: Delegate bundle accessors to the owned instance**
 
 In `MultiTenantDBShardingBundleBase`:
 
 ```java
 public ShardCalculator<String> getShardCalculator(String tenantId) {
-    return ShardCalculatorRegistry.get(tenantId);
+    return shardCalculatorRegistry.get(tenantId);
 }
 ```
 
-In `DBShardingBundleBase`:
+Keep `DBShardingBundleBase`:
 
 ```java
 public ShardCalculator<String> getShardCalculator() {
@@ -727,41 +651,41 @@ public ShardCalculator<String> getShardCalculator() {
 }
 ```
 
-- [ ] **Step 5: Isolate bundle tests**
+Tasks 4-6 will update each DAO factory to pass
+`shardCalculatorRegistry`. Until then, retain the current constructor
+arguments so this task compiles.
 
-Add `@AfterEach` methods to both shared bundle test bases:
+- [ ] **Step 6: Remove shared test cleanup**
 
-```java
-@AfterEach
-void clearShardCalculatorRegistry() {
-    ShardCalculatorRegistry.clear();
-}
-```
+Delete the registry imports and `@AfterEach` cleanup methods from
+`BundleBasedTestBase` and `MultiTenantBundleBasedTestBase`. Bundle tests now
+receive fresh registry state from each new bundle instance and need no shared
+teardown.
 
-Keep any existing setup or teardown behavior unchanged.
-
-- [ ] **Step 6: Run focused bundle tests**
+- [ ] **Step 7: Run focused bundle coverage**
 
 Run:
 
 ```bash
 mvn -q -o \
-  -Dtest=MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest \
+  -Dtest=MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest,BundleMvccSnapshotTest \
   test
 ```
 
-Expected: PASS.
+Expected: PASS, including both existing `BundleMvccSnapshotTest` MVCC cases
+and `twoLiveDefaultNamespaceBundlesOwnIndependentCalculators`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java \
         src/main/java/io/appform/dropwizard/sharding/DBShardingBundleBase.java \
-        src/test/java/io/appform/dropwizard/sharding/MultiTenantBundleBasedTestBase.java \
-        src/test/java/io/appform/dropwizard/sharding/BundleBasedTestBase.java \
         src/test/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleTestBase.java \
-        src/test/java/io/appform/dropwizard/sharding/DBShardingBundleTestBase.java
-git commit -m "feat: register tenant calculators from bundles" \
+        src/test/java/io/appform/dropwizard/sharding/DBShardingBundleTestBase.java \
+        src/test/java/io/appform/dropwizard/sharding/BundleBasedTestBase.java \
+        src/test/java/io/appform/dropwizard/sharding/MultiTenantBundleBasedTestBase.java \
+        src/test/java/io/appform/dropwizard/sharding/BundleMvccSnapshotTest.java
+git commit -m "refactor: scope calculator registry to bundles" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
@@ -771,7 +695,7 @@ git commit -m "feat: register tenant calculators from bundles" \
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantLookupDao.java`
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableLookupDao.java`
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/LookupDao.java`
-- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:212-230`
+- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:212-240`
 - Modify tests:
   - `src/test/java/io/appform/dropwizard/sharding/dao/MultiTenantLookupDaoTest.java`
   - `src/test/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableLookupDaoTest.java`
@@ -781,10 +705,33 @@ git commit -m "feat: register tenant calculators from bundles" \
   - `src/test/java/io/appform/dropwizard/sharding/dao/EncryptionAtRestTest.java`
   - `src/test/java/io/appform/dropwizard/sharding/dao/locktest/LockTest.java`
 
+**Interfaces:**
+- Consumes: the bundle-owned registry from Task 3.
+- Produces: lookup constructors whose routing dependency is
+  `ShardCalculatorRegistry registry`.
+
 - [ ] **Step 1: Add failing per-operation and unknown-tenant tests**
 
-In `MultiTenantLookupDaoTest`, register fixture calculators with
-`ShardCalculatorTestUtils.register(shardManager)`, then add:
+In `MultiTenantLookupDaoTest`, retain the isolated registry as a field:
+
+```java
+private ShardCalculatorRegistry registry;
+```
+
+Build it in setup and pass it to the DAO constructor:
+
+```java
+registry = ShardCalculatorTestUtils.registryFor(shardManagers);
+lookupDao = new MultiTenantLookupDao<>(
+        sessionFactories,
+        TestEntity.class,
+        registry,
+        shardingOptions,
+        shardInfoProviders,
+        observer);
+```
+
+Add:
 
 ```java
 @Test
@@ -795,7 +742,7 @@ void resolvesCalculatorForEveryOperation() throws Exception {
             .build();
     lookupDao.save("TENANT1", entity);
 
-    ShardCalculatorRegistry.clear();
+    registry.clear();
 
     var error = assertThrows(
             IllegalStateException.class,
@@ -817,7 +764,10 @@ void unknownTenantFailsThroughRegistry() {
 }
 ```
 
-- [ ] **Step 2: Run the lookup test and verify DAO still owns a calculator**
+The first test clears only the registry created by that test fixture. It proves
+that the DAO queries its registry again instead of retaining a calculator.
+
+- [ ] **Step 2: Run the lookup test and verify the new constructor is missing**
 
 Run:
 
@@ -825,27 +775,88 @@ Run:
 mvn -q -o -Dtest=MultiTenantLookupDaoTest test
 ```
 
-Expected: the new per-operation test fails because the DAO still uses its
-constructor-created calculator after the registry is cleared, and the
-unknown-tenant test does not report the registry error.
+Expected: test compilation fails because `MultiTenantLookupDao` still accepts
+the shard-manager map instead of `ShardCalculatorRegistry`.
 
-- [ ] **Step 3: Remove calculator state and resolve through a helper**
+- [ ] **Step 3: Replace lookup calculator state with the registry**
 
-In `MultiTenantLookupDao`:
-
-1. Remove `implements ShardedDao<T>`.
-2. Remove the `shardCalculator` field and its Lombok getter.
-3. Remove `Map<String, ShardManager> shardManagers` from the constructor.
-4. Remove `ConsistentHashBucketIdExtractor` and `ShardManager` imports.
-5. Add:
+Change the constructor to:
 
 ```java
-protected final ShardCalculator<String> shardCalculator(String tenantId) {
-    return ShardCalculatorRegistry.get(tenantId);
+public MultiTenantLookupDao(
+        Map<String, List<SessionFactory>> sessionFactories,
+        Class<T> entityClass,
+        ShardCalculatorRegistry registry,
+        Map<String, ShardingBundleOptions> shardingOptions,
+        Map<String, ShardInfoProvider> shardInfoProviders,
+        TransactionObserver observer) {
+    this.registry = Objects.requireNonNull(registry, "registry");
+    this.sessionFactories = sessionFactories;
+    sessionFactories.forEach((tenantId, factories) -> daos.put(
+            tenantId,
+            factories.stream()
+                    .map(LookupDaoPriv::new)
+                    .collect(Collectors.toList())));
+    this.entityClass = entityClass;
+    this.shardingOptions = shardingOptions;
+    this.shardInfoProviders = shardInfoProviders;
+    this.observer = observer;
+    shardInfoProviders.forEach((tenantId, shardInfoProvider) ->
+            this.transactionExecutor.put(
+                    tenantId,
+                    new TransactionExecutor(
+                            shardInfoProvider,
+                            DaoType.LOOKUP,
+                            entityClass,
+                            observer)));
+    Field[] fields =
+            FieldUtils.getFieldsWithAnnotation(entityClass, LookupKey.class);
+    Preconditions.checkArgument(
+            fields.length != 0,
+            "At least one field needs to be sharding key");
+    Preconditions.checkArgument(
+            fields.length == 1,
+            "Only one field can be sharding key");
+    keyField = fields[0];
+    if (!keyField.isAccessible()) {
+        try {
+            keyField.setAccessible(true);
+        } catch (SecurityException e) {
+            log.error(
+                    "Error making key field accessible please use a public "
+                            + "method and mark that as LookupKey",
+                    e);
+            throw new IllegalArgumentException(
+                    "Invalid class, DAO cannot be created.",
+                    e);
+        }
+    }
+    Preconditions.checkArgument(
+            ClassUtils.isAssignable(keyField.getType(), String.class),
+            "Key field must be a string");
 }
 ```
 
-6. Replace every routing expression:
+Add one final field:
+
+```java
+private final ShardCalculatorRegistry registry;
+```
+
+Remove `implements ShardedDao<T>`, the calculator field, its getter, calculator
+construction, and shard-manager imports. Add:
+
+```java
+protected final int shardId(String tenantId, String key) {
+    return registry.get(tenantId).shardId(key);
+}
+
+protected final void validateTenant(String tenantId) {
+    registry.get(tenantId);
+}
+```
+
+Replace every routing expression:
 
 ```java
 shardCalculator.shardId(tenantId, key)
@@ -854,13 +865,13 @@ shardCalculator.shardId(tenantId, key)
 with:
 
 ```java
-shardCalculator(tenantId).shardId(key)
+shardId(tenantId, key)
 ```
 
 Apply the same replacement for variables named `id` and for batch grouping
-lambdas. Do not cache the returned calculator in a field or map.
+lambdas. Do not store a returned calculator in a field or map.
 
-- [ ] **Step 4: Reduce cacheable and bundle constructor calls**
+- [ ] **Step 4: Pass the registry through cacheable lookup and bundle factories**
 
 Change `MultiTenantCacheableLookupDao` to:
 
@@ -868,6 +879,7 @@ Change `MultiTenantCacheableLookupDao` to:
 public MultiTenantCacheableLookupDao(
         Map<String, List<SessionFactory>> sessionFactories,
         Class<T> entityClass,
+        ShardCalculatorRegistry registry,
         Map<String, LookupCache<T>> cache,
         Map<String, ShardingBundleOptions> shardingOptions,
         Map<String, ShardInfoProvider> shardInfoProvider,
@@ -875,6 +887,7 @@ public MultiTenantCacheableLookupDao(
     super(
             sessionFactories,
             entityClass,
+            registry,
             shardingOptions,
             shardInfoProvider,
             observer);
@@ -882,61 +895,48 @@ public MultiTenantCacheableLookupDao(
 }
 ```
 
-Update both lookup factory methods in `MultiTenantDBShardingBundleBase` to stop
-passing `this.shardManagers`.
+Update both lookup factory methods in `MultiTenantDBShardingBundleBase` to pass
+`this.shardCalculatorRegistry` in place of `this.shardManagers`.
 
-Before every cache access in `MultiTenantCacheableLookupDao`, validate the
-tenant through the inherited registry helper:
-
-```java
-shardCalculator(tenantId);
-if (cache.get(tenantId).exists(key)) {
-    // retain the existing cache behavior
-}
-```
-
-Apply this at the start of each public override that reads
-`cache.get(tenantId)` before it calls a superclass routing method. Add an
-unknown-tenant test to `MultiTenantCacheableLookupDaoTest` that expects the
-registry's exact `IllegalStateException` instead of a cache-map null
-dereference.
+Insert `validateTenant(tenantId);` as the first statement in each public
+override that reads `cache.get(tenantId)` before a superclass routing method.
+Leave the cache lookup and fallback logic after that validation unchanged. Add
+an unknown-tenant test to `MultiTenantCacheableLookupDaoTest` that expects the
+registry's exact `IllegalStateException`.
 
 - [ ] **Step 5: Remove single-tenant lookup calculator access**
 
-Change `LookupDao` to no longer implement `ShardedDao<T>` and delete its
-`getShardCalculator()` method and `ShardCalculator` import.
+Change `LookupDao` to stop implementing `ShardedDao<T>`. Delete its
+`getShardCalculator()` method and `ShardCalculator` import. Single-tenant
+lookup creation continues through the delegate bundle's DAO factory, which now
+passes that bundle's registry.
 
 - [ ] **Step 6: Update lookup-related test fixtures**
 
 In every test listed for this task:
 
-1. Register calculators after creating shard managers:
+1. Create an isolated registry after creating shard managers:
 
 ```java
-ShardCalculatorTestUtils.register(shardManagers);
+ShardCalculatorRegistry registry =
+        ShardCalculatorTestUtils.registryFor(shardManagers);
 ```
 
-For single-tenant maps use:
+For one default-namespace manager use:
 
 ```java
-ShardCalculatorTestUtils.register(
-        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
+ShardCalculatorRegistry registry =
+        ShardCalculatorTestUtils.registryFor(Map.of(
+                DBShardingBundleBase.DEFAULT_NAMESPACE,
+                shardManager));
 ```
 
-2. Remove the shard-manager argument from lookup and cacheable-lookup
-constructors.
-3. Add teardown:
+2. Replace the shard-manager constructor argument with `registry`.
+3. Remove registry teardown; each fixture owns its registry.
+4. Replace `LookupDao.getShardCalculator()` use with:
 
 ```java
-ShardCalculatorRegistry.clear();
-```
-
-4. Remove any use of `LookupDao.getShardCalculator()`. Tests that need a shard
-ID should call:
-
-```java
-ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
-        .shardId(key);
+registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(key);
 ```
 
 - [ ] **Step 7: Run all lookup selectors**
@@ -965,7 +965,7 @@ git add src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundle
         src/test/java/io/appform/dropwizard/sharding/dao/LookupDaoTest.java \
         src/test/java/io/appform/dropwizard/sharding/dao/CacheableLookupDaoTest.java \
         src/test/java/io/appform/dropwizard/sharding/dao/locktest/LockTest.java
-git commit -m "refactor: resolve lookup calculators by tenant" \
+git commit -m "refactor: resolve lookup calculators by bundle registry" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
@@ -975,7 +975,7 @@ git commit -m "refactor: resolve lookup calculators by tenant" \
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantRelationalDao.java`
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableRelationalDao.java`
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/RelationalDao.java`
-- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:232-252`
+- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:232-260`
 - Modify tests:
   - `src/test/java/io/appform/dropwizard/sharding/dao/MultiTenantRelationalDaoTest.java`
   - `src/test/java/io/appform/dropwizard/sharding/dao/MultiTenantRelationalReadOnlyLockedContextTest.java`
@@ -985,9 +985,29 @@ git commit -m "refactor: resolve lookup calculators by tenant" \
   - `src/test/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableLookupDaoTest.java`
   - `src/test/java/io/appform/dropwizard/sharding/dao/locktest/ParentChildTest.java`
 
+**Interfaces:**
+- Consumes: the bundle-owned registry from Task 3.
+- Produces: relational constructors whose routing dependency is
+  `ShardCalculatorRegistry registry`.
+
 - [ ] **Step 1: Add failing relational per-operation and unknown-tenant tests**
 
-In `MultiTenantRelationalDaoTest`, register fixture calculators and add:
+In `MultiTenantRelationalDaoTest`, retain and pass an isolated registry:
+
+```java
+private ShardCalculatorRegistry registry;
+
+registry = ShardCalculatorTestUtils.registryFor(shardManagers);
+relationalDao = new MultiTenantRelationalDao<>(
+        sessionFactories,
+        RelationalEntity.class,
+        registry,
+        shardingOptions,
+        shardInfoProviders,
+        observer);
+```
+
+Add:
 
 ```java
 @Test
@@ -996,9 +1016,12 @@ void resolvesCalculatorForEveryOperation() {
             .key("entity")
             .value("value")
             .build();
-    assertTrue(relationalDao.save("TENANT1", "parent", entity).isPresent());
+    assertTrue(relationalDao.save(
+            "TENANT1",
+            "parent",
+            entity).isPresent());
 
-    ShardCalculatorRegistry.clear();
+    registry.clear();
 
     var error = assertThrows(
             IllegalStateException.class,
@@ -1015,7 +1038,10 @@ void resolvesCalculatorForEveryOperation() {
 void unknownTenantFailsThroughRegistry() {
     var error = assertThrows(
             IllegalStateException.class,
-            () -> relationalDao.get("UNKNOWN", "parent", "key"));
+            () -> relationalDao.get(
+                    "UNKNOWN",
+                    "parent",
+                    "key"));
 
     assertEquals(
             "ShardCalculator has not been registered for tenant: UNKNOWN",
@@ -1023,7 +1049,7 @@ void unknownTenantFailsThroughRegistry() {
 }
 ```
 
-- [ ] **Step 2: Run the relational test and verify current behavior fails**
+- [ ] **Step 2: Run the relational test and verify the new constructor is missing**
 
 Run:
 
@@ -1031,25 +1057,79 @@ Run:
 mvn -q -o -Dtest=MultiTenantRelationalDaoTest test
 ```
 
-Expected: the per-operation and registry-error assertions fail while the DAO
-uses its constructor-created calculator.
+Expected: test compilation fails because `MultiTenantRelationalDao` still
+accepts the shard-manager map instead of `ShardCalculatorRegistry`.
 
-- [ ] **Step 3: Remove relational calculator state**
+- [ ] **Step 3: Replace relational calculator state with the registry**
 
-In `MultiTenantRelationalDao`:
-
-1. Remove `implements ShardedDao<T>`.
-2. Remove the `shardCalculator` field and getter.
-3. Remove the shard-manager constructor parameter and calculator construction.
-4. Add:
+Change the constructor to:
 
 ```java
-protected final ShardCalculator<String> shardCalculator(String tenantId) {
-    return ShardCalculatorRegistry.get(tenantId);
+public MultiTenantRelationalDao(
+        Map<String, List<SessionFactory>> sessionFactories,
+        Class<T> entityClass,
+        ShardCalculatorRegistry registry,
+        Map<String, ShardingBundleOptions> shardingOptions,
+        Map<String, ShardInfoProvider> shardInfoProviders,
+        TransactionObserver observer) {
+    this.registry = Objects.requireNonNull(registry, "registry");
+    this.shardingOptions = shardingOptions;
+    sessionFactories.forEach((tenantId, factories) -> daos.put(
+            tenantId,
+            factories.stream()
+                    .map(RelationalDaoPriv::new)
+                    .collect(Collectors.toList())));
+    this.entityClass = entityClass;
+    this.shardInfoProviders = shardInfoProviders;
+    this.observer = observer;
+    shardInfoProviders.forEach((tenantId, shardInfoProvider) ->
+            this.transactionExecutor.put(
+                    tenantId,
+                    new TransactionExecutor(
+                            shardInfoProvider,
+                            DaoType.RELATIONAL,
+                            entityClass,
+                            observer)));
+    Field[] fields = FieldUtils.getFieldsWithAnnotation(entityClass, Id.class);
+    Preconditions.checkArgument(
+            fields.length != 0,
+            "A field needs to be designated as @Id");
+    Preconditions.checkArgument(
+            fields.length == 1,
+            "Only one field can be designated as @Id");
+    keyField = fields[0];
+    if (!keyField.isAccessible()) {
+        try {
+            keyField.setAccessible(true);
+        } catch (SecurityException e) {
+            log.error(
+                    "Error making key field accessible please use a public "
+                            + "method and mark that as @Id",
+                    e);
+            throw new IllegalArgumentException(
+                    "Invalid class, DAO cannot be created.",
+                    e);
+        }
+    }
 }
 ```
 
-5. Replace every:
+Add:
+
+```java
+private final ShardCalculatorRegistry registry;
+
+protected final int shardId(String tenantId, String key) {
+    return registry.get(tenantId).shardId(key);
+}
+
+protected final void validateTenant(String tenantId) {
+    registry.get(tenantId);
+}
+```
+
+Remove `implements ShardedDao<T>`, the calculator field, its getter,
+calculator construction, and shard-manager imports. Replace every:
 
 ```java
 shardCalculator.shardId(tenantId, parentKey)
@@ -1058,47 +1138,69 @@ shardCalculator.shardId(tenantId, parentKey)
 with:
 
 ```java
-shardCalculator(tenantId).shardId(parentKey)
+shardId(tenantId, parentKey)
 ```
 
-Apply the same replacement at routing points whose key variable is `id`.
-Contexts that already contain a shard ID must remain unchanged.
+Apply the same replacement where the routing key variable is `id`. Contexts
+that already contain a shard ID remain unchanged. Do not cache a calculator.
 
-- [ ] **Step 4: Reduce cacheable and bundle constructor calls**
+- [ ] **Step 4: Pass the registry through cacheable relational and bundle factories**
 
-Change `MultiTenantCacheableRelationalDao` to remove the shard-manager map from
-its signature and `super(...)` call. Update both relational factory methods in
-`MultiTenantDBShardingBundleBase` to stop passing `this.shardManagers`.
+Change `MultiTenantCacheableRelationalDao` to:
+
+```java
+public MultiTenantCacheableRelationalDao(
+        Map<String, List<SessionFactory>> sessionFactories,
+        Class<T> entityClass,
+        ShardCalculatorRegistry registry,
+        Map<String, RelationalCache<T>> cache,
+        Map<String, ShardingBundleOptions> shardingOptions,
+        Map<String, ShardInfoProvider> shardInfoProvider,
+        TransactionObserver observer) {
+    super(
+            sessionFactories,
+            entityClass,
+            registry,
+            shardingOptions,
+            shardInfoProvider,
+            observer);
+    this.cache = cache;
+}
+```
+
+Update both relational factory methods in
+`MultiTenantDBShardingBundleBase` to pass `this.shardCalculatorRegistry` in
+place of `this.shardManagers`.
 
 Before every cache access in `MultiTenantCacheableRelationalDao`, call:
 
 ```java
-shardCalculator(tenantId);
+validateTenant(tenantId);
 ```
 
 Apply this at the start of each public override that reads
 `cache.get(tenantId)` before superclass routing. Add an unknown-tenant test to
 the cacheable relational coverage in `MultiTenantCacheableLookupDaoTest` that
-expects the registry's exact error message.
+expects the exact registry error.
 
 - [ ] **Step 5: Remove single-tenant relational calculator access**
 
-Change `RelationalDao` to no longer implement `ShardedDao<T>`. Delete its
-calculator accessor and `ShardCalculator` import.
+Change `RelationalDao` to stop implementing `ShardedDao<T>`. Delete its
+calculator accessor and `ShardCalculator` import. Single-tenant relational
+creation continues through the delegate bundle's DAO factory.
 
 - [ ] **Step 6: Update relational test fixtures**
 
 For every test listed in this task:
 
-1. Register the relevant tenant managers with
-   `ShardCalculatorTestUtils.register(...)`.
-2. Remove shard-manager arguments from relational and cacheable-relational
-   constructors.
-3. Clear `ShardCalculatorRegistry` during teardown.
-4. Replace DAO calculator access with registry access:
+1. Create a registry with
+   `ShardCalculatorTestUtils.registryFor(...)`.
+2. Replace the shard-manager constructor argument with that registry.
+3. Remove registry teardown.
+4. Replace DAO calculator access with:
 
 ```java
-ShardCalculatorRegistry.get(tenantId).shardId(parentKey);
+registry.get(tenantId).shardId(parentKey);
 ```
 
 - [ ] **Step 7: Run all relational selectors**
@@ -1127,30 +1229,50 @@ git add src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundle
         src/test/java/io/appform/dropwizard/sharding/dao/CacheableLookupDaoTest.java \
         src/test/java/io/appform/dropwizard/sharding/dao/MultiTenantCacheableLookupDaoTest.java \
         src/test/java/io/appform/dropwizard/sharding/dao/locktest/ParentChildTest.java
-git commit -m "refactor: resolve relational calculators by tenant" \
+git commit -m "refactor: resolve relational calculators by bundle registry" \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-## Task 6: Migrate `WrapperDao` and remove DAO calculator contract
+## Task 6: Migrate `WrapperDao` and remove the DAO calculator contract
 
 **Files:**
 - Modify: `src/main/java/io/appform/dropwizard/sharding/dao/WrapperDao.java`
-- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:254-273`
+- Modify: `src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java:254-285`
 - Delete: `src/main/java/io/appform/dropwizard/sharding/dao/ShardedDao.java`
 - Modify tests:
   - `src/test/java/io/appform/dropwizard/sharding/dao/WrapperDaoTest.java`
   - `src/test/java/io/appform/dropwizard/sharding/dao/WrapperDaoTransactionReuseTest.java`
 
-- [ ] **Step 1: Add failing wrapper registry tests**
+**Interfaces:**
+- Consumes: the bundle-owned registry from Task 3.
+- Produces: `WrapperDao` constructors that receive `dbNamespace` and
+  `ShardCalculatorRegistry registry`.
 
-In `WrapperDaoTest`, register the default namespace calculator and add:
+- [ ] **Step 1: Add failing per-call wrapper resolution**
+
+In `WrapperDaoTest`, retain the fixture's registry:
+
+```java
+private ShardCalculatorRegistry registry;
+
+registry = ShardCalculatorTestUtils.registryFor(Map.of(
+        DBShardingBundleBase.DEFAULT_NAMESPACE,
+        shardManager));
+dao = new WrapperDao<>(
+        DBShardingBundleBase.DEFAULT_NAMESPACE,
+        sessionFactories,
+        OrderDao.class,
+        registry);
+```
+
+Add:
 
 ```java
 @Test
 void resolvesCalculatorForEveryForParentCall() {
     dao.forParent("customer1");
 
-    ShardCalculatorRegistry.clear();
+    registry.clear();
 
     var error = assertThrows(
             IllegalStateException.class,
@@ -1161,7 +1283,7 @@ void resolvesCalculatorForEveryForParentCall() {
 }
 ```
 
-- [ ] **Step 2: Run wrapper tests and verify the DAO retains its calculator**
+- [ ] **Step 2: Run wrapper tests and verify the registry constructor is missing**
 
 Run:
 
@@ -1169,10 +1291,10 @@ Run:
 mvn -q -o -Dtest=WrapperDaoTest,WrapperDaoTransactionReuseTest test
 ```
 
-Expected: the new test fails because the wrapper continues using the calculator
-created in its constructor.
+Expected: test compilation fails because `WrapperDao` still accepts a
+`ShardManager`.
 
-- [ ] **Step 3: Remove wrapper calculator and manager dependencies**
+- [ ] **Step 3: Replace wrapper calculator state with the registry**
 
 Change the constructors to:
 
@@ -1180,8 +1302,15 @@ Change the constructors to:
 public WrapperDao(
         String dbNamespace,
         List<SessionFactory> sessionFactories,
-        Class<DaoType> daoClass) {
-    this(dbNamespace, sessionFactories, daoClass, null, null);
+        Class<DaoType> daoClass,
+        ShardCalculatorRegistry registry) {
+    this(
+            dbNamespace,
+            sessionFactories,
+            daoClass,
+            null,
+            null,
+            registry);
 }
 
 public WrapperDao(
@@ -1189,29 +1318,74 @@ public WrapperDao(
         List<SessionFactory> sessionFactories,
         Class<DaoType> daoClass,
         Class[] extraConstructorParamClasses,
-        Class[] extraConstructorParamObjects) {
+        Class[] extraConstructorParamObjects,
+        ShardCalculatorRegistry registry) {
     this.dbNamespace = dbNamespace;
-    this.daos = sessionFactories.stream()
-            // retain the existing proxy construction body unchanged
-            .collect(Collectors.toList());
+    this.registry = Objects.requireNonNull(registry, "registry");
+    this.daos = sessionFactories.stream().map(sessionFactory -> {
+        Enhancer enhancer = new Enhancer();
+        enhancer.setUseFactory(false);
+        enhancer.setSuperclass(daoClass);
+        enhancer.setCallback((MethodInterceptor) (
+                obj,
+                method,
+                args,
+                proxy) -> {
+            ShardedTransaction transaction =
+                    method.getAnnotation(ShardedTransaction.class);
+            if (transaction == null) {
+                return proxy.invokeSuper(obj, args);
+            }
+            TransactionHandler transactionHandler =
+                    new TransactionHandler(
+                            sessionFactory,
+                            transaction.readOnly());
+            try {
+                transactionHandler.beforeStart();
+                Object result = proxy.invokeSuper(obj, args);
+                transactionHandler.afterEnd();
+                return result;
+            } catch (InvocationTargetException e) {
+                transactionHandler.onError();
+                throw e.getCause();
+            } catch (Exception e) {
+                transactionHandler.onError();
+                throw e;
+            }
+        });
+        return createDAOProxy(
+                sessionFactory,
+                enhancer,
+                extraConstructorParamClasses,
+                extraConstructorParamObjects);
+    }).collect(Collectors.toList());
 }
 ```
 
-Remove the `ShardCalculator` field, `ShardManager` parameter, calculator
-construction, and calculator accessor. Change routing to:
+Add:
+
+```java
+private final ShardCalculatorRegistry registry;
+```
+
+Remove the calculator field, shard-manager parameter, calculator construction,
+calculator getter, and related imports. Resolve for every call:
 
 ```java
 public DaoType forParent(final String parentKey) {
-    int shardId = ShardCalculatorRegistry.get(dbNamespace)
-            .shardId(parentKey);
+    int shardId = registry.get(dbNamespace).shardId(parentKey);
     return daos.get(shardId);
 }
 ```
 
 - [ ] **Step 4: Update wrapper factories**
 
-In both `MultiTenantDBShardingBundleBase.createWrapperDao` overloads, retain the
-unknown-tenant precondition but stop passing `this.shardManagers.get(tenantId)`.
+In both `MultiTenantDBShardingBundleBase.createWrapperDao` overloads, retain
+the unknown-tenant precondition and pass `this.shardCalculatorRegistry` instead
+of `this.shardManagers.get(tenantId)`.
+
+`DBShardingBundleBase.createWrapperDao` already delegates to these factories,
+so its wrappers use the delegate bundle's registry.
 
 - [ ] **Step 5: Delete `ShardedDao`**
 
@@ -1227,28 +1401,29 @@ Search for remaining references:
 grep -R "ShardedDao\\|getShardCalculator()" -n src/main/java
 ```
 
-Expected: only the bundle-level `getShardCalculator()` method remains; no
+Expected: only bundle-level `getShardCalculator()` methods remain; no
 `ShardedDao` references remain.
 
 - [ ] **Step 6: Update wrapper tests**
 
-Register the default namespace manager in each setup:
+In each wrapper test, create an isolated registry:
 
 ```java
-ShardCalculatorTestUtils.register(Map.of(
-        DBShardingBundleBase.DEFAULT_NAMESPACE,
-        shardManager));
+ShardCalculatorRegistry registry =
+        ShardCalculatorTestUtils.registryFor(Map.of(
+                DBShardingBundleBase.DEFAULT_NAMESPACE,
+                shardManager));
 ```
 
-Remove the manager argument from `new WrapperDao(...)`. Replace shard-ID
-calculations in `WrapperDaoTransactionReuseTest` with:
+Pass it in place of the manager. Replace shard-ID calculations in
+`WrapperDaoTransactionReuseTest` with:
 
 ```java
-ShardCalculatorRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
+registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE)
         .shardId(parentKey);
 ```
 
-Clear the registry in teardown.
+Do not add teardown; each test fixture owns its registry.
 
 - [ ] **Step 7: Run wrapper and bundle tests**
 
@@ -1256,7 +1431,7 @@ Run:
 
 ```bash
 mvn -q -o \
-  -Dtest=WrapperDaoTest,WrapperDaoTransactionReuseTest,MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest \
+  -Dtest=WrapperDaoTest,WrapperDaoTransactionReuseTest,MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest,BundleMvccSnapshotTest \
   test
 ```
 
@@ -1375,7 +1550,7 @@ Run:
 
 ```bash
 mvn -q -o \
-  -Dtest=ShardCalculatorTest,ShardCalculatorRegistryTest,MultiTenantLookupDaoTest,MultiTenantRelationalDaoTest,WrapperDaoTest,MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest \
+  -Dtest=ShardCalculatorTest,ShardCalculatorRegistryTest,MultiTenantLookupDaoTest,MultiTenantRelationalDaoTest,WrapperDaoTest,MultiTenantBalancedDBShardingBundleWithEntityTest,BalancedDBShardingBundleWithEntityTest,BundleMvccSnapshotTest \
   test
 ```
 
@@ -1397,7 +1572,7 @@ git commit -m "refactor: remove legacy shard calculator api" \
 - Modify any remaining test fixture that creates a DAO directly
 - No production behavior changes
 
-- [ ] **Step 1: Find direct DAO construction without registry setup**
+- [ ] **Step 1: Find direct DAO construction without an isolated registry**
 
 Run:
 
@@ -1406,59 +1581,68 @@ grep -R "new MultiTenantLookupDao\\|new MultiTenantCacheableLookupDao\\|new Mult
   -n src/test/java
 ```
 
-For each result, verify its setup calls either bundle `run()` or
-`ShardCalculatorTestUtils.register(...)`. Add registration when neither is
-present.
+For each result, verify its setup either runs a bundle or creates a registry
+with `ShardCalculatorTestUtils.registryFor(...)` and passes that instance to
+the constructor. Add the helper call when neither is present.
 
-- [ ] **Step 2: Find teardown gaps**
-
-Run:
-
-```bash
-grep -R "ShardCalculatorTestUtils.register\\|ShardCalculatorRegistry.register" \
-  -l src/test/java
-```
-
-For each direct-registration test class, add:
-
-```java
-@AfterEach
-void clearShardCalculatorRegistry() {
-    ShardCalculatorRegistry.clear();
-}
-```
-
-Merge this call into an existing teardown method when one exists.
-
-- [ ] **Step 3: Verify forbidden production dependencies are gone**
+- [ ] **Step 2: Verify the old helper and shared cleanup are gone**
 
 Run:
 
 ```bash
-grep -R "Map<String, ShardManager> shardManagers\\|ShardCalculator<String> shardCalculator" \
-  -n src/main/java/io/appform/dropwizard/sharding/dao || true
-grep -R "getShardCalculator" \
-  -n src/main/java/io/appform/dropwizard/sharding/dao || true
+grep -R "ShardCalculatorTestUtils.register\\|ShardCalculatorRegistry\\.clear()\\|ResourceLock" \
+  -n src/test/java || true
 ```
 
-Expected: no output.
+Expected: no output. Calls such as `registry.clear()` are allowed only inside
+an isolated test that proves per-operation resolution.
 
-- [ ] **Step 4: Verify all registry call sites are tenant-aware**
+- [ ] **Step 3: Verify registry state and methods belong to instances**
 
 Run:
 
 ```bash
-grep -R "ShardCalculatorRegistry.get()" \
+grep -n "static.*calculators\\|static.*register\\|static.*get\\|static.*clear" \
+  src/main/java/io/appform/dropwizard/sharding/utils/ShardCalculatorRegistry.java || true
+grep -R "ShardCalculatorRegistry\\.register\\|ShardCalculatorRegistry\\.get\\|ShardCalculatorRegistry\\.clear" \
   -n src/main/java src/test/java || true
-grep -R "ShardCalculatorRegistry.register(" \
-  -n src/main/java
 ```
 
-Expected: no no-argument `get()` calls. Production registration occurs only in
-`MultiTenantDBShardingBundleBase`; production reads occur in bundle accessors
-and DAO routing helpers.
+Expected: no output. Construction with `new ShardCalculatorRegistry()` and
+calls through variables or bundle fields are expected.
 
-- [ ] **Step 5: Run the complete test suite**
+- [ ] **Step 4: Verify DAO constructor dependencies**
+
+Run:
+
+```bash
+grep -R -n -A12 \
+  "public MultiTenantLookupDao\\|public MultiTenantCacheableLookupDao\\|public MultiTenantRelationalDao\\|public MultiTenantCacheableRelationalDao\\|public WrapperDao" \
+  src/main/java/io/appform/dropwizard/sharding/dao
+grep -R "Map<String, ShardManager> shardManagers\\|ShardManager shardManager\\|ShardCalculator<String> shardCalculator\\|Map<String, ShardCalculator" \
+  -n src/main/java/io/appform/dropwizard/sharding/dao || true
+```
+
+Expected: constructor output shows `ShardCalculatorRegistry registry` for each
+DAO. The forbidden-type search produces no output. Other constructor
+dependencies remain unchanged.
+
+- [ ] **Step 5: Verify bundle ownership and routing lookups**
+
+Run:
+
+```bash
+grep -n "final ShardCalculatorRegistry\\|shardCalculatorRegistry.register" \
+  src/main/java/io/appform/dropwizard/sharding/MultiTenantDBShardingBundleBase.java
+grep -R "registry.get(tenantId)\\|registry.get(dbNamespace)" \
+  -n src/main/java/io/appform/dropwizard/sharding/dao
+```
+
+Expected: the bundle has one final registry field and one post-initialization
+batch registration. Lookup and relational DAOs query `registry.get(tenantId)`;
+`WrapperDao` queries `registry.get(dbNamespace)`.
+
+- [ ] **Step 6: Run the complete test suite**
 
 Run:
 
@@ -1466,9 +1650,21 @@ Run:
 mvn -q -o test
 ```
 
-Expected: BUILD SUCCESS.
+Expected: BUILD SUCCESS. This includes `BundleMvccSnapshotTest` with two live
+default-namespace bundles.
 
-- [ ] **Step 6: Run final repository checks**
+- [ ] **Step 7: Commit fixture-only corrections if Step 1 changed files**
+
+```bash
+git add src/test/java
+git commit -m "test: isolate tenant calculator registries" \
+  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+Skip this commit only when Tasks 1-7 already left every direct-construction
+fixture isolated.
+
+- [ ] **Step 8: Run final repository checks**
 
 Run:
 
@@ -1478,14 +1674,3 @@ git status --short
 ```
 
 Expected: no whitespace errors and no uncommitted files.
-
-- [ ] **Step 7: Commit fixture-only corrections if Step 1 or Step 2 changed files**
-
-```bash
-git add src/test/java
-git commit -m "test: isolate tenant calculator registry state" \
-  -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-```
-
-Skip this commit only when Tasks 1-7 already left every fixture isolated and
-the worktree is clean.
