@@ -25,6 +25,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
@@ -34,13 +36,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class WrapperDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
     private WrapperDao<Order, OrderDao> dao;
+    private ShardCalculatorRegistry registry;
 
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
@@ -66,7 +71,9 @@ public class WrapperDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class, shardManager);
+        registry = ShardCalculatorTestUtils.registryFor(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
+        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class, registry);
 
     }
 
@@ -103,5 +110,65 @@ public class WrapperDaoTest {
 
         assertEquals(saveResult.getId(), result.getId());
         assertEquals(saveResult.getId(), result.getId());
+    }
+
+    @Test
+    void testRegistryClearIsObservedAfterInitialLookup() {
+        dao.forParent("customer-before-clear");
+
+        registry.clear();
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> dao.forParent("customer-after-clear"));
+        assertEquals(
+                "ShardCalculator has not been registered for tenant: default",
+                error.getMessage());
+    }
+
+    @Test
+    void testConstructorRejectsMissingNamespace() {
+        ShardCalculatorRegistry emptyRegistry = new ShardCalculatorRegistry();
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> new WrapperDao<>(
+                        DBShardingBundleBase.DEFAULT_NAMESPACE,
+                        sessionFactories,
+                        OrderDao.class,
+                        emptyRegistry));
+        assertEquals(
+                "ShardCalculator has not been registered for tenant: default",
+                error.getMessage());
+    }
+
+    @Test
+    void testCalculatedShardMustMatchSessionFactories() {
+        ShardCalculatorRegistry mismatchedRegistry = ShardCalculatorTestUtils.registryFor(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new BalancedShardManager(4)));
+        String parentKey = parentKeyForShard(mismatchedRegistry, 2);
+        WrapperDao<Order, OrderDao> mismatchedDao = new WrapperDao<>(
+                DBShardingBundleBase.DEFAULT_NAMESPACE,
+                sessionFactories,
+                OrderDao.class,
+                mismatchedRegistry);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> mismatchedDao.forParent(parentKey));
+        assertEquals(
+                "Calculated shard 2 for tenant default is outside configured session factory range [0, 1]",
+                error.getMessage());
+    }
+
+    private String parentKeyForShard(ShardCalculatorRegistry targetRegistry, int targetShard) {
+        for (int i = 0; i < 1000; i++) {
+            String parentKey = "customer-" + i;
+            if (targetRegistry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(parentKey)
+                    == targetShard) {
+                return parentKey;
+            }
+        }
+        throw new AssertionError("Unable to find parent key for shard " + targetShard);
     }
 }

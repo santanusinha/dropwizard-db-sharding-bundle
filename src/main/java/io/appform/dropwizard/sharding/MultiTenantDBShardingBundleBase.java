@@ -270,7 +270,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     Preconditions.checkArgument(
             this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
             "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass, this.shardManagers.get(tenantId));
+    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
+        this.shardCalculatorRegistry);
   }
 
   public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
@@ -282,7 +283,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
             this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
             "Unknown tenant: " + tenantId);
     return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
-        extraConstructorParamClasses, extraConstructorParamObjects, this.shardManagers.get(tenantId));
+        extraConstructorParamClasses, extraConstructorParamObjects, this.shardCalculatorRegistry);
   }
 
   private int fetchParallelism(final ShardingBundleOptions bundleOptions) {
