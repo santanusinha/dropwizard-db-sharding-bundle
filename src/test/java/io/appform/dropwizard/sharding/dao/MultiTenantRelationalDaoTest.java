@@ -32,7 +32,8 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.val;
 import org.apache.commons.lang3.RandomUtils;
 import org.hibernate.SessionFactory;
@@ -58,6 +59,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class MultiTenantRelationalDaoTest {
 
@@ -67,7 +69,7 @@ public class MultiTenantRelationalDaoTest {
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
 
-  private ShardCalculator<String> shardCalculator;
+  private ShardCalculatorRegistry registry;
 
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
@@ -98,6 +100,7 @@ public class MultiTenantRelationalDaoTest {
     this.shardManager = Map.of("TENANT1",
         new BalancedShardManager(sessionFactories.get("TENANT1").size()),
         "TENANT2", new BalancedShardManager(sessionFactories.get("TENANT2").size()));
+    registry = ShardCalculatorTestUtils.registryFor(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
@@ -106,13 +109,109 @@ public class MultiTenantRelationalDaoTest {
     final TransactionObserver observer = new EntityClassThreadLocalObserver(
         new DaoClassLocalObserver(new TerminalTransactionObserver()));
     relationalDao = new MultiTenantRelationalDao<>(sessionFactories, RelationalEntity.class,
-        this.shardManager,
+        registry,
         shardingOptions, shardInfoProvider, observer);
     relationalWithAIDao = new MultiTenantRelationalDao<>(sessionFactories,
         RelationalEntityWithAIKey.class,
-        this.shardManager,
+        registry,
         shardingOptions, shardInfoProvider, observer);
-    shardCalculator = relationalDao.getShardCalculator();
+  }
+
+  @Test
+  public void testRegistryIsResolvedForEveryLookup() throws Exception {
+    relationalDao.save("TENANT1", "parent", RelationalEntity.builder()
+        .key("1")
+        .value("value")
+        .build());
+
+    registry.clear();
+
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> relationalDao.get("TENANT1", "parent", "1"));
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: TENANT1",
+        error.getMessage());
+  }
+
+  @Test
+  public void testUnknownTenantUsesRegistryError() {
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> relationalDao.get("UNKNOWN", "parent", "1"));
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: UNKNOWN",
+        error.getMessage());
+  }
+
+  @Test
+  public void testRegistrySupersetTenantIsRejectedAsUnknown() {
+    Map<String, ShardManager> managers = new HashMap<>(shardManager);
+    managers.put("TENANT3", new BalancedShardManager(1));
+    ShardCalculatorRegistry registryWithExtraTenant =
+        ShardCalculatorTestUtils.registryFor(managers);
+
+    MultiTenantRelationalDao<RelationalEntity> dao = new MultiTenantRelationalDao<>(
+        sessionFactories,
+        RelationalEntity.class,
+        registryWithExtraTenant,
+        Map.of("TENANT1", new ShardingBundleOptions(), "TENANT2",
+            new ShardingBundleOptions()),
+        Map.of("TENANT1", new ShardInfoProvider("TENANT1"), "TENANT2",
+            new ShardInfoProvider("TENANT2")),
+        new TerminalTransactionObserver());
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> dao.get("TENANT3", "parent", "1"));
+    assertEquals("Unknown tenant: TENANT3", error.getMessage());
+  }
+
+  @Test
+  public void testConstructorRejectsMissingCalculator() {
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> new MultiTenantRelationalDao<>(
+            Map.of("TENANT1", sessionFactories.get("TENANT1")),
+            RelationalEntity.class,
+            new ShardCalculatorRegistry(),
+            Map.of("TENANT1", new ShardingBundleOptions()),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
+            new TerminalTransactionObserver()));
+
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: TENANT1",
+        error.getMessage());
+  }
+
+  @Test
+  public void testConstructorRejectsMissingShardingOptions() {
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> new MultiTenantRelationalDao<>(
+            Map.of("TENANT1", sessionFactories.get("TENANT1")),
+            RelationalEntity.class,
+            registry,
+            Map.of(),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
+            new TerminalTransactionObserver()));
+
+    assertEquals("Missing sharding options for tenant: TENANT1", error.getMessage());
+  }
+
+  @Test
+  public void testConstructorRejectsMissingShardInfoProvider() {
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> new MultiTenantRelationalDao<>(
+            Map.of("TENANT1", sessionFactories.get("TENANT1")),
+            RelationalEntity.class,
+            registry,
+            Map.of("TENANT1", new ShardingBundleOptions()),
+            Map.of(),
+            new TerminalTransactionObserver()));
+
+    assertEquals("Missing shard info provider for tenant: TENANT1", error.getMessage());
   }
 
   @AfterEach
@@ -467,7 +566,7 @@ public class MultiTenantRelationalDaoTest {
         .mapToObj(value -> {
           while (true) {
             String id = UUID.randomUUID().toString();
-            if (shardCalculator.shardId(tenantId, id) == expectedShardIndex) {
+            if (registry.get(tenantId).shardId(id) == expectedShardIndex) {
               return id;
             }
           }

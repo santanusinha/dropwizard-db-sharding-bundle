@@ -33,7 +33,8 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.val;
 import org.apache.commons.lang3.RandomUtils;
 import org.hibernate.SessionFactory;
@@ -66,7 +67,7 @@ public class RelationalDaoTest {
     private RelationalDao<RelationalEntityWithAIKey> relationalWithAIDao;
 
     private ShardManager shardManager;
-    private ShardCalculator<String> shardCalculator;
+    private ShardCalculatorRegistry registry;
 
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
@@ -93,22 +94,23 @@ public class RelationalDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         this.shardManager = new BalancedShardManager(sessionFactories.size());
+        registry = ShardCalculatorTestUtils.registryFor(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         final TransactionObserver observer = new EntityClassThreadLocalObserver(new DaoClassLocalObserver(new TerminalTransactionObserver()));
         relationalDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        RelationalEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        RelationalEntity.class, registry,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         relationalWithAIDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        RelationalEntityWithAIKey.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        RelationalEntityWithAIKey.class, registry,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
-        this.shardCalculator = relationalDao.getShardCalculator();
     }
 
     @AfterEach
@@ -458,7 +460,8 @@ public class RelationalDaoTest {
                 .mapToObj(value -> {
                     while (true) {
                         String id = UUID.randomUUID().toString();
-                        if (shardCalculator.shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, id) == expectedShardIndex) {
+                        if (registry.get(DBShardingBundleBase.DEFAULT_NAMESPACE).shardId(id)
+                                == expectedShardIndex) {
                             return id;
                         }
                     }

@@ -152,7 +152,7 @@ public class CacheableLookupDaoTest {
                 new MultiTenantCacheableRelationalDao<>(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Transaction.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        registry,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new RelationalCache<Transaction>() {
 
                             private Map<String, Object> cache = new HashMap<>();
@@ -219,7 +219,7 @@ public class CacheableLookupDaoTest {
         auditDao = new CacheableRelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantCacheableRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Audit.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        registry,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new RelationalCache<Audit>() {
 
                             private Map<String, Object> cache = new HashMap<>();

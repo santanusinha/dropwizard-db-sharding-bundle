@@ -128,10 +128,10 @@ public class MultiTenantLookupDaoTest {
         shardingOptions,
         shardInfoProvider, observer);
     transactionDao = new MultiTenantRelationalDao<>(sessionFactories, Transaction.class,
-        shardManager,
+        registry,
         shardingOptions,
         shardInfoProvider, observer);
-    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, shardManager,
+    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, registry,
         shardingOptions,
         shardInfoProvider, observer);
   }

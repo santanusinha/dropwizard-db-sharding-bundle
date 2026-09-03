@@ -246,7 +246,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public <EntityType, T extends Configuration>
   MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
     return new MultiTenantRelationalDao<>(this.sessionFactories, clazz,
-        this.shardManagers,
+        this.shardCalculatorRegistry,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
@@ -258,7 +258,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       Map<String, RelationalCache<EntityType>> cacheManager) {
     return new MultiTenantCacheableRelationalDao<>(this.sessionFactories,
         clazz,
-        this.shardManagers,
+        this.shardCalculatorRegistry,
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,

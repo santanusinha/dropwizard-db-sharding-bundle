@@ -63,6 +63,47 @@ public class MultiTenantCacheableLookupDaoTest {
   private MultiTenantCacheableRelationalDao<Transaction> transactionDao;
   private MultiTenantCacheableRelationalDao<Audit> auditDao;
 
+  private <T> RelationalCache<T> relationalCache() {
+    return new RelationalCache<T>() {
+      private final Map<String, Object> entries = new HashMap<>();
+
+      @Override
+      public void put(String parentKey, Object key, T entity) {
+        entries.put(StringUtils.join(parentKey, key, ':'), entity);
+      }
+
+      @Override
+      public void put(String parentKey, List<T> entities) {
+        entries.put(parentKey, entities);
+      }
+
+      @Override
+      public void put(String parentKey, int first, int numResults, List<T> entities) {
+        entries.put(StringUtils.join(parentKey, first, numResults, ':'), entities);
+      }
+
+      @Override
+      public boolean exists(String parentKey, Object key) {
+        return entries.containsKey(StringUtils.join(parentKey, key, ':'));
+      }
+
+      @Override
+      public T get(String parentKey, Object key) {
+        return (T) entries.get(StringUtils.join(parentKey, key, ':'));
+      }
+
+      @Override
+      public List<T> select(String parentKey) {
+        return (List<T>) entries.get(parentKey);
+      }
+
+      @Override
+      public List<T> select(String parentKey, int first, int numResults) {
+        return (List<T>) entries.get(StringUtils.join(parentKey, first, numResults, ':'));
+      }
+    };
+  }
+
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
     configuration.setProperty("hibernate.dialect",
@@ -189,7 +230,7 @@ public class MultiTenantCacheableLookupDaoTest {
         shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     transactionDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Transaction.class,
-        shardManager,
+        registry,
         Map.of("TENANT1",
             new RelationalCache<Transaction>() {
 
@@ -317,7 +358,7 @@ public class MultiTenantCacheableLookupDaoTest {
             }), shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     auditDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Audit.class,
-        shardManager,
+        registry,
         Map.of("TENANT1", new RelationalCache<Audit>() {
 
           private Map<String, Object> cache = new HashMap<>();
@@ -433,6 +474,60 @@ public class MultiTenantCacheableLookupDaoTest {
     assertEquals(
         "ShardCalculator has not been registered for tenant: UNKNOWN",
         error.getMessage());
+  }
+
+  @Test
+  public void testCacheableRelationalUnknownTenantUsesRegistryError() {
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> transactionDao.get("UNKNOWN", "parent", "key"));
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: UNKNOWN",
+        error.getMessage());
+  }
+
+  @Test
+  public void testCacheableRelationalRegistrySupersetTenantIsRejectedAsUnknown() {
+    Map<String, ShardManager> managers = new HashMap<>(shardManager);
+    managers.put("TENANT3", new BalancedShardManager(1));
+    ShardCalculatorRegistry registryWithExtraTenant =
+        ShardCalculatorTestUtils.registryFor(managers);
+
+    MultiTenantCacheableRelationalDao<Transaction> dao =
+        new MultiTenantCacheableRelationalDao<>(
+            sessionFactories,
+            Transaction.class,
+            registryWithExtraTenant,
+            Map.of("TENANT1", relationalCache(), "TENANT2", relationalCache(),
+                "TENANT3", relationalCache()),
+            Map.of("TENANT1", new ShardingBundleOptions(), "TENANT2",
+                new ShardingBundleOptions()),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1"), "TENANT2",
+                new ShardInfoProvider("TENANT2")),
+            new TerminalTransactionObserver());
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> dao.get("TENANT3", "parent", "key"));
+    assertEquals("Unknown tenant: TENANT3", error.getMessage());
+  }
+
+  @Test
+  public void testCacheableRelationalConstructorRejectsMissingCache() {
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> new MultiTenantCacheableRelationalDao<>(
+            sessionFactories,
+            Transaction.class,
+            registry,
+            Map.of("TENANT1", relationalCache()),
+            Map.of("TENANT1", new ShardingBundleOptions(), "TENANT2",
+                new ShardingBundleOptions()),
+            Map.of("TENANT1", new ShardInfoProvider("TENANT1"), "TENANT2",
+                new ShardInfoProvider("TENANT2")),
+            new TerminalTransactionObserver()));
+
+    assertEquals("Missing cache for tenant: TENANT2", error.getMessage());
   }
 
   @Test
