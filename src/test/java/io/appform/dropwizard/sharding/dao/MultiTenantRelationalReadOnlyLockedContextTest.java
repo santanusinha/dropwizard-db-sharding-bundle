@@ -47,6 +47,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
   private MultiTenantRelationalDao<Department> departmentRelationalDao;
   private MultiTenantRelationalDao<Ceo> ceoRelationalDao;
   private MultiTenantRelationalDao<Company> companyRelationalDao;
+  private ShardCalculatorRegistry registry;
 
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
@@ -79,7 +80,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Map<String, ShardManager> shardManager = new HashMap<>();
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
-    ShardCalculatorRegistry registry = ShardCalculatorTestUtils.registryFor(shardManager);
+    registry = ShardCalculatorTestUtils.registryFor(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -243,6 +244,48 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Assertions.assertNotNull(respCompanyCase2.getCeo());
     Assertions.assertTrue(respCompanyCase2.getDepartments().stream()
         .allMatch(e -> e.getCompanyExtId().equals(companyToRetrieve)));
+  }
+
+  @Test
+  @SneakyThrows
+  void testReadOnlyContextKeepsResolvedRoutingAfterRegistryClear() {
+    val parentKey = "PARENT_KEY";
+    generateData(parentKey);
+
+    val companyToRetrieve = "CMPID1";
+    val departmentQueryFilterSpec = MultiTenantRelationalDao.QueryFilterSpec.<Department>builder()
+        .querySpec((queryRoot, query, criteriaBuilder) -> query.where(
+            criteriaBuilder.equal(queryRoot.get("companyExtId"), companyToRetrieve)))
+        .build();
+    val context = companyRelationalDao.readOnlyExecutor("TENANT1", parentKey,
+            (queryRoot, query, criteriaBuilder) -> query.where(
+                criteriaBuilder.equal(queryRoot.get("companyUsageId"), companyToRetrieve)), 0, 1)
+        .readAugmentParent(departmentRelationalDao, departmentQueryFilterSpec, 0,
+            Integer.MAX_VALUE, Company::setDepartments);
+
+    registry.clear();
+
+    val dataList = context.execute().orElse(new ArrayList<>());
+    Assertions.assertEquals(1, dataList.size());
+    Assertions.assertEquals(2, dataList.get(0).getDepartments().size());
+  }
+
+  @Test
+  void testContextBoundOperationRejectsUnknownDaoTenant() {
+    val context = companyRelationalDao.readOnlyExecutor("TENANT1", "PARENT_KEY",
+        DetachedCriteria.forClass(Company.class), 0, 1);
+    val tenantTwoDepartmentDao = new MultiTenantRelationalDao<>(
+        Map.of("TENANT2", sessionFactories.get("TENANT2")),
+        Department.class,
+        registry,
+        Map.of("TENANT2", new ShardingBundleOptions()),
+        Map.of("TENANT2", new ShardInfoProvider("TENANT2")),
+        new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener())));
+
+    val error = Assertions.assertThrows(IllegalArgumentException.class,
+        () -> tenantTwoDepartmentDao.select(
+            context, DetachedCriteria.forClass(Department.class), 0, 1));
+    Assertions.assertEquals("Unknown tenant: TENANT1", error.getMessage());
   }
 
   private void generateData(String parentKey) {

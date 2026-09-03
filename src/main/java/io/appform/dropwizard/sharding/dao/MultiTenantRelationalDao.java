@@ -345,8 +345,14 @@ public class MultiTenantRelationalDao<T> {
 
     protected final ShardCalculator<String> validateTenant(String tenantId) {
         ShardCalculator<String> calculator = registry.get(tenantId);
-        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        validateDaoTenant(tenantId);
         return calculator;
+    }
+
+    protected final void validateDaoTenant(String tenantId) {
+        Preconditions.checkArgument(
+                daos.containsKey(tenantId) && transactionExecutor.containsKey(tenantId),
+                "Unknown tenant: " + tenantId);
     }
 
     /**
@@ -458,6 +464,7 @@ public class MultiTenantRelationalDao<T> {
 
     public <U> void save(LockedContext<U> context, T entity) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
@@ -466,6 +473,7 @@ public class MultiTenantRelationalDao<T> {
 
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).afterSave(handler).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
@@ -488,6 +496,7 @@ public class MultiTenantRelationalDao<T> {
      */
     <U> boolean update(LockedContext<U> context, Object id, Function<T, T> updater) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         return update(tenantId, context.getShardId(), context.getSessionFactory(), dao, id, updater, false);
     }
@@ -518,6 +527,7 @@ public class MultiTenantRelationalDao<T> {
             UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         val dao = daos.get(tenantId).get(context.getShardId());
         val opContext = UpdateWithScroll.<T>builder()
                 .scroll(dao::scroll)
@@ -565,6 +575,7 @@ public class MultiTenantRelationalDao<T> {
             UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         val dao = daos.get(tenantId).get(context.getShardId());
         val opContext = UpdateWithScroll.<T>builder()
                 .scroll(dao::scroll)
@@ -592,6 +603,7 @@ public class MultiTenantRelationalDao<T> {
             int start,
             int numResults) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
@@ -611,6 +623,7 @@ public class MultiTenantRelationalDao<T> {
             int start,
             int numResults) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
@@ -643,7 +656,7 @@ public class MultiTenantRelationalDao<T> {
                        QuerySpec<T, T> querySpec, int start,
                        int numResults) {
         val tenantId = context.getTenantId();
-        validateTenant(tenantId);
+        validateDaoTenant(tenantId);
         final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
@@ -663,7 +676,7 @@ public class MultiTenantRelationalDao<T> {
                        QuerySpec<T, T> querySpec, int start,
                        int numResults) {
         val tenantId = context.getTenantId();
-        validateTenant(tenantId);
+        validateDaoTenant(tenantId);
         final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
@@ -760,7 +773,7 @@ public class MultiTenantRelationalDao<T> {
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
                        DetachedCriteria criteria,
                        int first, int numResults) {
-        validateTenant(tenantId);
+        validateDaoTenant(tenantId);
         final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
@@ -777,7 +790,7 @@ public class MultiTenantRelationalDao<T> {
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
                        QuerySpec<T, T> querySpec,
                        int first, int numResults) {
-        validateTenant(tenantId);
+        validateDaoTenant(tenantId);
         final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
@@ -876,7 +889,7 @@ public class MultiTenantRelationalDao<T> {
                            Object id,
                            Function<T, T> updater,
                            boolean completeTransaction) {
-        validateTenant(tenantId);
+        validateDaoTenant(tenantId);
         val opContext = GetAndUpdate.<T>builder()
                 .criteria(dao.getDetachedCriteria(id))
                 .getter(dao::get)
@@ -975,6 +988,7 @@ public class MultiTenantRelationalDao<T> {
 
     public <U> int updateUsingQuery(LockedContext<U> lockedContext, UpdateOperationMeta updateOperationMeta) {
         val tenantId = lockedContext.getTenantId();
+        validateDaoTenant(tenantId);
         val dao = daos.get(tenantId).get(lockedContext.getShardId());
         val opContext = UpdateByQuery.builder()
                 .updater(dao::update).updateOperationMeta(updateOperationMeta).build();
@@ -1048,6 +1062,7 @@ public class MultiTenantRelationalDao<T> {
             U parent,
             Function<U, T> entityGenerator) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         val dao = daos.get(tenantId).get(context.getShardId());
         val selectParam = SelectParam.<T>builder()
                 .criteria(criteria)
@@ -1082,6 +1097,7 @@ public class MultiTenantRelationalDao<T> {
             U parent,
             Function<U, T> entityGenerator) {
         val tenantId = context.getTenantId();
+        validateDaoTenant(tenantId);
         val dao = daos.get(tenantId).get(context.getShardId());
         val selectParam = SelectParam.<T>builder()
                 .querySpec(querySpec)
