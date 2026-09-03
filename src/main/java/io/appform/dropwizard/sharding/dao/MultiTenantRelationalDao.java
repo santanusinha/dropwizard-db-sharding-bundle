@@ -355,6 +355,29 @@ public class MultiTenantRelationalDao<T> {
                 "Unknown tenant: " + tenantId);
     }
 
+    private RelationalDaoPriv validateContextOwnership(
+            String tenantId,
+            String contextTenantId,
+            int shardId,
+            SessionFactory sessionFactory) {
+        String errorMessage = "Context does not belong to tenant: " + tenantId;
+        if (!Objects.equals(tenantId, contextTenantId)) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+        List<RelationalDaoPriv> tenantDaos = daos.get(tenantId);
+        if (tenantDaos == null
+                || !transactionExecutor.containsKey(tenantId)
+                || shardId < 0
+                || shardId >= tenantDaos.size()) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+        RelationalDaoPriv dao = tenantDaos.get(shardId);
+        if (dao.sessionFactory != sessionFactory) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+        return dao;
+    }
+
     /**
      * Retrieves an entity associated with a specific key from the database and returns it wrapped in
      * an Optional. This method allows you to retrieve an entity associated with a parent key and a
@@ -464,8 +487,8 @@ public class MultiTenantRelationalDao<T> {
 
     public <U> void save(LockedContext<U> context, T entity) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
                 context.getShardId(), false);
@@ -473,8 +496,8 @@ public class MultiTenantRelationalDao<T> {
 
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).afterSave(handler).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
                 context.getShardId(), false);
@@ -496,8 +519,8 @@ public class MultiTenantRelationalDao<T> {
      */
     <U> boolean update(LockedContext<U> context, Object id, Function<T, T> updater) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         return update(tenantId, context.getShardId(), context.getSessionFactory(), dao, id, updater, false);
     }
 
@@ -527,8 +550,8 @@ public class MultiTenantRelationalDao<T> {
             UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        val dao = daos.get(tenantId).get(context.getShardId());
+        val dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = UpdateWithScroll.<T>builder()
                 .scroll(dao::scroll)
                 .scrollParam(ScrollParam.<T>builder()
@@ -575,8 +598,8 @@ public class MultiTenantRelationalDao<T> {
             UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        val dao = daos.get(tenantId).get(context.getShardId());
+        val dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = UpdateWithScroll.<T>builder()
                 .scroll(dao::scroll)
                 .scrollParam(ScrollParam.<T>builder()
@@ -603,8 +626,8 @@ public class MultiTenantRelationalDao<T> {
             int start,
             int numResults) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
                 .selectParam(SelectParam.<T>builder()
@@ -623,8 +646,8 @@ public class MultiTenantRelationalDao<T> {
             int start,
             int numResults) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
                 .selectParam(SelectParam.<T>builder()
@@ -656,8 +679,8 @@ public class MultiTenantRelationalDao<T> {
                        QuerySpec<T, T> querySpec, int start,
                        int numResults) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
                 .selectParam(SelectParam.<T>builder()
@@ -676,8 +699,8 @@ public class MultiTenantRelationalDao<T> {
                        QuerySpec<T, T> querySpec, int start,
                        int numResults) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
                 .selectParam(SelectParam.<T>builder()
@@ -773,8 +796,8 @@ public class MultiTenantRelationalDao<T> {
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
                        DetachedCriteria criteria,
                        int first, int numResults) {
-        validateDaoTenant(tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, context.getTenantId(), context.getShardId(), context.getSessionFactory());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
                 .selectParam(SelectParam.<T>builder()
@@ -790,8 +813,8 @@ public class MultiTenantRelationalDao<T> {
     <U> List<T> select(String tenantId, MultiTenantRelationalDao.ReadOnlyContext<U> context,
                        QuerySpec<T, T> querySpec,
                        int first, int numResults) {
-        validateDaoTenant(tenantId);
-        final RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        final RelationalDaoPriv dao = validateContextOwnership(
+                tenantId, context.getTenantId(), context.getShardId(), context.getSessionFactory());
         val opContext = Select.<T, List<T>>builder()
                 .getter(dao::select)
                 .selectParam(SelectParam.<T>builder()
@@ -988,8 +1011,8 @@ public class MultiTenantRelationalDao<T> {
 
     public <U> int updateUsingQuery(LockedContext<U> lockedContext, UpdateOperationMeta updateOperationMeta) {
         val tenantId = lockedContext.getTenantId();
-        validateDaoTenant(tenantId);
-        val dao = daos.get(tenantId).get(lockedContext.getShardId());
+        val dao = validateContextOwnership(
+                tenantId, tenantId, lockedContext.getShardId(), lockedContext.getSessionFactory());
         val opContext = UpdateByQuery.builder()
                 .updater(dao::update).updateOperationMeta(updateOperationMeta).build();
         return transactionExecutor.get(tenantId).execute(lockedContext.getSessionFactory(),
@@ -1062,8 +1085,8 @@ public class MultiTenantRelationalDao<T> {
             U parent,
             Function<U, T> entityGenerator) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        val dao = daos.get(tenantId).get(context.getShardId());
+        val dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val selectParam = SelectParam.<T>builder()
                 .criteria(criteria)
                 .start(0)
@@ -1097,8 +1120,8 @@ public class MultiTenantRelationalDao<T> {
             U parent,
             Function<U, T> entityGenerator) {
         val tenantId = context.getTenantId();
-        validateDaoTenant(tenantId);
-        val dao = daos.get(tenantId).get(context.getShardId());
+        val dao = validateContextOwnership(
+                tenantId, tenantId, context.getShardId(), context.getSessionFactory());
         val selectParam = SelectParam.<T>builder()
                 .querySpec(querySpec)
                 .start(0)

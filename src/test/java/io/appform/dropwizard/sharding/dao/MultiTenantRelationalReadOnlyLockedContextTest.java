@@ -6,6 +6,7 @@ import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
+import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -285,7 +286,83 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val error = Assertions.assertThrows(IllegalArgumentException.class,
         () -> tenantTwoDepartmentDao.select(
             context, DetachedCriteria.forClass(Department.class), 0, 1));
-    Assertions.assertEquals("Unknown tenant: TENANT1", error.getMessage());
+    Assertions.assertEquals("Context does not belong to tenant: TENANT1", error.getMessage());
+  }
+
+  @Test
+  void testReadOnlyContextRejectsDifferentBundleWithSameTenant() {
+    val context = companyRelationalDao.readOnlyExecutor("TENANT1", "PARENT_KEY",
+        DetachedCriteria.forClass(Company.class), 0, 1);
+    val foreignSessionFactories = List.of(
+        buildSessionFactory("foreign_read_tenant1_1"),
+        buildSessionFactory("foreign_read_tenant1_2"));
+    try {
+      val foreignDao = buildDepartmentDao(foreignSessionFactories);
+
+      val error = Assertions.assertThrows(IllegalArgumentException.class,
+          () -> foreignDao.select(
+              context, DetachedCriteria.forClass(Department.class), 0, 1));
+
+      Assertions.assertEquals("Context does not belong to tenant: TENANT1",
+          error.getMessage());
+    } finally {
+      foreignSessionFactories.forEach(SessionFactory::close);
+    }
+  }
+
+  @Test
+  void testLockedContextRejectsDifferentBundleWithSameTenant() {
+    val context = companyRelationalDao.saveAndGetExecutor("TENANT1", "PARENT_KEY",
+        Company.builder().companyId(3L).companyUsageId("CMPID3").name("COMP3").build());
+    val foreignSessionFactories = List.of(
+        buildSessionFactory("foreign_locked_tenant1_1"),
+        buildSessionFactory("foreign_locked_tenant1_2"));
+    try {
+      val foreignDao = buildDepartmentDao(foreignSessionFactories);
+
+      val error = Assertions.assertThrows(IllegalArgumentException.class,
+          () -> foreignDao.save(context,
+              Department.builder().name("LEGAL").companyExtId("CMPID3").build()));
+
+      Assertions.assertEquals("Context does not belong to tenant: TENANT1",
+          error.getMessage());
+    } finally {
+      foreignSessionFactories.forEach(SessionFactory::close);
+    }
+  }
+
+  @Test
+  void testReadOnlyContextRejectsInvalidShard() {
+    val context = new MultiTenantRelationalDao.ReadOnlyContext<Company>(
+        "TENANT1",
+        sessionFactories.get("TENANT1").size(),
+        sessionFactories.get("TENANT1").get(0),
+        List::of,
+        () -> false,
+        new ShardInfoProvider("TENANT1"),
+        DaoType.RELATIONAL,
+        Company.class,
+        new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener())));
+
+    val error = Assertions.assertThrows(IllegalArgumentException.class,
+        () -> departmentRelationalDao.select(
+            context, DetachedCriteria.forClass(Department.class), 0, 1));
+
+    Assertions.assertEquals("Context does not belong to tenant: TENANT1",
+        error.getMessage());
+  }
+
+  private MultiTenantRelationalDao<Department> buildDepartmentDao(
+      List<SessionFactory> tenantSessionFactories) {
+    val foreignRegistry = ShardCalculatorTestUtils.registryFor(
+        Map.of("TENANT1", new BalancedShardManager(tenantSessionFactories.size())));
+    return new MultiTenantRelationalDao<>(
+        Map.of("TENANT1", tenantSessionFactories),
+        Department.class,
+        foreignRegistry,
+        Map.of("TENANT1", new ShardingBundleOptions()),
+        Map.of("TENANT1", new ShardInfoProvider("TENANT1")),
+        new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener())));
   }
 
   private void generateData(String parentKey) {
