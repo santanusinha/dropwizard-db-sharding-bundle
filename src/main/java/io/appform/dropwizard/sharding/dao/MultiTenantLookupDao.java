@@ -168,10 +168,6 @@ public class MultiTenantLookupDao<T> {
                 "Key field must be a string");
     }
 
-    ShardCalculator<String> getShardCalculator(String tenantId) {
-        return shardCalculators.get(tenantId);
-    }
-
     /**
      * Get an object on the basis of key (value of field annotated with {@link LookupKey}) from any
      * shard.

@@ -327,10 +327,6 @@ public class MultiTenantRelationalDao<T> {
         }
     }
 
-    ShardCalculator<String> getShardCalculator(String tenantId) {
-        return shardCalculators.get(tenantId);
-    }
-
     /**
      * Retrieves an entity associated with a specific key from the database and returns it wrapped in
      * an Optional. This method allows you to retrieve an entity associated with a parent key and a

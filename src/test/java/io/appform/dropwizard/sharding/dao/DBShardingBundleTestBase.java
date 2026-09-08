@@ -154,15 +154,6 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
     }
 
     @Test
-    public void testShardCalculatorMatchesInjectedInstance() throws Exception {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
-        bundle.initialize(bootstrap);
-        bundle.run(testConfig, environment);
-        RelationalDao<Order> relationalDao = bundle.createRelatedObjectDao(Order.class);
-        assertEquals(bundle.getShardCalculator(), relationalDao.getShardCalculator());
-    }
-
-    @Test
     public void testBundleWithShardBlacklisted() throws Exception {
         DBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);

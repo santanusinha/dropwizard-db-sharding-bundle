@@ -35,6 +35,7 @@ class WrapperDaoTransactionReuseTest {
 
     private final List<SessionFactory> sessionFactories = new ArrayList<>();
     private WrapperDao<Order, OrderDao> dao;
+    private ShardCalculator<String> shardCalculator;
 
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = getConfiguration(dbName);
@@ -62,7 +63,7 @@ class WrapperDaoTransactionReuseTest {
             sessionFactories.add(buildSessionFactory("reuse_tx_db_" + i));
         }
         ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        ShardCalculator<String> shardCalculator = new ShardCalculator<>(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager,
+        shardCalculator = new ShardCalculator<>(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager,
                 new ConsistentHashBucketIdExtractor<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager)));
         dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories,
                 OrderDao.class, shardCalculator);
@@ -89,8 +90,7 @@ class WrapperDaoTransactionReuseTest {
     @Test
     void testTransactionReuseAcrossMultipleDaoCalls() {
         String parentKey = "customer-tx-reuse"; // Determines shard
-        int shardId = dao.getShardCalculator()
-                .shardId(parentKey);
+        int shardId = shardCalculator.shardId(parentKey);
         SessionFactory targetSessionFactory = sessionFactories.get(shardId);
 
         // Outer application layer begins and binds session + transaction.
@@ -135,7 +135,7 @@ class WrapperDaoTransactionReuseTest {
     @Test
     void testMultipleWritesReuseSameOuterTransaction() {
         String parentKey = "customer-multi-write";
-        int shardId = dao.getShardCalculator().shardId(parentKey);
+        int shardId = shardCalculator.shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session outer = sf.openSession();
         ManagedSessionContext.bind(outer);
@@ -186,7 +186,7 @@ class WrapperDaoTransactionReuseTest {
         // TC to verify that inner DAO calls within an outer transaction
         // that is rolled back do not persist any data.
         String parentKey = "customer-rollback";
-        int shardId = dao.getShardCalculator().shardId(parentKey);
+        int shardId = shardCalculator.shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session outer = sf.openSession();
         ManagedSessionContext.bind(outer);
@@ -240,7 +240,7 @@ class WrapperDaoTransactionReuseTest {
         assertTrue(persisted.getId() > 0);
 
         // Determine shard & verify using fresh manual session
-        int shardId = dao.getShardCalculator().shardId(parentKey);
+        int shardId = shardCalculator.shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session s = sf.openSession();
         ManagedSessionContext.bind(s);
