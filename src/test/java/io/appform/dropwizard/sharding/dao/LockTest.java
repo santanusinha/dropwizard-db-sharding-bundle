@@ -15,21 +15,16 @@
  *
  */
 
-package io.appform.dropwizard.sharding.dao.locktest;
+package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.LockedContext;
-import io.appform.dropwizard.sharding.dao.LookupDao;
-import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
-import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
-import io.appform.dropwizard.sharding.dao.RelationalDao;
-import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
+import io.appform.dropwizard.sharding.dao.locktest.SomeLookupObject;
+import io.appform.dropwizard.sharding.dao.locktest.SomeOtherObject;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import java.util.function.Function;
