@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.*;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;

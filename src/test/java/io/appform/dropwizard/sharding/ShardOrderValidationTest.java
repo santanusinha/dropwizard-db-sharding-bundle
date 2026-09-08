@@ -1,5 +1,6 @@
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.*;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;

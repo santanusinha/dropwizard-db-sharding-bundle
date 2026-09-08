@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.*;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;

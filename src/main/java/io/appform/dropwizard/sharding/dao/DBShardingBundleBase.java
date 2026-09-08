@@ -15,7 +15,7 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.appform.dropwizard.sharding.caching.LookupCache;
@@ -145,7 +145,7 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     public <U> BucketInfo getBucketInfo(final String shardingKey,
                                         final Class<U> clazz) {
-        return delegate.getBucketInfo(dbNamespace, shardingKey, clazz);
+        return delegate.getTenantBucketInfo(dbNamespace, shardingKey, clazz);
     }
 
     protected abstract ShardManager createShardManager(int numShards, ShardBlacklistingStore blacklistingStore);

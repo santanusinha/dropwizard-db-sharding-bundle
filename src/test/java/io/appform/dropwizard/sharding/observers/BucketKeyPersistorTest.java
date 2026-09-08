@@ -1,8 +1,8 @@
 package io.appform.dropwizard.sharding.observers;
 
-import io.appform.dropwizard.sharding.BalancedDBShardingBundle;
+import io.appform.dropwizard.sharding.dao.BalancedDBShardingBundle;
 import io.appform.dropwizard.sharding.BundleBasedTestBase;
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.observers.entity.BaseChild;
 import io.appform.dropwizard.sharding.observers.entity.ChildWithDuplicateBucketKey;

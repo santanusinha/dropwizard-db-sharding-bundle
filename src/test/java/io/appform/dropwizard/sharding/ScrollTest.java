@@ -1,5 +1,6 @@
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.*;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;

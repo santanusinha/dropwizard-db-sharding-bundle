@@ -1,5 +1,6 @@
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.*;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Maps;

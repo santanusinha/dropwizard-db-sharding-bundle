@@ -15,33 +15,38 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
+import io.appform.dropwizard.sharding.sharding.LegacyShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 /**
  * A dropwizard bundle that provides sharding over normal RDBMS with multi tenancy.
  */
 @Slf4j
-public abstract class MultiTenantBalancedDBShardingBundle<T extends Configuration> extends
+public abstract class MultiTenantDBShardingBundle<T extends Configuration> extends
     MultiTenantDBShardingBundleBase<T> {
 
-  protected MultiTenantBalancedDBShardingBundle(Class<?> entity, Class<?>... entities) {
+  protected MultiTenantDBShardingBundle(List<String> classPathPrefixList) {
+    super(classPathPrefixList);
+  }
+
+  protected MultiTenantDBShardingBundle(Class<?> entity, Class<?>... entities) {
     super(entity, entities);
   }
 
-  protected MultiTenantBalancedDBShardingBundle(String... classPathPrefixes) {
+  protected MultiTenantDBShardingBundle(String... classPathPrefixes) {
     super(classPathPrefixes);
   }
 
   @Override
   protected ShardManager createShardManager(int numShards,
-      ShardBlacklistingStore shardBlacklistingStore) {
-    return new BalancedShardManager(numShards, shardBlacklistingStore);
+      ShardBlacklistingStore blacklistingStore) {
+    return new LegacyShardManager(numShards, blacklistingStore);
   }
-
 }

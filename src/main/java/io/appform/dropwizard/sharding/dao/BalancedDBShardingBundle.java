@@ -15,9 +15,9 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.sharding.LegacyShardManager;
+import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.dropwizard.Configuration;
@@ -29,30 +29,30 @@ import java.util.List;
  * A dropwizard bundle that provides sharding over normal RDBMS.
  */
 @Slf4j
-public abstract class DBShardingBundle<T extends Configuration> extends DBShardingBundleBase<T> {
+public abstract class BalancedDBShardingBundle<T extends Configuration> extends DBShardingBundleBase<T> {
 
-    public DBShardingBundle(
+    public BalancedDBShardingBundle(
             String dbNamespace,
             Class<?> entity,
             Class<?>... entities) {
         super(dbNamespace, entity, entities);
     }
 
-    public DBShardingBundle(String dbNamespace, List<String> classPathPrefixList) {
+    public BalancedDBShardingBundle(String dbNamespace, List<String> classPathPrefixList) {
         super(dbNamespace, classPathPrefixList);
     }
 
-    public DBShardingBundle(Class<?> entity, Class<?>... entities) {
+    public BalancedDBShardingBundle(Class<?> entity, Class<?>... entities) {
         super(entity, entities);
     }
 
-    public DBShardingBundle(String... classPathPrefixes) {
+    public BalancedDBShardingBundle(String... classPathPrefixes) {
         super(classPathPrefixes);
     }
 
     @Override
-    protected ShardManager createShardManager(int numShards, ShardBlacklistingStore blacklistingStore) {
-        return new LegacyShardManager(numShards, blacklistingStore);
+    protected ShardManager createShardManager(int numShards, ShardBlacklistingStore shardBlacklistingStore) {
+        return new BalancedShardManager(numShards, shardBlacklistingStore);
     }
 
 }

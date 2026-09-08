@@ -15,8 +15,9 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.*;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import org.junit.jupiter.api.Test;
 

@@ -17,7 +17,7 @@
 
 package io.appform.dropwizard.sharding.utils;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.extern.slf4j.Slf4j;
