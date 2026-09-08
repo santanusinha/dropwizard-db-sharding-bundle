@@ -3,7 +3,6 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.ScrollTestEntity;
@@ -56,13 +55,11 @@ public class ScrollTest {
         val shardManager = new BalancedShardManager(sessionFactories.size());
         val shardCalculator = new ShardCalculator<String>(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager,
                 new ConsistentHashBucketIdExtractor<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager)));
-        val shardingOptions = new ShardingBundleOptions();
         val shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TerminalTransactionObserver();
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         ScrollTestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardCalculator),
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), observer));
     }
 

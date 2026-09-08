@@ -213,7 +213,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   MultiTenantLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
     return new MultiTenantLookupDao<>(this.sessionFactories, clazz,
         this.shardCalculators,
-        this.shardingOptions,
         shardInfoProviders,
         rootObserver);
   }
@@ -224,7 +223,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     return new MultiTenantCacheableLookupDao<>(this.sessionFactories,
         clazz, this.shardCalculators,
         cacheManager,
-        this.shardingOptions,
         shardInfoProviders,
         rootObserver);
   }
@@ -233,7 +231,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
     return new MultiTenantRelationalDao<>(this.sessionFactories, clazz,
         this.shardCalculators,
-        this.shardingOptions,
         shardInfoProviders,
         rootObserver);
   }
@@ -246,7 +243,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         clazz,
         this.shardCalculators,
         cacheManager,
-        this.shardingOptions,
         shardInfoProviders,
         rootObserver);
   }

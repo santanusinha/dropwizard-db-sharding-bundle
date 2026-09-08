@@ -20,7 +20,6 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.dao.interceptors.EntityClassThreadLocalObserver;
 import io.appform.dropwizard.sharding.dao.interceptors.InterceptorTestUtil;
@@ -103,8 +102,6 @@ public class MultiTenantRelationalDaoTest {
         .collect(Collectors.toMap(Map.Entry::getKey,
                 entry -> new ShardCalculator<>(entry.getKey(), entry.getValue(),
                         new ConsistentHashBucketIdExtractor<>(Map.of(entry.getKey(), entry.getValue())))));
-    final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
-        new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
         new ShardInfoProvider("TENANT1"),
         "TENANT2", new ShardInfoProvider("TENANT2"));
@@ -112,11 +109,11 @@ public class MultiTenantRelationalDaoTest {
         new DaoClassLocalObserver(new TerminalTransactionObserver()));
     relationalDao = new MultiTenantRelationalDao<>(sessionFactories, RelationalEntity.class,
         this.shardCalculators,
-        shardingOptions, shardInfoProvider, observer);
+        shardInfoProvider, observer);
     relationalWithAIDao = new MultiTenantRelationalDao<>(sessionFactories,
         RelationalEntityWithAIKey.class,
         this.shardCalculators,
-        shardingOptions, shardInfoProvider, observer);
+        shardInfoProvider, observer);
   }
 
   @AfterEach

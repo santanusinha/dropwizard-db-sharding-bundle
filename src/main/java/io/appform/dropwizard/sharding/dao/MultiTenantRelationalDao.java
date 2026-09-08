@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.operations.Count;
 import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Get;
@@ -268,8 +267,6 @@ public class MultiTenantRelationalDao<T> {
     @Getter
     private final Class<T> entityClass;
     private final Map<String, ShardCalculator<String>> shardCalculators;
-    @Getter
-    private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
 
     private final Map<String, TransactionExecutor> transactionExecutor = Maps.newHashMap();
@@ -298,11 +295,9 @@ public class MultiTenantRelationalDao<T> {
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
             Map<String, ShardCalculator<String>> shardCalculators,
-            Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
         this.shardCalculators = shardCalculators;
-        this.shardingOptions = shardingOptions;
         sessionFactories.forEach((tenantId, factories) -> daos.put(tenantId,
                 factories.stream().map(RelationalDaoPriv::new).collect(Collectors.toList())));
         this.entityClass = entityClass;

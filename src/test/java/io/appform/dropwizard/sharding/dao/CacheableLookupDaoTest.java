@@ -23,7 +23,6 @@ import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.LookupCache;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Audit;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Phone;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
@@ -93,7 +92,6 @@ public class CacheableLookupDaoTest {
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager,
                 new ConsistentHashBucketIdExtractor<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager)));
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
-        final ShardingBundleOptions shardingBundleOptions = new ShardingBundleOptions();
         lookupDao = new CacheableLookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantCacheableLookupDao<>(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
@@ -118,7 +116,6 @@ public class CacheableLookupDaoTest {
                                 return cache.get(key);
                             }
                         }),
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new TerminalTransactionObserver()));
         phoneDao = new CacheableLookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
@@ -145,7 +142,6 @@ public class CacheableLookupDaoTest {
                                 return cache.get(key);
                             }
                         }),
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new TerminalTransactionObserver()));
         transactionDao = new CacheableRelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
@@ -214,7 +210,7 @@ public class CacheableLookupDaoTest {
                                         numResults,
                                         ':'));
                             }
-                        }), Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
+                        }),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), new TerminalTransactionObserver()));
         auditDao = new CacheableRelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantCacheableRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
@@ -269,7 +265,7 @@ public class CacheableLookupDaoTest {
                                         numResults,
                                         ':'));
                             }
-                        }), Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
+                        }),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), new TerminalTransactionObserver()));
     }
 

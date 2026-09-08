@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
-import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.operations.Count;
 import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
@@ -103,8 +102,6 @@ public class MultiTenantLookupDao<T> {
     private final Map<String, List<LookupDaoPriv>> daos = Maps.newHashMap();
     private final Class<T> entityClass;
     private final Map<String, ShardCalculator<String>> shardCalculators;
-    @Getter
-    private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
     private final Map<String, TransactionExecutor> transactionExecutor = Maps.newHashMap();
     private final Map<String, ShardInfoProvider> shardInfoProviders;
@@ -122,8 +119,6 @@ public class MultiTenantLookupDao<T> {
      * @param entityClass        The Class representing the type of entities managed by this
      *                           LookupDao.
      * @param shardCalculators   A map of per-tenant ShardCalculator instances.
-     * @param shardingOptions    ShardingBundleOptions specifying additional sharding configuration
-     *                           options.
      * @param shardInfoProviders A ShardInfoProvider for retrieving shard information.
      * @param observer           A TransactionObserver for monitoring transaction events.
      * @throws IllegalArgumentException If the entity class does not have exactly one field marked as
@@ -134,7 +129,6 @@ public class MultiTenantLookupDao<T> {
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
             Map<String, ShardCalculator<String>> shardCalculators,
-            Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
         this.sessionFactories = sessionFactories;
@@ -143,7 +137,6 @@ public class MultiTenantLookupDao<T> {
         });
         this.entityClass = entityClass;
         this.shardCalculators = shardCalculators;
-        this.shardingOptions = shardingOptions;
         this.shardInfoProviders = shardInfoProviders;
         this.observer = observer;
         shardInfoProviders.forEach((tenantId, shardInfoProvider) -> {
