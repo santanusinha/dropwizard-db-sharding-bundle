@@ -3,6 +3,7 @@ package io.appform.dropwizard.sharding.dao;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.dao.testdata.entities.TestEncryptedEntity;
@@ -69,11 +70,13 @@ public class EncryptionAtRestTest {
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         final ShardCalculator<String> shardCalculator = new ShardCalculator<>(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager,
                 new ConsistentHashBucketIdExtractor<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager)));
+        final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         TestEncryptedEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardCalculator),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
 

@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
 import io.appform.dropwizard.sharding.dao.interceptors.EntityClassThreadLocalObserver;
 import io.appform.dropwizard.sharding.dao.interceptors.InterceptorTestUtil;
@@ -95,16 +96,19 @@ public class RelationalDaoTest {
         this.shardManager = new BalancedShardManager(sessionFactories.size());
         this.shardCalculator = new ShardCalculator<>(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager,
                 new ConsistentHashBucketIdExtractor<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager)));
+        final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         final TransactionObserver observer = new EntityClassThreadLocalObserver(new DaoClassLocalObserver(new TerminalTransactionObserver()));
         relationalDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         RelationalEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardCalculator),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         relationalWithAIDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         RelationalEntityWithAIKey.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardCalculator),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
     }

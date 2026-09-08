@@ -19,6 +19,7 @@ package io.appform.dropwizard.sharding.dao;
 
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.LookupCache;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.exceptions.DaoFwdException;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
@@ -53,6 +54,7 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    * @param entityClass       The Class representing the entity type handled by the DAO.
    * @param shardCalculators  A map of per-tenant ShardCalculator instances.
    * @param cache             The LookupCache implementation for caching entities.
+   * @param shardingOptions   ShardingBundleOptions for configuring sharding behavior.
    * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
    * @param observer          A TransactionObserver for observing transaction events.
    */
@@ -60,9 +62,10 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
                                        Class<T> entityClass,
                                        Map<String, ShardCalculator<String>> shardCalculators,
                                        Map<String, LookupCache<T>> cache,
+                                       Map<String, ShardingBundleOptions> shardingOptions,
                                        Map<String, ShardInfoProvider> shardInfoProvider,
                                        TransactionObserver observer) {
-    super(sessionFactories, entityClass, shardCalculators, shardInfoProvider, observer);
+    super(sessionFactories, entityClass, shardCalculators, shardingOptions, shardInfoProvider, observer);
     this.cache = cache;
   }
 

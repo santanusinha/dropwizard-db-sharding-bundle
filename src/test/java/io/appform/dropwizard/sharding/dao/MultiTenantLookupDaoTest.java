@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Audit;
@@ -108,24 +109,32 @@ public class MultiTenantLookupDaoTest {
         .collect(Collectors.toMap(Map.Entry::getKey,
                 entry -> new ShardCalculator<>(entry.getKey(), entry.getValue(),
                         new ConsistentHashBucketIdExtractor<>(Map.of(entry.getKey(), entry.getValue())))));
+    final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
+        new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
+
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
         new ShardInfoProvider("TENANT1"),
         "TENANT2", new ShardInfoProvider("TENANT2"));
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
     lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class, shardCalculators,
+        shardingOptions,
         shardInfoProvider, observer);
 
     lookupDaoForAI = new MultiTenantLookupDao<>(sessionFactories, TestEntityWithAIId.class,
         shardCalculators,
+        shardingOptions,
         shardInfoProvider, observer);
 
     phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class, shardCalculators,
+        shardingOptions,
         shardInfoProvider, observer);
     transactionDao = new MultiTenantRelationalDao<>(sessionFactories, Transaction.class,
         shardCalculators,
+        shardingOptions,
         shardInfoProvider, observer);
     auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, shardCalculators,
+        shardingOptions,
         shardInfoProvider, observer);
   }
 
