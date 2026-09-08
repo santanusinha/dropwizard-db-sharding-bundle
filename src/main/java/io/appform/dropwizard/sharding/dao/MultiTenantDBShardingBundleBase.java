@@ -43,6 +43,7 @@ import io.appform.dropwizard.sharding.observers.bucket.BucketKeyPersistor;
 import io.appform.dropwizard.sharding.observers.internal.FilteringObserver;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.sharding.BucketInfo;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -275,6 +276,13 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public ShardCalculator<String> getShardCalculator(String tenantId) {
     Preconditions.checkArgument(shardCalculators.containsKey(tenantId), "Unknown tenant: " + tenantId);
     return shardCalculators.get(tenantId);
+  }
+
+  @Override
+  protected <U> BucketInfo getBucketInfo(final String tenantId,
+                                         final String shardingKey,
+                                         final Class<U> clazz) {
+    return super.getBucketInfo(tenantId, shardingKey, clazz);
   }
 
 
