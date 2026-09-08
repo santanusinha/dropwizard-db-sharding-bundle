@@ -63,7 +63,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      * distributed across multiple shards.
      *
      */
-    public LookupDao(final String dbNamespace,
+    LookupDao(final String dbNamespace,
                      final MultiTenantLookupDao<T> delegate) {
         this.dbNamespace = dbNamespace;
         this.delegate = delegate;
@@ -522,7 +522,7 @@ public class LookupDao<T> implements ShardedDao<T> {
 
     @Override
     public ShardCalculator<String> getShardCalculator() {
-        return delegate.getShardCalculator();
+        return delegate.getShardCalculator(dbNamespace);
     }
 
 

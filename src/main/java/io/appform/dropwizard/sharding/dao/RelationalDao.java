@@ -65,7 +65,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @throws IllegalArgumentException If the entity class does not have exactly one field designated as @Id,
      *                                  if the designated key field is not accessible, or if it is not of type String.
      */
-    public RelationalDao(final String tenantId,
+    RelationalDao(final String tenantId,
                          final MultiTenantRelationalDao<T> delegate) {
         this.tenantId = tenantId;
         this.delegate = delegate;
@@ -744,7 +744,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
 
     @Override
     public ShardCalculator<String> getShardCalculator() {
-        return delegate.getShardCalculator();
+        return delegate.getShardCalculator(tenantId);
     }
 
     /**
