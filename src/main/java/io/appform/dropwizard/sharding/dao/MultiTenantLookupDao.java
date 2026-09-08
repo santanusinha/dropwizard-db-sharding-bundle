@@ -103,7 +103,6 @@ public class MultiTenantLookupDao<T> {
     private final Map<String, List<LookupDaoPriv>> daos = Maps.newHashMap();
     private final Class<T> entityClass;
     private final Map<String, ShardCalculator<String>> shardCalculators;
-    @Getter
     private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
     private final Map<String, TransactionExecutor> transactionExecutor = Maps.newHashMap();

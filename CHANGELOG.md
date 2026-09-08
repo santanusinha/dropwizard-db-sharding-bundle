@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Removed the `ShardedDao<T>` interface entirely, along with the `getShardCalculator()` accessors it required on `LookupDao`, `RelationalDao`, `WrapperDao`, and the package-private `getShardCalculator(String tenantId)` on `MultiTenantLookupDao`/`MultiTenantRelationalDao`. DAOs no longer expose their internal `ShardCalculator` in any form; bundle-level `getShardCalculator(...)` accessors on `DBShardingBundleBase`/`MultiTenantDBShardingBundleBase` are unaffected.
 
   **Reason**: This is a breaking change for any consumer that directly constructed DAOs, imported the old `io.appform.dropwizard.sharding.DBShardingBundleBase`/`MultiTenantDBShardingBundleBase`/`BundleCommonBase` package paths, called the two-arg `ShardCalculator` methods, or relied on `ShardedDao<T>`/`dao.getShardCalculator()`. It removes a static/global shard-calculator registry in favor of instances scoped to and owned by the bundle, eliminating a class of bugs where shard-routing state could leak or be shared unexpectedly across tenants.
+- Removed the public `@Getter` from `MultiTenantLookupDao`/`MultiTenantRelationalDao#shardingOptions`; the field and constructor parameter are unchanged, but it is no longer exposed as a public accessor since it had no external callers.
 
 ## [2.1.12-7]
 - Added logs to print the original exception during DB exception handling.

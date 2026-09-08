@@ -268,7 +268,6 @@ public class MultiTenantRelationalDao<T> {
     @Getter
     private final Class<T> entityClass;
     private final Map<String, ShardCalculator<String>> shardCalculators;
-    @Getter
     private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
 
