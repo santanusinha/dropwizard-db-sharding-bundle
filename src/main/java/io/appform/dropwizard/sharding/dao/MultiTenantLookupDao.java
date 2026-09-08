@@ -168,7 +168,7 @@ public class MultiTenantLookupDao<T> {
                 "Key field must be a string");
     }
 
-    public ShardCalculator<String> getShardCalculator(String tenantId) {
+    ShardCalculator<String> getShardCalculator(String tenantId) {
         return shardCalculators.get(tenantId);
     }
 

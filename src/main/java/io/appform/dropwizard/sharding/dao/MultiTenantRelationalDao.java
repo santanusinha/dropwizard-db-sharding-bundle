@@ -327,7 +327,7 @@ public class MultiTenantRelationalDao<T> {
         }
     }
 
-    public ShardCalculator<String> getShardCalculator(String tenantId) {
+    ShardCalculator<String> getShardCalculator(String tenantId) {
         return shardCalculators.get(tenantId);
     }
 
