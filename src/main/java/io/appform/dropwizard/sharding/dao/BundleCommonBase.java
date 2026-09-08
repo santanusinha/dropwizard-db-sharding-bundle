@@ -1,4 +1,4 @@
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;

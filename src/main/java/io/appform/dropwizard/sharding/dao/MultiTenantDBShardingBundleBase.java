@@ -23,7 +23,6 @@ import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module.Feature;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import io.appform.dropwizard.sharding.BundleCommonBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.admin.BlacklistShardTask;
 import io.appform.dropwizard.sharding.admin.UnblacklistShardTask;
@@ -43,7 +42,6 @@ import io.appform.dropwizard.sharding.observers.bucket.BucketKeyPersistor;
 import io.appform.dropwizard.sharding.observers.internal.FilteringObserver;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
-import io.appform.dropwizard.sharding.sharding.BucketInfo;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
@@ -276,13 +274,6 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public ShardCalculator<String> getShardCalculator(String tenantId) {
     Preconditions.checkArgument(shardCalculators.containsKey(tenantId), "Unknown tenant: " + tenantId);
     return shardCalculators.get(tenantId);
-  }
-
-  @Override
-  protected <U> BucketInfo getBucketInfo(final String tenantId,
-                                         final String shardingKey,
-                                         final Class<U> clazz) {
-    return super.getBucketInfo(tenantId, shardingKey, clazz);
   }
 
 
