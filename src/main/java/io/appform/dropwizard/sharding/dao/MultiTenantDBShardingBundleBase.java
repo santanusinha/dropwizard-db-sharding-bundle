@@ -15,7 +15,7 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module;
@@ -23,6 +23,8 @@ import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module.Feature;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import io.appform.dropwizard.sharding.BundleCommonBase;
+import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.admin.BlacklistShardTask;
 import io.appform.dropwizard.sharding.admin.UnblacklistShardTask;
 import io.appform.dropwizard.sharding.caching.LookupCache;
@@ -30,12 +32,6 @@ import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.MetricConfig;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
-import io.appform.dropwizard.sharding.dao.AbstractDAO;
-import io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao;
-import io.appform.dropwizard.sharding.dao.MultiTenantCacheableRelationalDao;
-import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
-import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
-import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
 import io.appform.dropwizard.sharding.hibernate.SessionFactoryFactory;
 import io.appform.dropwizard.sharding.hibernate.SessionFactoryManager;

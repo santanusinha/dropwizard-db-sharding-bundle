@@ -131,7 +131,7 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     this.bucketResolver = new BucketResolver<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
   }
 
-  protected <U> BucketInfo getBucketInfo(final String tenantId,
+  public <U> BucketInfo getBucketInfo(final String tenantId,
                                          final String shardingKey,
                                          final Class<U> clazz) {
     return getBucketResolver().getBucketInfo(tenantId, shardingKey, clazz);
