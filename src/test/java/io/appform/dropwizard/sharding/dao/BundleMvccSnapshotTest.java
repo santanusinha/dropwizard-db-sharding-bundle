@@ -1,6 +1,5 @@
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.dao.*;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
@@ -27,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -81,6 +81,38 @@ class BundleMvccSnapshotTest {
 
     private LookupDao<TestEntity> writeLookupDao;
     private LookupDao<TestEntity> readLookupDao;
+
+    @Test
+    void sameNamespaceBundlesKeepIndependentCalculators() {
+        String singleShardUrl =
+                "jdbc:h2:mem:calculator_single_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
+        DBShardingBundleBase<TestConfig> singleShardBundle = initBundle(
+                new TestConfig(ShardedHibernateFactory.builder()
+                        .shards(List.of(buildWriteDataSourceFactory(singleShardUrl)))
+                        .shardingOptions(ShardingBundleOptions.builder().build())
+                        .build()));
+
+        String fourShardPrefix = "jdbc:h2:mem:calculator_four_" + System.nanoTime();
+        DBShardingBundleBase<TestConfig> fourShardBundle = initBundle(
+                new TestConfig(ShardedHibernateFactory.builder()
+                        .shards(List.of(
+                                buildWriteDataSourceFactory(fourShardPrefix + "_0"),
+                                buildWriteDataSourceFactory(fourShardPrefix + "_1"),
+                                buildWriteDataSourceFactory(fourShardPrefix + "_2"),
+                                buildWriteDataSourceFactory(fourShardPrefix + "_3")))
+                        .shardingOptions(ShardingBundleOptions.builder().build())
+                        .build()));
+
+        assertNotSame(
+                singleShardBundle.getShardCalculator(),
+                fourShardBundle.getShardCalculator());
+        int singleShard = singleShardBundle.getShardCalculator().shardId("customer");
+        int fourShard = fourShardBundle.getShardCalculator().shardId("customer");
+        assertTrue(singleShard >= 0
+                && singleShard < singleShardBundle.getSessionFactories().size());
+        assertTrue(fourShard >= 0
+                && fourShard < fourShardBundle.getSessionFactories().size());
+    }
 
     @BeforeEach
     void setUp() {

@@ -20,6 +20,9 @@ package io.appform.dropwizard.sharding.dao;
 import io.appform.dropwizard.sharding.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
@@ -32,10 +35,14 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntityWithAIId;
+import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
+import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
+import io.appform.dropwizard.sharding.sharding.ShardManager;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -50,6 +57,53 @@ import org.junit.jupiter.api.Test;
  * Core systems are not mocked. Uses H2 for testing.
  */
 public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBundleBasedTestBase {
+
+    @Test
+    void createsOneCalculatorPerTenant() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+
+        assertNotSame(
+                bundle.getShardCalculator("TENANT1"),
+                bundle.getShardCalculator("TENANT2"));
+        assertSame(
+                bundle.getShardCalculator("TENANT1"),
+                bundle.getShardCalculators().get("TENANT1"));
+    }
+
+    @Test
+    void failedInitializationDoesNotPublishPartialCalculators() {
+        AtomicInteger managersCreated = new AtomicInteger();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle =
+                new MultiTenantBalancedDBShardingBundle<TestConfig>(
+                        "io.appform.dropwizard.sharding.dao.testdata.entities") {
+                    @Override
+                    protected MultiTenantShardedHibernateFactory getConfig(TestConfig config) {
+                        return config.getShards();
+                    }
+
+                    @Override
+                    protected ShardManager createShardManager(
+                            int numShards,
+                            ShardBlacklistingStore blacklistingStore) {
+                        if (managersCreated.incrementAndGet() == 2) {
+                            throw new IllegalStateException("second tenant failed");
+                        }
+                        return super.createShardManager(numShards, blacklistingStore);
+                    }
+                };
+
+        bundle.initialize(bootstrap);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> bundle.run(testConfig, environment));
+        assertTrue(bundle.getShardCalculators().isEmpty());
+        assertThrows(
+                IllegalStateException.class,
+                () -> bundle.createParentObjectDao(Order.class));
+    }
 
     @Test
     public void testBundle() throws Exception {

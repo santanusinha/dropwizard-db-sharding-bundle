@@ -37,6 +37,7 @@ import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -214,6 +215,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     final ShardManager getShardManager() {
         return delegate.getShardManagers().get(dbNamespace);
+    }
+
+    final ShardCalculator<String> getShardCalculator() {
+        return delegate.getShardCalculator(dbNamespace);
     }
 
     public void registerObserver(TransactionObserver transactionObserver) {
