@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+- Replaced the global mutable shard-calculator lookup with per-tenant `ShardCalculator` instances built once inside the bundle's `run()` and injected directly into each DAO's constructor.
+- Made all DAO constructors (`LookupDao`, `RelationalDao`, `WrapperDao`, `CacheableLookupDao`, `CacheableRelationalDao`, and their multi-tenant counterparts) package-private so DAOs can only be constructed by bundle classes.
+- Moved `DBShardingBundleBase` and `MultiTenantDBShardingBundleBase` from `io.appform.dropwizard.sharding` to `io.appform.dropwizard.sharding.dao` so they retain access to the now package-private DAO constructors.
+- Widened `BundleCommonBase#getBucketInfo` from `protected` to `public` as a necessary consequence of the package move above.
+- `ShardCalculator` is now tenant-scoped: its constructor takes a `tenantId`, and `shardId`/`isOnValidShard` are now single-arg methods (the two-arg `(tenantId, key)` overloads were removed). `MultiTenantLookupDao`/`MultiTenantRelationalDao` no longer implement `ShardedDao<T>` (they expose `getShardCalculator(String tenantId)` instead of a no-arg accessor).
+
+  **Reason**: This is a breaking change for any consumer that directly constructed DAOs, imported the old `io.appform.dropwizard.sharding.DBShardingBundleBase`/`MultiTenantDBShardingBundleBase` package paths, or called the two-arg `ShardCalculator` methods. It removes a static/global shard-calculator registry in favor of instances scoped to and owned by the bundle, eliminating a class of bugs where shard-routing state could leak or be shared unexpectedly across tenants.
+
 ## [2.1.12-7]
 - Added logs to print the original exception during DB exception handling.
 
