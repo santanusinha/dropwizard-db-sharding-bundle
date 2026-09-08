@@ -17,6 +17,9 @@
 
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.dao.DBShardingBundleTestBase;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;

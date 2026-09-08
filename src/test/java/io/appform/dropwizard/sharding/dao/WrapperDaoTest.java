@@ -19,7 +19,7 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.dao.testdata.OrderDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;

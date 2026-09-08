@@ -17,6 +17,8 @@
 
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.MultiTenantDBShardingBundleBase;
+
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.sharding.InMemoryLocalShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
