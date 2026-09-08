@@ -23,6 +23,7 @@ import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Utility class for calculating shards.
@@ -30,28 +31,43 @@ import java.util.Map;
 @Slf4j
 public class ShardCalculator<T> {
 
+    private final String tenantId;
     private final Map<String, ShardManager> shardManagers;
     private final BucketIdExtractor<T> extractor;
 
+    @Deprecated
     public ShardCalculator(Map<String, ShardManager> shardManagers, BucketIdExtractor<T> extractor) {
+        this.tenantId = DBShardingBundleBase.DEFAULT_NAMESPACE;
         this.shardManagers = shardManagers;
         this.extractor = extractor;
     }
 
-    public int shardId(T key) {
-        return shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, key);
+    public ShardCalculator(
+            String tenantId,
+            ShardManager shardManager,
+            BucketIdExtractor<T> extractor) {
+        this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
+        this.shardManagers = Map.of(
+                tenantId,
+                Objects.requireNonNull(shardManager, "shardManager"));
+        this.extractor = Objects.requireNonNull(extractor, "extractor");
     }
 
+    public int shardId(T key) {
+        return shardId(tenantId, key);
+    }
+
+    @Deprecated
     public int shardId(String tenantId, T key) {
         int bucketId = extractor.bucketId(tenantId, key);
         return shardManagers.get(tenantId).shardForBucket(bucketId);
     }
 
     public boolean isOnValidShard(T key) {
-        int bucketId = extractor.bucketId(DBShardingBundleBase.DEFAULT_NAMESPACE, key);
-        return shardManagers.get(DBShardingBundleBase.DEFAULT_NAMESPACE).isMappedToValidShard(bucketId);
+        return isOnValidShard(tenantId, key);
     }
 
+    @Deprecated
     public boolean isOnValidShard(String tenantId, T key) {
         int bucketId = extractor.bucketId(tenantId, key);
         return shardManagers.get(tenantId).isMappedToValidShard(bucketId);
