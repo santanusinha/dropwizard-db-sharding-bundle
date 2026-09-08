@@ -47,8 +47,6 @@ import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.scroll.ScrollResultItem;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.appform.dropwizard.sharding.utils.InternalUtils;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
@@ -99,14 +97,12 @@ import static io.appform.dropwizard.sharding.query.QueryUtils.equalityFilter;
  * {@link LookupKey} The entity can be retrieved from any shard using the key.
  */
 @Slf4j
-public class MultiTenantLookupDao<T> implements ShardedDao<T> {
+public class MultiTenantLookupDao<T> {
 
     private final Map<String, List<SessionFactory>> sessionFactories;
     private final Map<String, List<LookupDaoPriv>> daos = Maps.newHashMap();
     private final Class<T> entityClass;
-    @Getter
-    private final ShardCalculator<String> shardCalculator;
-    @Getter
+    private final Map<String, ShardCalculator<String>> shardCalculators;
     private final Map<String, ShardingBundleOptions> shardingOptions;
     private final Field keyField;
     private final Map<String, TransactionExecutor> transactionExecutor = Maps.newHashMap();
@@ -124,7 +120,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *                           shards.
      * @param entityClass        The Class representing the type of entities managed by this
      *                           LookupDao.
-     * @param shardManagers      A map of ShardManager to instantiate ShardCalculator.
+     * @param shardCalculators   A map of per-tenant ShardCalculator instances.
      * @param shardingOptions    ShardingBundleOptions specifying additional sharding configuration
      *                           options.
      * @param shardInfoProviders A ShardInfoProvider for retrieving shard information.
@@ -133,10 +129,10 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      *                                  LookupKey, if the key field is not accessible, or if it is not
      *                                  of type String.
      */
-    public MultiTenantLookupDao(
+    MultiTenantLookupDao(
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
-            Map<String, ShardManager> shardManagers,
+            Map<String, ShardCalculator<String>> shardCalculators,
             Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
@@ -145,7 +141,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             daos.put(tenantId, factories.stream().map(LookupDaoPriv::new).collect(Collectors.toList()));
         });
         this.entityClass = entityClass;
-        this.shardCalculator = new ShardCalculator<>(shardManagers, new ConsistentHashBucketIdExtractor<>(shardManagers));
+        this.shardCalculators = shardCalculators;
         this.shardingOptions = shardingOptions;
         this.shardInfoProviders = shardInfoProviders;
         this.observer = observer;
@@ -206,7 +202,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public <U> U get(String tenantId, String key, Function<T, U> handler) throws Exception {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, key);
+        int shardId = shardCalculators.get(tenantId).shardId(key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
@@ -222,7 +218,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                      Function<T, U> handler)
             throws Exception {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, key);
+        int shardId = shardCalculators.get(tenantId).shardId(key);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = GetByLookupKey.<T, U>builder()
                 .id(key)
@@ -278,7 +274,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     public <U> U save(String tenantId, T entity, Function<T, U> handler) throws Exception {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         final String key = keyField.get(entity).toString();
-        int shardId = shardCalculator.shardId(tenantId, key);
+        int shardId = shardCalculators.get(tenantId).shardId(key);
         log.debug("Saving entity of type {} with key {} to shard {}", entityClass.getSimpleName(), key,
                 shardId);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
@@ -296,7 +292,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                       UnaryOperator<T> updater,
                                       Supplier<T> entityGenerator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        val shardId = shardCalculator.shardId(tenantId, id);
+        val shardId = shardCalculators.get(tenantId).shardId(id);
         val dao = daos.get(tenantId).get(shardId);
         val opContext = CreateOrUpdateByLookupKey.<T>builder()
                 .id(id)
@@ -327,7 +323,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public boolean updateInLock(String tenantId, String id, Function<Optional<T>, T> updater) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return updateImpl(tenantId, id, dao::getLockedForWrite, updater, shardId);
     }
@@ -348,7 +344,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public boolean update(String tenantId, String id, Function<Optional<T>, T> updater) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return updateImpl(tenantId, id, dao::get, updater, shardId);
     }
@@ -370,7 +366,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public int updateUsingQuery(String tenantId, String id, UpdateOperationMeta updateOperationMeta) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = UpdateByQuery.builder()
                 .updater(dao::update)
@@ -437,7 +433,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public LockedContext<T> lockAndGetExecutor(String tenantId, final String id) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(id),
                 DaoType.LOOKUP, entityClass, shardInfoProviders.get(tenantId), observer);
@@ -465,7 +461,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
     public ReadOnlyContext<T> readOnlyExecutor(String tenantId, String id,
                                                UnaryOperator<Criteria> criteriaUpdater) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
@@ -501,7 +497,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
                                                UnaryOperator<Criteria> criteriaUpdater,
                                                Supplier<Boolean> entityPopulator) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new ReadOnlyContext<>(tenantId, shardId,
                 dao.sessionFactory,
@@ -532,7 +528,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, dao::save,
                 DaoType.LOOKUP, entity,
@@ -801,7 +797,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
         Map<Integer, List<String>> lookupKeysGroupByShards = keys.stream()
                 .collect(
-                        Collectors.groupingBy(key -> shardCalculator.shardId(tenantId, key),
+                        Collectors.groupingBy(key -> shardCalculators.get(tenantId).shardId(key),
                                 Collectors.toList()));
         return lookupKeysGroupByShards.keySet().stream().map(shardId -> {
             try {
@@ -837,7 +833,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public <U> U runInSession(String tenantId, String id, Function<Session, U> handler) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         LookupDaoPriv dao = daos.get(tenantId).get(shardId);
         val opContext = RunInSession.<U>builder()
                 .handler(handler)
@@ -886,7 +882,7 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
      */
     public boolean delete(String tenantId, String id) {
         Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
-        int shardId = shardCalculator.shardId(tenantId, id);
+        int shardId = shardCalculators.get(tenantId).shardId(id);
         val opContext = DeleteByLookupKey.builder()
                 .id(id)
                 .handler(daos.get(tenantId).get(shardId)::delete)

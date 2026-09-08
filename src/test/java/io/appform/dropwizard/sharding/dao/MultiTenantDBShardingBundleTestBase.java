@@ -15,15 +15,16 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
+
+import io.appform.dropwizard.sharding.MultiTenantBundleBasedTestBase;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import io.appform.dropwizard.sharding.dao.RelationalDao;
+import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
@@ -49,21 +50,18 @@ import org.junit.jupiter.api.Test;
  * Top level test. Saves an order using custom dao to a shard belonging to a particular customer.
  * Core systems are not mocked. Uses H2 for testing.
  */
-public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
+public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBundleBasedTestBase {
 
     @Test
     public void testBundle() throws Exception {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
         bundle.run(testConfig, environment);
         bundle.registerObserver(new TimerObserver());
         bundle.registerListener(new LoggingListener());
-        WrapperDao<Order, OrderDao> dao = bundle.createWrapperDao(OrderDao.class);
-
-        RelationalDao<Order> rDao = bundle.createRelatedObjectDao(Order.class);
-
-        RelationalDao<OrderItem> orderItemDao = bundle.createRelatedObjectDao(OrderItem.class);
-
+        WrapperDao<Order, OrderDao> tenant1Dao = bundle.createWrapperDao("TENANT1", OrderDao.class);
+        MultiTenantRelationalDao<Order> tenant1RelDao = bundle.createRelatedObjectDao(Order.class);
+        MultiTenantRelationalDao<OrderItem> tenant1OrderItemDao = bundle.createRelatedObjectDao(OrderItem.class);
 
         final String customer = "customer1";
 
@@ -72,7 +70,6 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
                 .orderId("OD00001")
                 .amount(100)
                 .build();
-
         OrderItem itemA = OrderItem.builder()
                 .order(order)
                 .name("Item A")
@@ -81,43 +78,27 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
                 .order(order)
                 .name("Item B")
                 .build();
-
-        order.setItems(ImmutableList.of(itemA, itemB));
-
-        Order saveResult = dao.forParent(customer).save(order);
-
+        order.setItems(List.of(itemA, itemB));
+        Order saveResult = tenant1Dao.forParent(customer).save(order);
         long saveId = saveResult.getId();
-
-        Order result = dao.forParent(customer).get(saveId);
-
+        Order result = tenant1Dao.forParent(customer).get(saveId);
         assertEquals(saveResult.getId(), result.getId());
         assertEquals(saveResult.getId(), result.getId());
-
-        Optional<Order> newOrder = rDao.save("customer1", order);
-
+        Optional<Order> newOrder = tenant1RelDao.save("TENANT1", "customer1", order);
         assertTrue(newOrder.isPresent());
-
         long generatedId = newOrder.get().getId();
-
-        Optional<Order> checkOrder = rDao.get("customer1", generatedId);
-
+        Optional<Order> checkOrder = tenant1RelDao.get("TENANT1","customer1", generatedId);
         assertEquals(100, checkOrder.get().getAmount());
-
-        rDao.update("customer1", saveId, foundOrder -> {
+        tenant1RelDao.update("TENANT1","customer1", saveId, foundOrder -> {
             foundOrder.setAmount(200);
             return foundOrder;
         });
-
-        Optional<Order> modifiedOrder = rDao.get("customer1", saveId);
+        Optional<Order> modifiedOrder = tenant1RelDao.get("TENANT1","customer1", saveId);
         assertEquals(200, modifiedOrder.get().getAmount());
-
         assertTrue(checkOrder.isPresent());
-
         assertEquals(newOrder.get().getId(), checkOrder.get().getId());
-
         Map<String, Object> blah = Maps.newHashMap();
-
-        rDao.get("customer1", generatedId, foundOrder -> {
+        tenant1RelDao.get("TENANT1","customer1", generatedId, foundOrder -> {
             if (null == foundOrder) {
                 return Collections.emptyList();
             }
@@ -125,15 +106,13 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
             blah.put("count", itemList.size());
             return itemList;
         });
-
         assertEquals(2, blah.get("count"));
-
-        List<OrderItem> orderItems = orderItemDao.select("customer1",
+        List<OrderItem> orderItems = tenant1OrderItemDao.select("TENANT1","customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
         assertEquals(2, orderItems.size());
-        orderItemDao.update("customer1",
+        tenant1OrderItemDao.update("TENANT1","customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")),
@@ -142,8 +121,7 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
                         .order(item.getOrder())
                         .name("Item AA")
                         .build());
-
-        orderItems = orderItemDao.select("customer1",
+        orderItems = tenant1OrderItemDao.select("TENANT1","customer1",
                 DetachedCriteria.forClass(OrderItem.class)
                         .createAlias("order", "o")
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
@@ -153,17 +131,19 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
 
     @Test
     public void testBundleWithShardBlacklisted() throws Exception {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
         bundle.run(testConfig, environment);
-        bundle.getShardManager().blacklistShard(1);
+        //one for each tenant
+        assertEquals(2, bundle.healthStatus().size());
+        bundle.getShardManagers().get("TENANT1").blacklistShard(1);
         //no healthchecks for blacklisting aware bundle
-        assertEquals(0, bundle.healthStatus().size());
+        assertEquals(0, bundle.healthStatus().get("TENANT1").size());
     }
 
     @Test
     public void testRegisterEntityClassesBeforeRun() {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
         bundle.registerEntities(PendingRegistrationTestEntity.class, PendingRegistrationTestEntityWithAIId.class);
         bundle.run(testConfig, environment);
@@ -177,10 +157,9 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
     @SneakyThrows
     @SuppressWarnings("unchecked")
     public void testRegisterAlreadyRegisteredEntityClassesBeforeRun() {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
-        final var delegate = FieldUtils.readField(bundle, "delegate", true);
-        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(delegate, "initialisedEntities", true);
+        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(bundle, "initialisedEntities", true);
         final var alreadyRegisteredEntityClasses = initializedEntities.toArray(new Class<?>[0]);
         Assertions.assertDoesNotThrow(() -> bundle.registerEntities(alreadyRegisteredEntityClasses));
         Assertions.assertDoesNotThrow(() -> bundle.run(testConfig, environment));
@@ -188,7 +167,7 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
 
     @Test
     public void testRegisterEntityPackagesBeforeRun() {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
         bundle.registerEntities(List.of("io.appform.dropwizard.sharding.dao.testdata.pending"));
         bundle.run(testConfig, environment);
@@ -202,10 +181,9 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
     @SneakyThrows
     @SuppressWarnings("unchecked")
     public void testRegisterAlreadyRegisteredEntityPackagesBeforeRun() {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
-        final var delegate = FieldUtils.readField(bundle, "delegate", true);
-        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(delegate, "initialisedEntities", true);
+        final var initializedEntities = (List<Class<?>>) FieldUtils.readField(bundle, "initialisedEntities", true);
         final var alreadyRegisteredEntityPackages = initializedEntities.stream()
                 .map(Class::getPackageName)
                 .collect(Collectors.toList());
@@ -215,7 +193,7 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
 
     @Test
     public void testRegisterEntityClassesFailsAfterRun() {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
         bundle.run(testConfig, environment);
         final var unsupportedOperationException = Assertions.assertThrows(UnsupportedOperationException.class, () -> {
@@ -231,7 +209,7 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
 
     @Test
     public void testRegisterEntityPackagesFailsAfterRun() {
-        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
         bundle.initialize(bootstrap);
         bundle.run(testConfig, environment);
         final var packagesToRegister = List.of("io.appform.dropwizard.sharding.dao.testdata.pending");

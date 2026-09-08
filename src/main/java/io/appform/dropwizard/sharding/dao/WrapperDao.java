@@ -17,12 +17,9 @@
 
 package io.appform.dropwizard.sharding.dao;
 
-import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardedTransaction;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
@@ -31,7 +28,6 @@ import org.hibernate.SessionFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -44,11 +40,10 @@ import java.util.stream.Collectors;
  * - Use {@link RelationalDao} where-ever possible as it will be slight more performant than this due to lack of any proxy.
  */
 @Slf4j
-public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao<T> {
+public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
 
     private String dbNamespace;
     private List<DaoType> daos;
-    @Getter
     private final ShardCalculator<String> shardCalculator;
 
     /**
@@ -56,13 +51,13 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      *
      * @param sessionFactories List of session factories. One for each shard.
      * @param daoClass         Class for the dao.
-     * @param shardManager     ShardManager to instantiate ShardCalculator.
+     * @param shardCalculator  ShardCalculator to compute the shard for a parent key.
      */
-    public WrapperDao(String dbNamespace,
+    WrapperDao(String dbNamespace,
                       List<SessionFactory> sessionFactories,
                       Class<DaoType> daoClass,
-                      ShardManager shardManager) {
-        this(dbNamespace, sessionFactories, daoClass, null, null, shardManager);
+                      ShardCalculator<String> shardCalculator) {
+        this(dbNamespace, sessionFactories, daoClass, null, null, shardCalculator);
     }
 
     /**
@@ -72,17 +67,16 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @param daoClass                     Class for the dao.
      * @param extraConstructorParamClasses Class names for constructor parameters to the DAO other than SessionFactory
      * @param extraConstructorParamObjects Objects for constructor parameters to the DAO other than SessionFactory
-     * @param shardManager                 ShardManager to instantiateShardCalculator
+     * @param shardCalculator              ShardCalculator to compute the shard for a parent key.
      */
-     public WrapperDao(
+     WrapperDao(
              String dbNamespace,
              List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
              Class[] extraConstructorParamClasses,
              Class[] extraConstructorParamObjects,
-             ShardManager shardManager) {
+             ShardCalculator<String> shardCalculator) {
         this.dbNamespace = dbNamespace;
-        this.shardCalculator = new ShardCalculator<>(Map.of(dbNamespace, shardManager),
-                new ConsistentHashBucketIdExtractor<>(Map.of(dbNamespace, shardManager)));
+        this.shardCalculator = shardCalculator;
         this.daos = sessionFactories.stream().map((SessionFactory sessionFactory) -> {
             Enhancer enhancer = new Enhancer();
             enhancer.setUseFactory(false);
@@ -117,7 +111,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao
      * @return Wrapper for parent dao
      */
     public DaoType forParent(final String parentKey) {
-        return daos.get(shardCalculator.shardId(dbNamespace, parentKey));
+        return daos.get(shardCalculator.shardId(parentKey));
     }
 
     @SuppressWarnings("unchecked")

@@ -15,7 +15,7 @@
  *
  */
 
-package io.appform.dropwizard.sharding;
+package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.appform.dropwizard.sharding.caching.LookupCache;
@@ -23,12 +23,6 @@ import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.MetricConfig;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
-import io.appform.dropwizard.sharding.dao.AbstractDAO;
-import io.appform.dropwizard.sharding.dao.CacheableLookupDao;
-import io.appform.dropwizard.sharding.dao.CacheableRelationalDao;
-import io.appform.dropwizard.sharding.dao.LookupDao;
-import io.appform.dropwizard.sharding.dao.RelationalDao;
-import io.appform.dropwizard.sharding.dao.WrapperDao;
 import io.appform.dropwizard.sharding.filters.TransactionFilter;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
@@ -37,6 +31,7 @@ import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -133,6 +128,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     public List<SessionFactory> getSessionFactories() {
         return delegate.getSessionFactories().get(dbNamespace);
+    }
+
+    public ShardCalculator<String> getShardCalculator() {
+        return delegate.getShardCalculator(dbNamespace);
     }
 
     public List<Class<?>> getInitialisedEntities() {

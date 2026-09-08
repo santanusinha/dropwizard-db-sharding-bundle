@@ -17,6 +17,9 @@
 
 package io.appform.dropwizard.sharding;
 
+import io.appform.dropwizard.sharding.dao.MultiTenantDBShardingBundleBase;
+import io.appform.dropwizard.sharding.dao.MultiTenantDBShardingBundleTestBase;
+
 
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.testdata.entities.Order;

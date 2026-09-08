@@ -21,7 +21,6 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
@@ -50,7 +49,7 @@ import java.util.function.UnaryOperator;
  * The entity can be retrieved from any shard using the key.
  */
 @Slf4j
-public class LookupDao<T> implements ShardedDao<T> {
+public class LookupDao<T> {
 
     private final String dbNamespace;
 
@@ -63,7 +62,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      * distributed across multiple shards.
      *
      */
-    public LookupDao(final String dbNamespace,
+    LookupDao(final String dbNamespace,
                      final MultiTenantLookupDao<T> delegate) {
         this.dbNamespace = dbNamespace;
         this.delegate = delegate;
@@ -518,11 +517,6 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     protected Field getKeyField() {
         return delegate.getKeyField();
-    }
-
-    @Override
-    public ShardCalculator<String> getShardCalculator() {
-        return delegate.getShardCalculator();
     }
 
 

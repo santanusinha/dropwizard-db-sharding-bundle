@@ -2,7 +2,7 @@ package io.appform.dropwizard.sharding.observers;
 
 import io.appform.dropwizard.sharding.BundleBasedTestBase;
 import io.appform.dropwizard.sharding.DBShardingBundle;
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.dao.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.exceptions.TransactionFilteredException;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;

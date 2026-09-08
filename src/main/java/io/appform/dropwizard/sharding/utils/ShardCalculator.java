@@ -17,43 +17,31 @@
 
 package io.appform.dropwizard.sharding.utils;
 
-import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import lombok.extern.slf4j.Slf4j;
 
-import java.util.Map;
+import java.util.Objects;
 
 /**
- * Utility class for calculating shards.
+ * Utility class for calculating shards. One instance is bound to a single tenant.
  */
-@Slf4j
 public class ShardCalculator<T> {
 
-    private final Map<String, ShardManager> shardManagers;
+    private final String tenantId;
+    private final ShardManager shardManager;
     private final BucketIdExtractor<T> extractor;
 
-    public ShardCalculator(Map<String, ShardManager> shardManagers, BucketIdExtractor<T> extractor) {
-        this.shardManagers = shardManagers;
-        this.extractor = extractor;
+    public ShardCalculator(String tenantId, ShardManager shardManager, BucketIdExtractor<T> extractor) {
+        this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
+        this.shardManager = Objects.requireNonNull(shardManager, "shardManager");
+        this.extractor = Objects.requireNonNull(extractor, "extractor");
     }
 
     public int shardId(T key) {
-        return shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, key);
-    }
-
-    public int shardId(String tenantId, T key) {
-        int bucketId = extractor.bucketId(tenantId, key);
-        return shardManagers.get(tenantId).shardForBucket(bucketId);
+        return shardManager.shardForBucket(extractor.bucketId(tenantId, key));
     }
 
     public boolean isOnValidShard(T key) {
-        int bucketId = extractor.bucketId(DBShardingBundleBase.DEFAULT_NAMESPACE, key);
-        return shardManagers.get(DBShardingBundleBase.DEFAULT_NAMESPACE).isMappedToValidShard(bucketId);
-    }
-
-    public boolean isOnValidShard(String tenantId, T key) {
-        int bucketId = extractor.bucketId(tenantId, key);
-        return shardManagers.get(tenantId).isMappedToValidShard(bucketId);
+        return shardManager.isMappedToValidShard(extractor.bucketId(tenantId, key));
     }
 }

@@ -29,6 +29,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -44,6 +46,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -90,6 +93,10 @@ public class MultiTenantCacheableLookupDaoTest {
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    final Map<String, ShardCalculator<String>> shardCalculators = shardManager.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey,
+                entry -> new ShardCalculator<>(entry.getKey(), entry.getValue(),
+                        new ConsistentHashBucketIdExtractor<>(Map.of(entry.getKey(), entry.getValue())))));
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -99,7 +106,7 @@ public class MultiTenantCacheableLookupDaoTest {
       lookupDao = new MultiTenantCacheableLookupDao<>(
               sessionFactories,
               TestEntity.class,
-              shardManager,
+              shardCalculators,
               Map.of("TENANT1", new LookupCache<TestEntity>() {
 
                           private Map<String, TestEntity> cache = new HashMap<>();
@@ -141,7 +148,7 @@ public class MultiTenantCacheableLookupDaoTest {
               shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     phoneDao = new MultiTenantCacheableLookupDao<>(sessionFactories,
         Phone.class,
-        shardManager,
+        shardCalculators,
         Map.of("TENANT1",
             new LookupCache<Phone>() {
 
@@ -184,7 +191,7 @@ public class MultiTenantCacheableLookupDaoTest {
         shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     transactionDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Transaction.class,
-        shardManager,
+        shardCalculators,
         Map.of("TENANT1",
             new RelationalCache<Transaction>() {
 
@@ -312,7 +319,7 @@ public class MultiTenantCacheableLookupDaoTest {
             }), shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     auditDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Audit.class,
-        shardManager,
+        shardCalculators,
         Map.of("TENANT1", new RelationalCache<Audit>() {
 
           private Map<String, Object> cache = new HashMap<>();
