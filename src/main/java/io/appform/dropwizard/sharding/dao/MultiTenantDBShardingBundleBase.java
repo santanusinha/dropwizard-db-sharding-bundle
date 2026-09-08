@@ -76,6 +76,8 @@ import org.hibernate.SessionFactory;
 public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends
     BundleCommonBase<T> {
 
+  private static final String UNKNOWN_TENANT_MESSAGE = "Unknown tenant: ";
+
   @Getter
   private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
 
@@ -255,7 +257,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId, Class<DaoType> daoTypeClass) {
     Preconditions.checkArgument(
             this.sessionFactories.containsKey(tenantId) && this.shardCalculators.containsKey(tenantId),
-            "Unknown tenant: " + tenantId);
+            UNKNOWN_TENANT_MESSAGE + tenantId);
     return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass, this.shardCalculators.get(tenantId));
   }
 
@@ -266,13 +268,13 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       Class[] extraConstructorParamObjects) {
     Preconditions.checkArgument(
             this.sessionFactories.containsKey(tenantId) && this.shardCalculators.containsKey(tenantId),
-            "Unknown tenant: " + tenantId);
+            UNKNOWN_TENANT_MESSAGE + tenantId);
     return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
         extraConstructorParamClasses, extraConstructorParamObjects, this.shardCalculators.get(tenantId));
   }
 
   public ShardCalculator<String> getShardCalculator(String tenantId) {
-    Preconditions.checkArgument(shardCalculators.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    Preconditions.checkArgument(shardCalculators.containsKey(tenantId), UNKNOWN_TENANT_MESSAGE + tenantId);
     return shardCalculators.get(tenantId);
   }
 
