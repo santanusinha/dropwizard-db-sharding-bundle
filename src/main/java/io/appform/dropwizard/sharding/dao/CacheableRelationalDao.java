@@ -39,7 +39,7 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
      * The entity class should designate one field as the primary key using the `@Id` annotation.
      *
      */
-    public CacheableRelationalDao(String dbNamespace,
+    CacheableRelationalDao(String dbNamespace,
                                   MultiTenantCacheableRelationalDao<T> delegate) {
         super(dbNamespace, delegate);
         this.delegate = delegate;
