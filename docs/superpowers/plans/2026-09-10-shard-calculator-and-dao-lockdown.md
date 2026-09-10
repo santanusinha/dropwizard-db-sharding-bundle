@@ -62,6 +62,7 @@ The full suite spins up in-memory H2 databases and takes a few minutes. Run the 
 - `src/main/java/io/appform/dropwizard/sharding/dao/CacheableRelationalDao.java`
 - `src/main/java/io/appform/dropwizard/sharding/dao/WrapperDao.java`
 - `README.md`
+- `CHANGELOG.md`
 
 **Deleted:**
 
@@ -1283,6 +1284,7 @@ git commit -m "build: seal the DAO packages in the published jar"
 **Files:**
 - Modify: `pom.xml:9`
 - Modify: `README.md`
+- Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: Bump the version**
 
@@ -1319,9 +1321,27 @@ int shard = bundle.getShardCalculators().get(tenantId).shardId(parentKey);
 ```
 ~~~
 
-- [ ] **Step 3: Record the breaking changes**
+- [ ] **Step 3: Record the breaking changes in the changelog**
 
-The repository has no `CHANGELOG.md`, so the README carries the upgrade notes. Add this section to `README.md`:
+Add a new entry at the top of `CHANGELOG.md`, directly under the `All notable changes…` line, following the existing style:
+
+~~~markdown
+## [2.1.12-10]
+
+### Changed (breaking)
+- **Java 17 is now required.** The published bytecode targets Java 17 so the DAO hierarchies can be `sealed`.
+- **`ShardCalculator` is single-tenant.** `shardId(tenantId, key)` becomes `shardId(key)` and `isOnValidShard(tenantId, key)` becomes `isOnValidShard(key)`. The bundle owns one calculator per tenant, reachable via `getShardCalculators()`.
+- **`BucketIdExtractor` is single-tenant.** `bucketId(tenantId, id)` becomes `bucketId(id)`. Custom implementations must be updated.
+- **`ShardedDao` and all `getShardCalculator()` accessors have been removed.**
+- **DAO constructors are package private and the classes are sealed or final.** Obtain DAOs from the bundle's `createParentObjectDao` / `createRelatedObjectDao` / `createWrapperDao` methods.
+- The published jar seals `io/appform/dropwizard/sharding/dao/` and `io/appform/dropwizard/sharding/dao/operations/`.
+
+  **Reason**: each DAO previously built its own `ShardCalculator` and `ConsistentHashBucketIdExtractor`, duplicating one object per DAO per tenant, and public constructors let clients bypass the bundle entirely.
+~~~
+
+- [ ] **Step 4: Repeat the upgrade notes in the README**
+
+Add this section to `README.md`:
 
 ~~~markdown
 ## Upgrading to 2.1.12-10
@@ -1339,15 +1359,15 @@ Breaking changes:
    the bundle's `createParentObjectDao` / `createRelatedObjectDao` / `createWrapperDao` methods.
 ~~~
 
-- [ ] **Step 4: Final verification**
+- [ ] **Step 5: Final verification**
 
 Run: `mvn -q clean test && mvn -q -DskipTests package && unzip -p target/*.jar META-INF/MANIFEST.MF | grep Sealed`
 Expected: BUILD SUCCESS twice, then two `Sealed: true` lines.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add pom.xml README.md
+git add pom.xml README.md CHANGELOG.md
 git commit -m "docs: document DAO creation and 2.1.12-10 breaking changes"
 ```
 
