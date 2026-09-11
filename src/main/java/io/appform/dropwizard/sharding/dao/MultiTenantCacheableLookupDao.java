@@ -40,7 +40,7 @@ import java.util.function.Function;
  * {@link LookupKey} The entity can be retrieved from any shard using the key.
  */
 @Slf4j
-public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
+public final class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
 
   private Map<String, LookupCache<T>> cache;
 
@@ -58,7 +58,7 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
    * @param observer          A TransactionObserver for observing transaction events.
    */
-  public MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
+  MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
                                        Class<T> entityClass,
                                        Map<String, ShardCalculator<String>> shardCalculators,
                                        Map<String, LookupCache<T>> cache,

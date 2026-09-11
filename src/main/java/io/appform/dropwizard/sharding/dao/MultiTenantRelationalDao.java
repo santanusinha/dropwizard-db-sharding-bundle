@@ -107,7 +107,7 @@ import static io.appform.dropwizard.sharding.query.QueryUtils.equalityFilter;
  */
 @Slf4j
 @SuppressWarnings({"unchecked", "UnusedReturnValue"})
-public class MultiTenantRelationalDao<T> {
+public sealed class MultiTenantRelationalDao<T> permits MultiTenantCacheableRelationalDao {
 
     private final class RelationalDaoPriv extends AbstractDAO<T> {
 
@@ -294,7 +294,7 @@ public class MultiTenantRelationalDao<T> {
      *                                  as @Id, if the designated key field is not accessible, or if
      *                                  it is not of type String.
      */
-    public MultiTenantRelationalDao(
+    MultiTenantRelationalDao(
             Map<String, List<SessionFactory>> sessionFactories,
             Class<T> entityClass,
             Map<String, ShardCalculator<String>> shardCalculators,
