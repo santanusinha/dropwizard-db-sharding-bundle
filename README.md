@@ -149,7 +149,7 @@ The project dependencies are:
 <dependency>
     <groupId>io.appform.dropwizard.sharding</groupId>
     <artifactId>db-sharding-bundle</artifactId>
-    <version>2.1.10-11</version>
+    <version>2.1.12-10</version>
 </dependency>
 ```
 
@@ -173,8 +173,61 @@ BalancedDBShardingBundle<Configuration> dbShardingBundle = new BalancedDBShardin
 
 While running your application, ensure to set `-Dyour_namespace.db.shards=32` property. By default `db.shards=2`
 
+## Creating DAOs
+
+DAOs are created by the bundle, not with `new`. Their constructors are package private and the
+classes are sealed or final, so the bundle's factory methods are the only construction path:
+
+```java
+LookupDao<Order> orderDao = bundle.createParentObjectDao(Order.class);
+RelationalDao<OrderItem> itemDao = bundle.createRelatedObjectDao(OrderItem.class);
+WrapperDao<Order, OrderDao> wrapperDao = bundle.createWrapperDao(OrderDao.class);
+```
+
+Passing a cache manager returns the cacheable variant instead:
+
+```java
+CacheableLookupDao<Order> cachedOrderDao = bundle.createParentObjectDao(Order.class, lookupCache);
+```
+
+The multi-tenant bundles expose the same method names, returning the `MultiTenant*` variants whose
+methods each take a tenant id. `createWrapperDao` is the exception: it takes the tenant id at
+creation time and returns a plain `WrapperDao` already bound to that tenant.
+
+### Shard calculators
+
+Each tenant gets one `ShardCalculator`, built and owned by the bundle. A calculator is bound to a
+single tenant, so it takes no tenant id:
+
+```java
+int shard = bundle.getShardCalculator().shardId(parentKey);
+```
+
+The multi-tenant bundles expose the whole map instead, keyed by tenant id:
+
+```java
+int shard = bundle.getShardCalculators().get(tenantId).shardId(parentKey);
+```
+
+## Upgrading to 2.1.12-10
+
+Breaking changes:
+
+1. **Java 17 is required.** The published bytecode now targets Java 17.
+2. **`ShardCalculator` is single-tenant.** `shardId(tenantId, key)` becomes `shardId(key)` and
+   `isOnValidShard(tenantId, key)` becomes `isOnValidShard(key)`. Get the tenant's calculator from
+   `getShardCalculators()` on the bundle.
+3. **`BucketIdExtractor` is single-tenant.** `bucketId(tenantId, id)` becomes `bucketId(id)`.
+   Custom implementations must be updated.
+4. **`ShardedDao` and all `getShardCalculator()` methods are removed.** Get the calculator from the
+   bundle instead: `bundle.getShardCalculator()` on a single-tenant bundle, or
+   `bundle.getShardCalculators().get(tenantId)` on a multi-tenant one.
+5. **DAO constructors are package private and the classes are sealed or final.** Obtain DAOs from
+   the bundle's `createParentObjectDao` / `createRelatedObjectDao` / `createWrapperDao` methods.
+
 # NOTE
 
 - Package and group id has changed from `io.dropwizard.sharding` to `io.appfrom.dropwizard.sharding` from 1.3.12-3.
 - static create* methods have been replaced with instance methods from 1.3.13-4
 - Java compatibility moved to 11 (-release 11) from 2.1.10-1 onwards
+- Java compatibility moved to 17 (-release 17) from 2.1.12-10 onwards
