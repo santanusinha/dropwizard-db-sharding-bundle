@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
@@ -99,31 +100,31 @@ public class LookupDaoTest {
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 DaoFactory.INSTANCE.createMultiTenantLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        TestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        TestEntity.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         lookupDaoForAI = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 DaoFactory.INSTANCE.createMultiTenantLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        TestEntityWithAIId.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        TestEntityWithAIId.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         phoneDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 DaoFactory.INSTANCE.createMultiTenantLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        Phone.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Phone.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         transactionDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 DaoFactory.INSTANCE.createMultiTenantRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        Transaction.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Transaction.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         auditDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 DaoFactory.INSTANCE.createMultiTenantRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        Audit.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Audit.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));

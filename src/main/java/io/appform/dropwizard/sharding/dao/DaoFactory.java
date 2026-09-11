@@ -5,7 +5,7 @@ import io.appform.dropwizard.sharding.caching.LookupCache;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import org.hibernate.SessionFactory;
 
 import java.util.List;
@@ -24,46 +24,46 @@ public enum DaoFactory {
     public <T> MultiTenantLookupDao<T> createMultiTenantLookupDao(
             final Map<String, List<SessionFactory>> sessionFactories,
             final Class<T> entityClass,
-            final Map<String, ShardManager> shardManagers,
+            final Map<String, ShardCalculator<String>> shardCalculators,
             final Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
-        return new MultiTenantLookupDao<>(sessionFactories, entityClass, shardManagers,
+        return new MultiTenantLookupDao<>(sessionFactories, entityClass, shardCalculators,
                 shardingOptions, shardInfoProviders, observer);
     }
 
     public <T> MultiTenantCacheableLookupDao<T> createMultiTenantCacheableLookupDao(
             final Map<String, List<SessionFactory>> sessionFactories,
             final Class<T> entityClass,
-            final Map<String, ShardManager> shardManagers,
+            final Map<String, ShardCalculator<String>> shardCalculators,
             final Map<String, LookupCache<T>> cache,
             final Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
-        return new MultiTenantCacheableLookupDao<>(sessionFactories, entityClass, shardManagers,
+        return new MultiTenantCacheableLookupDao<>(sessionFactories, entityClass, shardCalculators,
                 cache, shardingOptions, shardInfoProviders, observer);
     }
 
     public <T> MultiTenantRelationalDao<T> createMultiTenantRelationalDao(
             final Map<String, List<SessionFactory>> sessionFactories,
             final Class<T> entityClass,
-            final Map<String, ShardManager> shardManagers,
+            final Map<String, ShardCalculator<String>> shardCalculators,
             final Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
-        return new MultiTenantRelationalDao<>(sessionFactories, entityClass, shardManagers,
+        return new MultiTenantRelationalDao<>(sessionFactories, entityClass, shardCalculators,
                 shardingOptions, shardInfoProviders, observer);
     }
 
     public <T> MultiTenantCacheableRelationalDao<T> createMultiTenantCacheableRelationalDao(
             final Map<String, List<SessionFactory>> sessionFactories,
             final Class<T> entityClass,
-            final Map<String, ShardManager> shardManagers,
+            final Map<String, ShardCalculator<String>> shardCalculators,
             final Map<String, RelationalCache<T>> cache,
             final Map<String, ShardingBundleOptions> shardingOptions,
             final Map<String, ShardInfoProvider> shardInfoProviders,
             final TransactionObserver observer) {
-        return new MultiTenantCacheableRelationalDao<>(sessionFactories, entityClass, shardManagers,
+        return new MultiTenantCacheableRelationalDao<>(sessionFactories, entityClass, shardCalculators,
                 cache, shardingOptions, shardInfoProviders, observer);
     }
 
@@ -93,8 +93,8 @@ public enum DaoFactory {
             final String tenantId,
             final List<SessionFactory> sessionFactories,
             final Class<DaoType> daoClass,
-            final ShardManager shardManager) {
-        return new WrapperDao<>(tenantId, sessionFactories, daoClass, shardManager);
+            final ShardCalculator<String> shardCalculator) {
+        return new WrapperDao<>(tenantId, sessionFactories, daoClass, shardCalculator);
     }
 
     public <T, DaoType extends AbstractDAO<T>> WrapperDao<T, DaoType> createWrapperDao(
@@ -103,8 +103,8 @@ public enum DaoFactory {
             final Class<DaoType> daoClass,
             final Class[] extraConstructorParamClasses,
             final Class[] extraConstructorParamObjects,
-            final ShardManager shardManager) {
+            final ShardCalculator<String> shardCalculator) {
         return new WrapperDao<>(tenantId, sessionFactories, daoClass, extraConstructorParamClasses,
-                extraConstructorParamObjects, shardManager);
+                extraConstructorParamObjects, shardCalculator);
     }
 }

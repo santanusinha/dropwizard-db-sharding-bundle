@@ -12,6 +12,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.TestEntity;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
@@ -64,7 +65,7 @@ class DaoFactoryTest {
         final MultiTenantLookupDao<TestEntity> dao = DaoFactory.INSTANCE.createMultiTenantLookupDao(
                 Map.of(NS, sessionFactories),
                 TestEntity.class,
-                Map.of(NS, shardManager),
+                ShardCalculators.forTenant(NS, shardManager),
                 Map.of(NS, new ShardingBundleOptions()),
                 Map.of(NS, new ShardInfoProvider(NS)),
                 new TerminalTransactionObserver());
@@ -80,7 +81,7 @@ class DaoFactoryTest {
                 DaoFactory.INSTANCE.createMultiTenantLookupDao(
                         Map.of(NS, sessionFactories),
                         TestEntity.class,
-                        Map.of(NS, shardManager),
+                        ShardCalculators.forTenant(NS, shardManager),
                         Map.of(NS, new ShardingBundleOptions()),
                         Map.of(NS, new ShardInfoProvider(NS)),
                         new TerminalTransactionObserver()));
@@ -91,7 +92,7 @@ class DaoFactoryTest {
     @Test
     void createsWorkingWrapperDao() {
         final WrapperDao<Order, OrderDao> dao = DaoFactory.INSTANCE.createWrapperDao(
-                NS, sessionFactories, OrderDao.class, shardManager);
+                NS, sessionFactories, OrderDao.class, ShardCalculators.calculator(shardManager));
 
         final String customer = "customer-3";
         final Order order = Order.builder()
@@ -108,5 +109,22 @@ class DaoFactoryTest {
 
         assertEquals(saveResult.getId(), result.getId());
         assertEquals(customer, result.getCustomerId());
+    }
+
+    @Test
+    void unknownTenantIsRejectedWithANamedError() {
+        final MultiTenantLookupDao<TestEntity> dao = DaoFactory.INSTANCE.createMultiTenantLookupDao(
+                Map.of(NS, sessionFactories),
+                TestEntity.class,
+                io.appform.dropwizard.sharding.testutils.ShardCalculators.forTenant(NS, shardManager),
+                Map.of(NS, new ShardingBundleOptions()),
+                Map.of(NS, new ShardInfoProvider(NS)),
+                new TerminalTransactionObserver());
+
+        final IllegalArgumentException exception = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> dao.get("no-such-tenant", "customer-1"));
+        org.junit.jupiter.api.Assertions.assertTrue(exception.getMessage().contains("no-such-tenant"),
+                "message should name the tenant, was: " + exception.getMessage());
     }
 }

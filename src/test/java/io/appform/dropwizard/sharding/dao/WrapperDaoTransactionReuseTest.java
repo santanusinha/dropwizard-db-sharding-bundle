@@ -6,6 +6,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -60,7 +61,7 @@ class WrapperDaoTransactionReuseTest {
         }
         ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
         dao = DaoFactory.INSTANCE.createWrapperDao(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories,
-                OrderDao.class, shardManager);
+                OrderDao.class, ShardCalculators.calculator(shardManager));
     }
 
     @AfterEach
@@ -85,7 +86,7 @@ class WrapperDaoTransactionReuseTest {
     void testTransactionReuseAcrossMultipleDaoCalls() {
         String parentKey = "customer-tx-reuse"; // Determines shard
         int shardId = dao.getShardCalculator()
-                .shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+                .shardId(parentKey);
         SessionFactory targetSessionFactory = sessionFactories.get(shardId);
 
         // Outer application layer begins and binds session + transaction.
@@ -130,7 +131,7 @@ class WrapperDaoTransactionReuseTest {
     @Test
     void testMultipleWritesReuseSameOuterTransaction() {
         String parentKey = "customer-multi-write";
-        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        int shardId = dao.getShardCalculator().shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session outer = sf.openSession();
         ManagedSessionContext.bind(outer);
@@ -181,7 +182,7 @@ class WrapperDaoTransactionReuseTest {
         // TC to verify that inner DAO calls within an outer transaction
         // that is rolled back do not persist any data.
         String parentKey = "customer-rollback";
-        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        int shardId = dao.getShardCalculator().shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session outer = sf.openSession();
         ManagedSessionContext.bind(outer);
@@ -235,7 +236,7 @@ class WrapperDaoTransactionReuseTest {
         assertTrue(persisted.getId() > 0);
 
         // Determine shard & verify using fresh manual session
-        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        int shardId = dao.getShardCalculator().shardId(parentKey);
         SessionFactory sf = sessionFactories.get(shardId);
         Session s = sf.openSession();
         ManagedSessionContext.bind(s);

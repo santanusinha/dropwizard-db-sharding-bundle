@@ -23,7 +23,7 @@ import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.exceptions.DaoFwdException;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
 
@@ -52,7 +52,7 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    *
    * @param sessionFactories  A list of SessionFactory instances for database access.
    * @param entityClass       The Class representing the entity type handled by the DAO.
-   * @param shardManagers     A map of ShardManager to instantiate ShardCalculator.
+   * @param shardCalculators  A map of tenant id to that tenant's ShardCalculator.
    * @param cache             The LookupCache implementation for caching entities.
    * @param shardingOptions   ShardingBundleOptions for configuring sharding behavior.
    * @param shardInfoProvider The ShardInfoProvider for obtaining shard information.
@@ -60,12 +60,12 @@ public class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao<T> {
    */
   public MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
                                        Class<T> entityClass,
-                                       Map<String, ShardManager> shardManagers,
+                                       Map<String, ShardCalculator<String>> shardCalculators,
                                        Map<String, LookupCache<T>> cache,
                                        Map<String, ShardingBundleOptions> shardingOptions,
                                        Map<String, ShardInfoProvider> shardInfoProvider,
                                        TransactionObserver observer) {
-    super(sessionFactories, entityClass, shardManagers, shardingOptions, shardInfoProvider, observer);
+    super(sessionFactories, entityClass, shardCalculators, shardingOptions, shardInfoProvider, observer);
     this.cache = cache;
   }
 

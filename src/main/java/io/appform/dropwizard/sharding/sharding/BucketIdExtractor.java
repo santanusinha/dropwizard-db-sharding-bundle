@@ -18,8 +18,8 @@
 package io.appform.dropwizard.sharding.sharding;
 
 /**
- * Extracts bucket id from key
+ * Extracts bucket id from key. One instance serves exactly one tenant.
  */
 public interface BucketIdExtractor<T> {
-    int bucketId(String tenantId, T id);
+    int bucketId(T id);
 }

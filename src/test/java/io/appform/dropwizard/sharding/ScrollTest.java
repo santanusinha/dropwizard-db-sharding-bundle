@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.DaoFactory;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.ScrollTestEntity;
@@ -58,7 +59,7 @@ public class ScrollTest {
         lookupDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 DaoFactory.INSTANCE.createMultiTenantLookupDao(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        ScrollTestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        ScrollTestEntity.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), observer));
     }

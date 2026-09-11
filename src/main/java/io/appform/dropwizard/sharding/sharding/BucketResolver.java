@@ -15,14 +15,14 @@ import java.util.Map;
  */
 public class BucketResolver<T> {
 
-    private final BucketIdExtractor<T> bucketIdExtractor;
+    private final Map<String, BucketIdExtractor<T>> bucketIdExtractors;
     private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
-    public BucketResolver(final BucketIdExtractor<T> bucketIdExtractor,
+    public BucketResolver(final Map<String, BucketIdExtractor<T>> bucketIdExtractors,
                           final Map<String, EntityMeta> initialisedEntitiesMeta) {
         Preconditions.checkArgument(initialisedEntitiesMeta != null, "initialisedEntitiesMeta must not be null");
-        Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
-        this.bucketIdExtractor = bucketIdExtractor;
+        Preconditions.checkArgument(bucketIdExtractors != null, "BucketIdExtractors must not be null");
+        this.bucketIdExtractors = bucketIdExtractors;
         this.initialisedEntitiesMeta = initialisedEntitiesMeta;
     }
 
@@ -38,7 +38,11 @@ public class BucketResolver<T> {
             return null;
         }
 
-        final var bucketId = bucketIdExtractor.bucketId(tenantId, shardingKey);
+        final var bucketIdExtractor = bucketIdExtractors.get(tenantId);
+        if (bucketIdExtractor == null) {
+            throw new IllegalArgumentException("Unknown tenant: " + tenantId);
+        }
+        final var bucketId = bucketIdExtractor.bucketId(shardingKey);
 
         return BucketInfo.builder()
                 .value(bucketId)
