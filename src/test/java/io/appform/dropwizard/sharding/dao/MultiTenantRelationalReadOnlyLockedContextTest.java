@@ -9,6 +9,7 @@ import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -77,6 +78,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Map<String, ShardManager> shardManager = new HashMap<>();
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    final var shardCalculators = ShardCalculators.forTenants(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -86,13 +88,13 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
 
-    companyRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class,
-        shardManager, shardingOptions,
+    companyRelationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Company.class,
+        shardCalculators, shardingOptions,
         shardInfoProvider, observer);
-    departmentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class,
-        shardManager, shardingOptions,
+    departmentRelationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Department.class,
+        shardCalculators, shardingOptions,
         shardInfoProvider, observer);
-    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardManager,
+    ceoRelationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Ceo.class, shardCalculators,
         shardingOptions,
         shardInfoProvider, observer);
   }

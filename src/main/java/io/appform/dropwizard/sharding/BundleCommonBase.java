@@ -8,6 +8,7 @@ import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BucketKey;
 import io.appform.dropwizard.sharding.sharding.BucketInfo;
+import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.BucketResolver;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
@@ -128,7 +129,10 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   }
 
   protected void registerBucketIdExtractor(final Map<String, ShardManager> shardManagers) {
-    this.bucketResolver = new BucketResolver<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
+    final Map<String, BucketIdExtractor<String>> extractors = shardManagers.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey,
+            entry -> new ConsistentHashBucketIdExtractor<>(entry.getValue())));
+    this.bucketResolver = new BucketResolver<>(extractors, getInitialisedEntitiesMeta());
   }
 
   protected <U> BucketInfo getBucketInfo(final String tenantId,

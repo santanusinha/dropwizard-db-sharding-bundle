@@ -22,23 +22,22 @@ import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 /**
  * Generates bucket id on the basis of murmur128 of the key.
  */
 public class ConsistentHashBucketIdExtractor<T> implements BucketIdExtractor<T> {
 
-    private final Map<String, ShardManager> shardManagers;
+    private final ShardManager shardManager;
 
-    public ConsistentHashBucketIdExtractor(Map<String, ShardManager> shardManagers) {
-        this.shardManagers = shardManagers;
+    public ConsistentHashBucketIdExtractor(ShardManager shardManager) {
+        this.shardManager = shardManager;
     }
 
     @Override
-    public int bucketId(String tenantId, T id) {
+    public int bucketId(T id) {
         int hashKey = Hashing.murmur3_128().hashString(id.toString(), StandardCharsets.UTF_8).asInt();
         hashKey *= hashKey < 0 ? -1 : 1;
-        return hashKey % shardManagers.get(tenantId).numBuckets();
+        return hashKey % shardManager.numBuckets();
     }
 }

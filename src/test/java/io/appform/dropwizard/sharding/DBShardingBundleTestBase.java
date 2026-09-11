@@ -32,6 +32,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntityWithAIId;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -149,6 +150,21 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
                         .add(Restrictions.eq("o.orderId", "OD00001")), 0, 10);
         assertEquals(2, orderItems.size());
         assertEquals("Item AA", orderItems.get(0).getName());
+    }
+
+    @Test
+    public void testShardCalculatorIsExposedByBundle() {
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+
+        ShardCalculator<String> shardCalculator = bundle.getShardCalculator();
+        Assertions.assertNotNull(shardCalculator);
+
+        String key = "test-parent-key";
+        int shardId = shardCalculator.shardId(key);
+        assertTrue(shardId >= 0 && shardId < 2, "shard id out of range: " + shardId);
+        assertEquals(shardId, shardCalculator.shardId(key), "shard id must be deterministic");
     }
 
     @Test

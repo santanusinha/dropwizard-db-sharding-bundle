@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.12-10]
+
+### Changed (breaking)
+- **Java 17 is now required.** The published bytecode targets Java 17 so the DAO hierarchies can be `sealed`.
+- **`ShardCalculator` is single-tenant.** `shardId(tenantId, key)` becomes `shardId(key)` and `isOnValidShard(tenantId, key)` becomes `isOnValidShard(key)`. The bundle owns one calculator per tenant, reachable via `getShardCalculators()`.
+- **`BucketIdExtractor` is single-tenant.** `bucketId(tenantId, id)` becomes `bucketId(id)`. Custom implementations must be updated.
+- **`ShardedDao` and all DAO-level `getShardCalculator()` accessors have been removed.** Get the calculator from the bundle instead.
+- **DAO constructors are package private and the classes are sealed or final.** Obtain DAOs from the bundle's `createParentObjectDao` / `createRelatedObjectDao` / `createWrapperDao` methods.
+- The published jar seals `io/appform/dropwizard/sharding/dao/` and `io/appform/dropwizard/sharding/dao/operations/`.
+
+### Added
+- `DBShardingBundleBase.getShardCalculator()` exposes the single-tenant bundle's calculator, replacing the removed DAO-level accessor.
+
+  **Reason**: each DAO previously built its own `ShardCalculator` and `ConsistentHashBucketIdExtractor`, duplicating one object per DAO per tenant, and public constructors let clients bypass the bundle entirely.
+
 ## [2.1.12-7]
 - Added logs to print the original exception during DB exception handling.
 

@@ -26,6 +26,7 @@ import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.AbstractDAO;
 import io.appform.dropwizard.sharding.dao.CacheableLookupDao;
 import io.appform.dropwizard.sharding.dao.CacheableRelationalDao;
+import io.appform.dropwizard.sharding.dao.DaoFactory;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
 import io.appform.dropwizard.sharding.dao.WrapperDao;
@@ -37,6 +38,7 @@ import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -174,28 +176,27 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     public <EntityType, T extends Configuration>
     LookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
-        return new LookupDao<>(dbNamespace, delegate.createParentObjectDao(clazz));
+        return DaoFactory.INSTANCE.createLookupDao(dbNamespace, delegate.createParentObjectDao(clazz));
     }
 
     public <EntityType, T extends Configuration>
     CacheableLookupDao<EntityType> createParentObjectDao(
             Class<EntityType> clazz,
             LookupCache<EntityType> cacheManager) {
-        return new CacheableLookupDao<>(dbNamespace,
+        return DaoFactory.INSTANCE.createCacheableLookupDao(dbNamespace,
                 delegate.createParentObjectDao(clazz, Map.of(dbNamespace, cacheManager)));
     }
 
     public <EntityType, T extends Configuration>
     RelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
-        return new RelationalDao<>(dbNamespace,
-                delegate.createRelatedObjectDao(clazz));
+        return DaoFactory.INSTANCE.createRelationalDao(dbNamespace, delegate.createRelatedObjectDao(clazz));
     }
 
     public <EntityType, T extends Configuration>
     CacheableRelationalDao<EntityType> createRelatedObjectDao(
             Class<EntityType> clazz,
             RelationalCache<EntityType> cacheManager) {
-        return new CacheableRelationalDao<>(dbNamespace,
+        return DaoFactory.INSTANCE.createCacheableRelationalDao(dbNamespace,
                 delegate.createRelatedObjectDao(clazz, Map.of(dbNamespace, cacheManager)));
     }
 
@@ -214,6 +215,16 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     final ShardManager getShardManager() {
         return delegate.getShardManagers().get(dbNamespace);
+    }
+
+    /**
+     * Returns the {@link ShardCalculator} owned by this bundle for its namespace. The calculator is
+     * bound to a single tenant, so its methods take no tenant id.
+     *
+     * @return the shard calculator for this bundle's namespace
+     */
+    public final ShardCalculator<String> getShardCalculator() {
+        return delegate.getShardCalculators().get(dbNamespace);
     }
 
     public void registerObserver(TransactionObserver transactionObserver) {

@@ -34,6 +34,8 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import java.util.function.Function;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
+import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -62,6 +64,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class MultiTenantLookupDaoTest {
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
+  private Map<String, ShardCalculator<String>> shardCalculators;
   private Map<String, List<SessionFactory>> sessionFactories = new HashMap<>();
   private MultiTenantLookupDao<TestEntity> lookupDao;
   private MultiTenantLookupDao<TestEntityWithAIId> lookupDaoForAI;
@@ -102,6 +105,7 @@ public class MultiTenantLookupDaoTest {
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    shardCalculators = ShardCalculators.forTenants(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -110,23 +114,23 @@ public class MultiTenantLookupDaoTest {
         "TENANT2", new ShardInfoProvider("TENANT2"));
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
-    lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class, shardManager,
+    lookupDao = DaoFactory.INSTANCE.createMultiTenantLookupDao(sessionFactories, TestEntity.class, shardCalculators,
         shardingOptions,
         shardInfoProvider, observer);
 
-    lookupDaoForAI = new MultiTenantLookupDao<>(sessionFactories, TestEntityWithAIId.class,
-        shardManager,
+    lookupDaoForAI = DaoFactory.INSTANCE.createMultiTenantLookupDao(sessionFactories, TestEntityWithAIId.class,
+        shardCalculators,
         shardingOptions,
         shardInfoProvider, observer);
 
-    phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class, shardManager,
+    phoneDao = DaoFactory.INSTANCE.createMultiTenantLookupDao(sessionFactories, Phone.class, shardCalculators,
         shardingOptions,
         shardInfoProvider, observer);
-    transactionDao = new MultiTenantRelationalDao<>(sessionFactories, Transaction.class,
-        shardManager,
+    transactionDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Transaction.class,
+        shardCalculators,
         shardingOptions,
         shardInfoProvider, observer);
-    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, shardManager,
+    auditDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Audit.class, shardCalculators,
         shardingOptions,
         shardInfoProvider, observer);
   }

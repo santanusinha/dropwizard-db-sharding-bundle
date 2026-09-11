@@ -2,6 +2,7 @@ package io.appform.dropwizard.sharding.dao;
 
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
+import io.appform.dropwizard.sharding.testutils.ShardCalculators;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
@@ -69,9 +70,9 @@ public class EncryptionAtRestTest {
         final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
-        lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        TestEncryptedEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+        lookupDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createMultiTenantLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        TestEncryptedEntity.class, ShardCalculators.forTenant(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));

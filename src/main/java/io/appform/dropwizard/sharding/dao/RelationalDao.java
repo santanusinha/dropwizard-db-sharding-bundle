@@ -20,7 +20,6 @@ package io.appform.dropwizard.sharding.dao;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NonNull;
@@ -49,7 +48,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @SuppressWarnings({"unchecked", "UnusedReturnValue"})
-public class RelationalDao<T> implements ShardedDao<T> {
+public sealed class RelationalDao<T> permits CacheableRelationalDao {
 
     private final String tenantId;
 
@@ -65,7 +64,7 @@ public class RelationalDao<T> implements ShardedDao<T> {
      * @throws IllegalArgumentException If the entity class does not have exactly one field designated as @Id,
      *                                  if the designated key field is not accessible, or if it is not of type String.
      */
-    public RelationalDao(final String tenantId,
+    RelationalDao(final String tenantId,
                          final MultiTenantRelationalDao<T> delegate) {
         this.tenantId = tenantId;
         this.delegate = delegate;
@@ -740,11 +739,6 @@ public class RelationalDao<T> implements ShardedDao<T> {
         return new ReadOnlyContext<>(
                 delegate.readOnlyExecutor(tenantId, parentKey, querySpec, first, numResults, entityPopulator)
         );
-    }
-
-    @Override
-    public ShardCalculator<String> getShardCalculator() {
-        return delegate.getShardCalculator();
     }
 
     /**
