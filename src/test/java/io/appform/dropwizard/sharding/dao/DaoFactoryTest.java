@@ -1,5 +1,6 @@
 package io.appform.dropwizard.sharding.dao;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
@@ -91,6 +92,21 @@ class DaoFactoryTest {
     void createsWorkingWrapperDao() {
         final WrapperDao<Order, OrderDao> dao = DaoFactory.INSTANCE.createWrapperDao(
                 NS, sessionFactories, OrderDao.class, shardManager);
-        assertNotNull(dao.forParent("customer-3"));
+
+        final String customer = "customer-3";
+        final Order order = Order.builder()
+                .customerId(customer)
+                .build();
+        final OrderItem item = OrderItem.builder()
+                .order(order)
+                .name("Item A")
+                .build();
+        order.setItems(ImmutableList.of(item));
+
+        final Order saveResult = dao.forParent(customer).save(order);
+        final Order result = dao.forParent(customer).get(saveResult.getId());
+
+        assertEquals(saveResult.getId(), result.getId());
+        assertEquals(customer, result.getCustomerId());
     }
 }
