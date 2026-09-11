@@ -107,7 +107,7 @@ import static io.appform.dropwizard.sharding.query.QueryUtils.equalityFilter;
  */
 @Slf4j
 @SuppressWarnings({"unchecked", "UnusedReturnValue"})
-public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
+public class MultiTenantRelationalDao<T> {
 
     private final class RelationalDaoPriv extends AbstractDAO<T> {
 
@@ -333,13 +333,6 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
             throw new IllegalArgumentException("Unknown tenant: " + tenantId);
         }
         return calculator;
-    }
-
-    // Retained only so ShardedDao keeps compiling; single-tenant wrappers hold exactly one
-    // calculator. Removed along with ShardedDao in a later task.
-    @Override
-    public ShardCalculator<String> getShardCalculator() {
-        return shardCalculators.values().iterator().next();
     }
 
     /**

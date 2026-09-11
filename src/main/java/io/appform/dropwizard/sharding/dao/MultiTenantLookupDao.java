@@ -97,7 +97,7 @@ import static io.appform.dropwizard.sharding.query.QueryUtils.equalityFilter;
  * {@link LookupKey} The entity can be retrieved from any shard using the key.
  */
 @Slf4j
-public class MultiTenantLookupDao<T> implements ShardedDao<T> {
+public class MultiTenantLookupDao<T> {
 
     private final Map<String, List<SessionFactory>> sessionFactories;
     private final Map<String, List<LookupDaoPriv>> daos = Maps.newHashMap();
@@ -174,13 +174,6 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
             throw new IllegalArgumentException("Unknown tenant: " + tenantId);
         }
         return calculator;
-    }
-
-    // Retained only so ShardedDao keeps compiling; single-tenant wrappers hold exactly one
-    // calculator. Removed along with ShardedDao in a later task.
-    @Override
-    public ShardCalculator<String> getShardCalculator() {
-        return shardCalculators.values().iterator().next();
     }
 
     /**

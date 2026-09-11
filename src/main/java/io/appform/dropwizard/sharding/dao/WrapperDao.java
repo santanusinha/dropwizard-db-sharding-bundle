@@ -20,7 +20,6 @@ package io.appform.dropwizard.sharding.dao;
 import io.appform.dropwizard.sharding.sharding.ShardedTransaction;
 import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import io.appform.dropwizard.sharding.utils.TransactionHandler;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
@@ -41,11 +40,10 @@ import java.util.stream.Collectors;
  * - Use {@link RelationalDao} where-ever possible as it will be slight more performant than this due to lack of any proxy.
  */
 @Slf4j
-public class WrapperDao<T, DaoType extends AbstractDAO<T>> implements ShardedDao<T> {
+public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
 
     private String dbNamespace;
     private List<DaoType> daos;
-    @Getter
     private final ShardCalculator<String> shardCalculator;
 
     /**

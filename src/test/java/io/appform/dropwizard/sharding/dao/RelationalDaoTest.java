@@ -109,7 +109,7 @@ public class RelationalDaoTest {
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
-        this.shardCalculator = relationalDao.getShardCalculator();
+        this.shardCalculator = ShardCalculators.calculator(shardManager);
     }
 
     @AfterEach
