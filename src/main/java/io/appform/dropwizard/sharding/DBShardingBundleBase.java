@@ -25,6 +25,7 @@ import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
 import io.appform.dropwizard.sharding.dao.AbstractDAO;
 import io.appform.dropwizard.sharding.dao.CacheableLookupDao;
+import io.appform.dropwizard.sharding.dao.DaoFactory;
 import io.appform.dropwizard.sharding.dao.CacheableRelationalDao;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
@@ -174,28 +175,27 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
 
     public <EntityType, T extends Configuration>
     LookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
-        return new LookupDao<>(dbNamespace, delegate.createParentObjectDao(clazz));
+        return DaoFactory.INSTANCE.createLookupDao(dbNamespace, delegate.createParentObjectDao(clazz));
     }
 
     public <EntityType, T extends Configuration>
     CacheableLookupDao<EntityType> createParentObjectDao(
             Class<EntityType> clazz,
             LookupCache<EntityType> cacheManager) {
-        return new CacheableLookupDao<>(dbNamespace,
+        return DaoFactory.INSTANCE.createCacheableLookupDao(dbNamespace,
                 delegate.createParentObjectDao(clazz, Map.of(dbNamespace, cacheManager)));
     }
 
     public <EntityType, T extends Configuration>
     RelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
-        return new RelationalDao<>(dbNamespace,
-                delegate.createRelatedObjectDao(clazz));
+        return DaoFactory.INSTANCE.createRelationalDao(dbNamespace, delegate.createRelatedObjectDao(clazz));
     }
 
     public <EntityType, T extends Configuration>
     CacheableRelationalDao<EntityType> createRelatedObjectDao(
             Class<EntityType> clazz,
             RelationalCache<EntityType> cacheManager) {
-        return new CacheableRelationalDao<>(dbNamespace,
+        return DaoFactory.INSTANCE.createCacheableRelationalDao(dbNamespace,
                 delegate.createRelatedObjectDao(clazz, Map.of(dbNamespace, cacheManager)));
     }
 
