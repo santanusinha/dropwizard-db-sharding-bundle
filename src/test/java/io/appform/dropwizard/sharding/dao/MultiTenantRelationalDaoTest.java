@@ -105,10 +105,10 @@ public class MultiTenantRelationalDaoTest {
         "TENANT2", new ShardInfoProvider("TENANT2"));
     final TransactionObserver observer = new EntityClassThreadLocalObserver(
         new DaoClassLocalObserver(new TerminalTransactionObserver()));
-    relationalDao = new MultiTenantRelationalDao<>(sessionFactories, RelationalEntity.class,
+    relationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, RelationalEntity.class,
         this.shardManager,
         shardingOptions, shardInfoProvider, observer);
-    relationalWithAIDao = new MultiTenantRelationalDao<>(sessionFactories,
+    relationalWithAIDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories,
         RelationalEntityWithAIKey.class,
         this.shardManager,
         shardingOptions, shardInfoProvider, observer);

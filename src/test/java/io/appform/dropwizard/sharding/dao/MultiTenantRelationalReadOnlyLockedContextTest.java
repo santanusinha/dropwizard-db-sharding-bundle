@@ -86,13 +86,13 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
 
-    companyRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class,
+    companyRelationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Company.class,
         shardManager, shardingOptions,
         shardInfoProvider, observer);
-    departmentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class,
+    departmentRelationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Department.class,
         shardManager, shardingOptions,
         shardInfoProvider, observer);
-    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardManager,
+    ceoRelationalDao = DaoFactory.INSTANCE.createMultiTenantRelationalDao(sessionFactories, Ceo.class, shardManager,
         shardingOptions,
         shardInfoProvider, observer);
   }

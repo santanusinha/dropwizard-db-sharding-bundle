@@ -59,7 +59,7 @@ class WrapperDaoTransactionReuseTest {
             sessionFactories.add(buildSessionFactory("reuse_tx_db_" + i));
         }
         ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories,
+        dao = DaoFactory.INSTANCE.createWrapperDao(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories,
                 OrderDao.class, shardManager);
     }
 
