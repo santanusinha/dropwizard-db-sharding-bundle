@@ -8,3 +8,4 @@ dep
 out
 .project
 .settings
+.worktrees
