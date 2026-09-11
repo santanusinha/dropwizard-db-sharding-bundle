@@ -293,6 +293,29 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <archive>
+                        <manifestSections>
+                            <manifestSection>
+                                <name>io/appform/dropwizard/sharding/dao/</name>
+                                <manifestEntries>
+                                    <Sealed>true</Sealed>
+                                </manifestEntries>
+                            </manifestSection>
+                            <manifestSection>
+                                <name>io/appform/dropwizard/sharding/dao/operations/</name>
+                                <manifestEntries>
+                                    <Sealed>true</Sealed>
+                                </manifestEntries>
+                            </manifestSection>
+                        </manifestSections>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
                 <version>3.3.0</version>
                 <executions>
