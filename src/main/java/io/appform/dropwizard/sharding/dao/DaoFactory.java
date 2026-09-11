@@ -12,11 +12,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The only supported way to build the DAOs in this package.
+ * The supported way to build the DAOs in this package.
  * <p>
  * This is an enum so it cannot be instantiated by client code, and its methods take
- * bundle-internal collaborators that clients cannot obtain. DAO constructors are package
- * private, so this factory is the sole construction path.
+ * bundle-internal collaborators that clients cannot obtain. The DAO constructors will become
+ * package private so that this factory is the only construction path.
  */
 public enum DaoFactory {
     INSTANCE;
