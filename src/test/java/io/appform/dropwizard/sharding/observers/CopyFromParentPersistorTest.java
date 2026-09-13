@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -569,5 +570,119 @@ class CopyFromParentPersistorTest {
 
         // Listener should never be called
         verify(mockListener, never()).onMismatches(any(), any(), any());
+    }
+
+    // Tests: copy/mismatch-detection happen immediately during visit(), not deferred until
+    // apply()/the saver is invoked.
+
+    @Test
+    void testCopyAppliesImmediatelyDuringVisit_beforeApplyIsEverCalled() {
+        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+                true, false, false, null);
+
+        TestParent parent = TestParent.builder()
+                .transactionId("TXN-123")
+                .amount(500)
+                .build();
+        TestChild child = TestChild.builder()
+                .ownField("mine")
+                .build();
+
+        SaveWithParent<TestChild, TestChild, TestParent> op =
+                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                        .entity(child)
+                        .parent(parent)
+                        .saver(e -> e)
+                        .build();
+
+        persistor.visit(op);
+
+        // Deliberately NOT calling op.apply(...) here. If copy were still deferred inside a
+        // wrapped saver (the old, buggy behavior), these fields would still be unset at this point.
+        assertEquals("TXN-123", child.getTxnId(),
+                "copy must be applied synchronously during visit(), not deferred until apply()");
+        assertEquals(500, child.getChildAmount(),
+                "copy must be applied synchronously during visit(), not deferred until apply()");
+        assertSame(child, op.getEntity(), "the same entity instance must be mutated in place");
+    }
+
+    @Test
+    void testMismatchDetectionRunsImmediatelyDuringVisit_beforeApplyIsEverCalled() {
+        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+                true, true, false, mockListener);
+
+        TestParent parent = TestParent.builder()
+                .transactionId("PARENT-TXN")
+                .amount(500)
+                .build();
+        TestChild child = TestChild.builder()
+                .txnId("CHILD-TXN")  // Mismatch
+                .childAmount(100)     // Mismatch
+                .build();
+
+        SaveWithParent<TestChild, TestChild, TestParent> op =
+                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                        .entity(child)
+                        .parent(parent)
+                        .saver(e -> e)
+                        .build();
+
+        persistor.visit(op);
+
+        verify(mockListener, times(1)).onMismatches(eq(parent), eq(child), any());
+    }
+
+    @Test
+    void testVisitDoesNotWrapOrReplaceTheSaver() {
+        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+                true, true, false, mock(CopyFromParentMismatchListener.class));
+
+        TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
+        TestChild child = TestChild.builder().build();
+
+        UnaryOperator<TestChild> originalSaver = e -> e;
+        SaveWithParent<TestChild, TestChild, TestParent> op =
+                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                        .entity(child)
+                        .parent(parent)
+                        .saver(originalSaver)
+                        .build();
+
+        persistor.visit(op);
+
+        // SaveWithParent here must not touch the saver reference at all - copy/mismatch
+        // detection must be applied directly on the entity instead.
+        assertSame(originalSaver, op.getSaver(),
+                "visit() must not wrap or replace the saver reference");
+    }
+
+    @Test
+    void testCopyDisabledAndNoMismatchDetection_visitIsNoopOnEntityAndSaver() {
+        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+                false, false, false, null);
+
+        TestParent parent = TestParent.builder()
+                .transactionId("PARENT-TXN")
+                .amount(500)
+                .build();
+        TestChild child = TestChild.builder()
+                .txnId("ORIGINAL-TXN")
+                .childAmount(100)
+                .build();
+
+        UnaryOperator<TestChild> originalSaver = e -> e;
+        SaveWithParent<TestChild, TestChild, TestParent> op =
+                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                        .entity(child)
+                        .parent(parent)
+                        .saver(originalSaver)
+                        .build();
+
+        persistor.visit(op);
+
+        assertEquals("ORIGINAL-TXN", child.getTxnId(), "copyEnabled=false must not mutate the entity");
+        assertEquals(100, child.getChildAmount(), "copyEnabled=false must not mutate the entity");
+        assertSame(originalSaver, op.getSaver(), "visit() must not wrap or replace the saver reference");
     }
 }

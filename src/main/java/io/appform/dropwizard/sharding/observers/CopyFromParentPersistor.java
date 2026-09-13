@@ -55,26 +55,26 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
 
     @Override
     public <T, R, U> Void visit(SaveWithParent<T, R, U> opContext) {
+        // Mutate the entity directly here (not via saver-wrapping) so copy always completes
+        // before any wrapped saver runs later, regardless of visitor order (e.g. BucketKeyPersistor).
         final U parent = opContext.getParent();
-        final var oldSaver = opContext.getSaver();
-        opContext.setSaver((T entity) -> {
-            if (mismatchDetectionEnabled && mismatchListener != null) {
-                try {
-                    List<CopyFromParentUtils.FieldMismatch> mismatches =
-                            CopyFromParentUtils.detectMismatches(parent, entity);
-                    if (!mismatches.isEmpty()) {
-                        mismatchListener.onMismatches(parent, entity, mismatches);
-                    }
-                } catch (Exception e) {
-                    log.error("Mismatch detection failed for child={}, proceeding with save",
-                            entity.getClass().getSimpleName(), e);
+        final T entity = opContext.getEntity();
+
+        if (mismatchDetectionEnabled && mismatchListener != null) {
+            try {
+                List<CopyFromParentUtils.FieldMismatch> mismatches =
+                        CopyFromParentUtils.detectMismatches(parent, entity);
+                if (!mismatches.isEmpty()) {
+                    mismatchListener.onMismatches(parent, entity, mismatches);
                 }
+            } catch (Exception e) {
+                log.error("Mismatch detection failed for child={}, proceeding with save",
+                        entity.getClass().getSimpleName(), e);
             }
-            if (copyEnabled) {
-                CopyFromParentUtils.copyFields(parent, entity, copyIfDefaultOnly);
-            }
-            return oldSaver.apply(entity);
-        });
+        }
+        if (copyEnabled) {
+            CopyFromParentUtils.copyFields(parent, entity, copyIfDefaultOnly);
+        }
         return null;
     }
 

@@ -495,4 +495,61 @@ class CopyFromParentUtilsTest {
 
         assertEquals(777L, child.getPartitionId());
     }
+
+    // Tests for copyIfDefaultOnly: validate-all-then-apply (two-pass) semantics.
+    // TestChild declares fields in order: txnId, childAmount. A violation on a later field
+    // (childAmount) must not leave an earlier field (txnId) partially mutated.
+
+    @Test
+    void testCopyIfDefaultOnly_violationOnLaterField_leavesEarlierFieldUntouched() {
+        TestParent parent = TestParent.builder()
+                .transactionId("NEW-TXN")
+                .amount(999)
+                .build();
+
+        TestChild child = TestChild.builder()
+                .childAmount(555)
+                .build();
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> CopyFromParentUtils.copyFields(parent, child, true));
+
+        assertEquals(0, exception.getMessage().indexOf("COPY_IF_DEFAULT_VIOLATION"));
+
+        assertNull(child.getTxnId(), "earlier field must not be mutated when a later field violates");
+        assertEquals(555, child.getChildAmount(), "the violating field itself must remain untouched too");
+    }
+
+    @Test
+    void testCopyIfDefaultOnly_violationOnEarlierField_leavesLaterFieldUntouched() {
+        TestParent parent = TestParent.builder()
+                .transactionId("NEW-TXN")
+                .amount(999)
+                .build();
+
+        TestChild child = TestChild.builder()
+                .txnId("MANUAL-VALUE")
+                .build();
+
+        assertThrows(IllegalStateException.class,
+                () -> CopyFromParentUtils.copyFields(parent, child, true));
+
+        assertEquals("MANUAL-VALUE", child.getTxnId(), "violating field must remain untouched");
+        assertEquals(0, child.getChildAmount(),
+                "later, otherwise-eligible field must not be mutated when an earlier field violates");
+    }
+
+    @Test
+    void testCopyIfDefaultOnly_allFieldsDefault_copiesEverything() {
+        TestParent parent = TestParent.builder()
+                .transactionId("NEW-TXN")
+                .amount(999)
+                .build();
+        TestChild child = new TestChild(); // all defaults
+
+        assertDoesNotThrow(() -> CopyFromParentUtils.copyFields(parent, child, true));
+
+        assertEquals("NEW-TXN", child.getTxnId());
+        assertEquals(999, child.getChildAmount());
+    }
 }

@@ -71,8 +71,21 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T, R> P visit(Select<T, R> opContext);
 
+    /**
+     * For backward compatibility, the default implementation delegates to the mandatory {@link #visit(Save)} method
+     * which every visitor must already implement.
+     * Visitors that need access to the parent reference should override this method explicitly.
+     */
     default <T, R, U> P visit(SaveWithParent<T, R, U> opContext) {
-      throw new UnsupportedOperationException("SaveWithParent OpContext not supported");
+      final Save<T, R> legacyView = Save.<T, R>builder()
+              .entity(opContext.getEntity())
+              .saver(opContext.getSaver())
+              .afterSave(opContext.getAfterSave())
+              .build();
+      final P result = visit(legacyView);
+      opContext.setSaver(legacyView.getSaver());
+      opContext.setAfterSave(legacyView.getAfterSave());
+      return result;
     }
 
   }

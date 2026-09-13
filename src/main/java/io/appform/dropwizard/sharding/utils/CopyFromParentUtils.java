@@ -173,18 +173,19 @@ public final class CopyFromParentUtils {
 
     private static <T, U> void applyMappings(T parent, U child, List<FieldHandleMapping> mappings, 
                                               boolean copyIfDefaultOnly) {
+        // Two-pass approach: validate every field first (including the copyIfDefaultOnly check),
+        // and only mutate the child once all fields have passed validation.
         for (FieldHandleMapping m : mappings) {
             if (!m.override) {
                 continue;
             }
             try {
-                Object parentValue = m.parentGetter.invoke(parent);
-                
                 if (copyIfDefaultOnly) {
                     // Check if child has default value
                     Object childValue = m.childGetter.invoke(child);
                     
                     if (!isDefaultValue(childValue, m.childFieldType)) {
+                        Object parentValue = m.parentGetter.invoke(parent);
                         // Child has non-default value - manual setter detected, fail the operation
                         throw new IllegalStateException(
                                 String.format("COPY_IF_DEFAULT_VIOLATION: Field %s.%s has non-default value [%s]. "
@@ -194,11 +195,23 @@ public final class CopyFromParentUtils {
                                         childValue, parentValue));
                     }
                 }
-                
-                // Copy from parent to child
-                m.childSetter.invoke(child, parentValue);
             } catch (IllegalStateException e) {
                 throw e;
+            } catch (Throwable e) {
+                throw new RuntimeException(
+                        String.format("Failed to copy field %s -> %s on %s",
+                                m.parentFieldName, m.childFieldName,
+                                child.getClass().getSimpleName()), e);
+            }
+        }
+
+        for (FieldHandleMapping m : mappings) {
+            if (!m.override) {
+                continue;
+            }
+            try {
+                Object parentValue = m.parentGetter.invoke(parent);
+                m.childSetter.invoke(child, parentValue);
             } catch (Throwable e) {
                 throw new RuntimeException(
                         String.format("Failed to copy field %s -> %s on %s",

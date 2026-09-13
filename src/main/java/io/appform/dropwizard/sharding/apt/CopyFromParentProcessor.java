@@ -6,12 +6,12 @@ import io.appform.dropwizard.sharding.sharding.ParentEntity;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
@@ -26,21 +26,34 @@ import java.util.Set;
  * Compile-time annotation processor that validates {@link CopyFromParent} and
  * {@link ParentEntity} usage:
  * <ul>
- *   <li>{@code @CopyFromParent} without {@code @ParentEntity} on the enclosing class → error</li>
+ *   <li>{@code @CopyFromParent} without {@code @ParentEntity} anywhere in the enclosing class's
+ *       superclass hierarchy → error</li>
  *   <li>{@code @CopyFromParent(field = "x")} where {@code x} does not exist on the parent → error</li>
  *   <li>Type mismatch between the parent field and the annotated child field → error</li>
  *   <li>Parent field annotated with {@code @Transient} (JPA) → error</li>
+ *   <li>Parent/child field declared {@code static}, or child field declared {@code final} → error,
+ *   since these cannot be safely read/written via {@link java.lang.invoke.MethodHandle}</li>
  * </ul>
  */
 @SupportedAnnotationTypes({
         "io.appform.dropwizard.sharding.sharding.CopyFromParent",
         "io.appform.dropwizard.sharding.sharding.ParentEntity"
 })
-@SupportedSourceVersion(SourceVersion.RELEASE_11)
 public class CopyFromParentProcessor extends AbstractProcessor {
 
     private static final String TRANSIENT_ANNOTATION = "javax.persistence.Transient";
     private static final String JAKARTA_TRANSIENT_ANNOTATION = "jakarta.persistence.Transient";
+
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        // This processor is auto-registered via META-INF/services, so it is loaded by javac for
+        // every downstream compilation regardless of whether the annotations it processes are
+        // actually used. Returning SourceVersion.latestSupported() (instead of pinning to
+        // RELEASE_11 via @SupportedSourceVersion) avoids the "-source N, which is more than
+        // RELEASE_11" javac warning on newer JDKs, which would otherwise fail downstream builds
+        // compiling with -Werror.
+        return SourceVersion.latestSupported();
+    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -55,23 +68,26 @@ public class CopyFromParentProcessor extends AbstractProcessor {
 
     private void validateField(VariableElement childField) {
         TypeElement childClass = (TypeElement) childField.getEnclosingElement();
-        ParentEntity parentAnn = childClass.getAnnotation(ParentEntity.class);
+        TypeElement annotatedClass = findParentEntityDeclaringClass(childClass);
 
-        // 1. @CopyFromParent without @ParentEntity
-        if (parentAnn == null) {
+        // 1. @CopyFromParent without @ParentEntity anywhere up the superclass hierarchy.
+        // @CopyFromParent field declared on a subclass is valid
+        // as long as some superclass (or the class itself) carries @ParentEntity.
+        if (annotatedClass == null) {
             error(childField,
-                    "@CopyFromParent on %s.%s requires @ParentEntity on the enclosing class %s",
+                    "@CopyFromParent on %s.%s requires @ParentEntity on the enclosing class %s "
+                            + "or one of its superclasses",
                     childClass.getSimpleName(), childField.getSimpleName(),
                     childClass.getQualifiedName());
             return;
         }
 
         // Resolve parent class TypeElement
-        TypeElement parentClass = resolveParentClass(childClass);
+        TypeElement parentClass = resolveParentClass(annotatedClass);
         if (parentClass == null) {
             error(childField,
                     "Could not resolve parent class declared in @ParentEntity on %s",
-                    childClass.getQualifiedName());
+                    annotatedClass.getQualifiedName());
             return;
         }
 
@@ -89,7 +105,31 @@ public class CopyFromParentProcessor extends AbstractProcessor {
             return;
         }
 
-        // 3. Type mismatch check
+        // 3. Modifier checks: static source/target fields and final target fields cannot be
+        // read/written safely via the instance MethodHandles that CopyFromParentUtils builds.
+        if (parentField.getModifiers().contains(Modifier.STATIC)) {
+            error(childField,
+                    "@CopyFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is static "
+                            + "and cannot be copied",
+                    parentFieldName, childClass.getSimpleName(),
+                    childField.getSimpleName(), parentFieldName,
+                    parentClass.getSimpleName());
+            return;
+        }
+        if (childField.getModifiers().contains(Modifier.STATIC)) {
+            error(childField,
+                    "@CopyFromParent on %s.%s: field is static and cannot be a copy target",
+                    childClass.getSimpleName(), childField.getSimpleName());
+            return;
+        }
+        if (childField.getModifiers().contains(Modifier.FINAL)) {
+            error(childField,
+                    "@CopyFromParent on %s.%s: field is final and cannot be a copy target",
+                    childClass.getSimpleName(), childField.getSimpleName());
+            return;
+        }
+
+        // 4. Type mismatch check
         TypeMirror parentFieldType = parentField.asType();
         TypeMirror childFieldType = childField.asType();
         if (!processingEnv.getTypeUtils().isAssignable(parentFieldType, childFieldType)) {
@@ -100,7 +140,7 @@ public class CopyFromParentProcessor extends AbstractProcessor {
                     parentFieldName, parentFieldType, childFieldType);
         }
 
-        // 4. @Transient check on parent field
+        // 5. @Transient check on parent field
         if (hasTransientAnnotation(parentField)) {
             error(childField,
                     "@CopyFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is "
@@ -109,6 +149,24 @@ public class CopyFromParentProcessor extends AbstractProcessor {
                     childField.getSimpleName(), parentFieldName,
                     parentClass.getSimpleName());
         }
+    }
+
+    /**
+     * Walks up the superclass hierarchy starting at {@code typeElement}, looking for the class
+     * that declares {@code @ParentEntity}
+     */
+    private TypeElement findParentEntityDeclaringClass(TypeElement typeElement) {
+        TypeElement current = typeElement;
+        while (current != null) {
+            if (current.getAnnotation(ParentEntity.class) != null) {
+                return current;
+            }
+            TypeMirror superclass = current.getSuperclass();
+            current = (superclass instanceof DeclaredType)
+                    ? (TypeElement) ((DeclaredType) superclass).asElement()
+                    : null;
+        }
+        return null;
     }
 
     /**
