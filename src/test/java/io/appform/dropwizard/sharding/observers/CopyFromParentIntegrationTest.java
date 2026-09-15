@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * id is a pure function of {@code (tenantId, shardingKey)} - it does not depend on the entity
  * type - so the same sharding key must always deterministically hash to the same bucket.
  */
-public class CopyFromParentIntegrationTest extends BundleBasedTestBase {
+class CopyFromParentIntegrationTest extends BundleBasedTestBase {
 
     private static final String PARENT_NAME = "PV10";
     private static final int PRECOMPUTED_BUCKET_KEY_FOR_PARENT_NAME = 103;
@@ -51,7 +51,7 @@ public class CopyFromParentIntegrationTest extends BundleBasedTestBase {
 
     @SneakyThrows
     @Test
-    public void testCopyHappensBeforeBucketKeyCalculation_fullObserverChain() {
+    void testCopyHappensBeforeBucketKeyCalculation_fullObserverChain() {
         val bundle = createBundle(true, false, false);
 
         val parentDao = bundle.createParentObjectDao(CopyFromParentIntegrationParent.class);
@@ -95,7 +95,7 @@ public class CopyFromParentIntegrationTest extends BundleBasedTestBase {
 
     @SneakyThrows
     @Test
-    public void testCopyIfDefaultOnlyViolation_rollsBackEntireTransaction_fullObserverChain() {
+    void testCopyIfDefaultOnlyViolation_rollsBackEntireTransaction_fullObserverChain() {
         val bundle = createBundle(true, false, true);
 
         val parentDao = bundle.createParentObjectDao(CopyFromParentIntegrationParent.class);
@@ -105,16 +105,15 @@ public class CopyFromParentIntegrationTest extends BundleBasedTestBase {
         parent.setName("PV11");
         parent.setTransactionRef("PARENT-TXN");
 
-        assertThrows(RuntimeException.class, () ->
-                parentDao.saveAndGetExecutor(parent)
-                        .save(childDao, p -> {
-                            CopyFromParentIntegrationChild child = new CopyFromParentIntegrationChild();
-                            // Non-default value on a copyIfDefaultOnly-checked field -> violation.
-                            child.setTxnRef("MANUAL-SETTER-VALUE");
-                            child.setValue("child-value");
-                            return child;
-                        })
-                        .execute());
+        val lockedContext = parentDao.saveAndGetExecutor(parent)
+                .save(childDao, p -> {
+                    CopyFromParentIntegrationChild child = new CopyFromParentIntegrationChild();
+                    // Non-default value on a copyIfDefaultOnly-checked field -> violation.
+                    child.setTxnRef("MANUAL-SETTER-VALUE");
+                    child.setValue("child-value");
+                    return child;
+                });
+        assertThrows(RuntimeException.class, lockedContext::execute);
 
         // The whole LockedContext transaction (parent save + child save) must be rolled back -
         // neither the parent nor the child should be persisted.

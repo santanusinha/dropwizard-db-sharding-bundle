@@ -162,6 +162,12 @@ public final class CopyFromParentUtils {
 
     private static <T, U> void validateParentType(T parent, U child) {
         ParentEntity parentAnn = findParentEntityAnnotation(child.getClass());
+        if (parentAnn == null) {
+            // Just a defensive NPE guard
+            throw new IllegalStateException(
+                    String.format("No @ParentEntity annotation found on %s or its superclasses",
+                            child.getClass().getSimpleName()));
+        }
         if (!parentAnn.value().isAssignableFrom(parent.getClass())) {
             throw new IllegalArgumentException(
                     String.format("Parent type mismatch for %s: expected %s, got %s",
@@ -176,48 +182,57 @@ public final class CopyFromParentUtils {
         // Two-pass approach: validate every field first (including the copyIfDefaultOnly check),
         // and only mutate the child once all fields have passed validation.
         for (FieldHandleMapping m : mappings) {
-            if (!m.override) {
-                continue;
-            }
-            try {
-                if (copyIfDefaultOnly) {
-                    // Check if child has default value
-                    Object childValue = m.childGetter.invoke(child);
-                    
-                    if (!isDefaultValue(childValue, m.childFieldType)) {
-                        Object parentValue = m.parentGetter.invoke(parent);
-                        // Child has non-default value - manual setter detected, fail the operation
-                        throw new IllegalStateException(
-                                String.format("COPY_IF_DEFAULT_VIOLATION: Field %s.%s has non-default value [%s]. "
-                                        + "Expected default value. Manual setter may still be present. "
-                                        + "Parent value: [%s].",
-                                        child.getClass().getSimpleName(), m.childFieldName,
-                                        childValue, parentValue));
-                    }
-                }
-            } catch (IllegalStateException e) {
-                throw e;
-            } catch (Throwable e) {
-                throw new RuntimeException(
-                        String.format("Failed to copy field %s -> %s on %s",
-                                m.parentFieldName, m.childFieldName,
-                                child.getClass().getSimpleName()), e);
+            if (m.override) {
+                validateField(parent, child, m, copyIfDefaultOnly);
             }
         }
 
         for (FieldHandleMapping m : mappings) {
-            if (!m.override) {
-                continue;
+            if (m.override) {
+                applyField(parent, child, m);
             }
-            try {
-                Object parentValue = m.parentGetter.invoke(parent);
-                m.childSetter.invoke(child, parentValue);
-            } catch (Throwable e) {
-                throw new RuntimeException(
-                        String.format("Failed to copy field %s -> %s on %s",
-                                m.parentFieldName, m.childFieldName,
-                                child.getClass().getSimpleName()), e);
+        }
+    }
+
+    private static <T, U> void validateField(T parent, U child, FieldHandleMapping m,
+                                              boolean copyIfDefaultOnly) {
+        if (!copyIfDefaultOnly) {
+            return;
+        }
+        try {
+            // Check if child has default value
+            Object childValue = m.childGetter.invoke(child);
+            if (isDefaultValue(childValue, m.childFieldType)) {
+                return;
             }
+
+            // Child has non-default value - manual setter detected, fail the operation
+            Object parentValue = m.parentGetter.invoke(parent);
+            throw new IllegalStateException(
+                    String.format("COPY_IF_DEFAULT_VIOLATION: Field %s.%s has non-default value [%s]. "
+                            + "Expected default value. Manual setter may still be present. "
+                            + "Parent value: [%s].",
+                            child.getClass().getSimpleName(), m.childFieldName,
+                            childValue, parentValue));
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new RuntimeException(
+                    String.format("Failed to copy field %s -> %s on %s",
+                            m.parentFieldName, m.childFieldName,
+                            child.getClass().getSimpleName()), e);
+        }
+    }
+
+    private static <T, U> void applyField(T parent, U child, FieldHandleMapping m) {
+        try {
+            Object parentValue = m.parentGetter.invoke(parent);
+            m.childSetter.invoke(child, parentValue);
+        } catch (Throwable e) {
+            throw new RuntimeException(
+                    String.format("Failed to copy field %s -> %s on %s",
+                            m.parentFieldName, m.childFieldName,
+                            child.getClass().getSimpleName()), e);
         }
     }
 

@@ -64,20 +64,20 @@ class SaveWithParentTest {
 
     @Test
     void testNullEntity_throwsNPE() {
-        Assertions.assertThrows(NullPointerException.class, () ->
-                SaveWithParent.builder().entity(null).build());
+        val builder = SaveWithParent.builder();
+        Assertions.assertThrows(NullPointerException.class, () -> builder.entity(null));
     }
 
     @Test
     void testNullParent_throwsNPE() {
-        Assertions.assertThrows(NullPointerException.class, () ->
-                SaveWithParent.builder().entity("e").parent(null).build());
+        val builder = SaveWithParent.builder().entity("e");
+        Assertions.assertThrows(NullPointerException.class, () -> builder.parent(null));
     }
 
     @Test
     void testNullSaver_throwsNPE() {
-        Assertions.assertThrows(NullPointerException.class, () ->
-                SaveWithParent.builder().entity("e").parent("p").saver(null).build());
+        val builder = SaveWithParent.builder().entity("e").parent("p");
+        Assertions.assertThrows(NullPointerException.class, () -> builder.saver(null));
     }
 
     /**
