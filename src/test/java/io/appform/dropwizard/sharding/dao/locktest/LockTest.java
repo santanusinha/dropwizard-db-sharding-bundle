@@ -48,9 +48,14 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.persistence.EntityNotFoundException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -1340,6 +1345,334 @@ public class LockTest {
                         .readAugmentParent(relationDao, nullFactory, 0, Integer.MAX_VALUE,
                                 (parent, children) -> {});
         assertThrows(RuntimeException.class, () -> readOnlyContext.execute());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockAndGetExecutorMutatesRowsInCriteriaOrder() {
+        final var first = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("FIRST")
+                .build()).get();
+        final var second = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("SECOND")
+                .build()).get();
+
+        final var criteria = List.of(
+                DetachedCriteria.forClass(SomeOtherObject.class)
+                        .add(Restrictions.eq("id", second.getId())),
+                DetachedCriteria.forClass(SomeOtherObject.class)
+                        .add(Restrictions.eq("id", first.getId())));
+
+        final var result = relationDao.lockAndGetExecutor("0", criteria)
+                .filterEach(
+                        row -> row.getValue() != null,
+                        row -> new IllegalStateException("Missing value for " + row.getId()))
+                .mutateEach(row -> row.setValue("UPDATED"))
+                .execute();
+
+        assertEquals(List.of(second.getId(), first.getId()),
+                result.stream().map(SomeOtherObject::getId).collect(Collectors.toList()));
+        assertEquals("UPDATED", relationDao.get("0", first.getId()).get().getValue());
+        assertEquals("UPDATED", relationDao.get("0", second.getId()).get().getValue());
+    }
+
+    @Test
+    void testBulkLockAndGetExecutorRejectsEmptyCriteria() {
+        assertThrows(IllegalArgumentException.class,
+                () -> relationDao.lockAndGetExecutor("0", List.of()));
+    }
+
+    @Test
+    void testBulkLockAndGetExecutorRejectsNullCriteria() {
+        assertThrows(IllegalArgumentException.class,
+                () -> relationDao.lockAndGetExecutor(
+                        "0",
+                        (List<DetachedCriteria>) null));
+    }
+
+    @Test
+    void testBulkLockAndGetExecutorRejectsNullCriteriaElement() {
+        final List<DetachedCriteria> criteria = Lists.newArrayList(
+                DetachedCriteria.forClass(SomeOtherObject.class));
+        criteria.add(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> relationDao.lockAndGetExecutor("0", criteria));
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockAndGetExecutorThrowsWhenCriteriaMatchesNoRow() {
+        final var missing = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", Long.MAX_VALUE));
+
+        assertThrows(EntityNotFoundException.class,
+                () -> relationDao.lockAndGetExecutor("0", List.of(missing)).execute());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockAndGetExecutorRejectsDuplicateEntity() {
+        final var entity = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("ORIGINAL")
+                .build()).get();
+        final var sameRow = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", entity.getId()));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> relationDao.lockAndGetExecutor("0", List.of(sameRow, sameRow)).execute());
+        assertEquals("ORIGINAL", relationDao.get("0", entity.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockAndGetExecutorRejectsNonUniqueCriteria() {
+        relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("FIRST")
+                .build()).get();
+        relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("SECOND")
+                .build()).get();
+        final var nonUnique = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("myId", "0"));
+
+        assertThrows(org.hibernate.NonUniqueResultException.class,
+                () -> relationDao.lockAndGetExecutor("0", List.of(nonUnique)).execute());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockedContextMutatesLookupAndSavesRelationalEntity() {
+        lookupDao.save(SomeLookupObject.builder()
+                .myId("0")
+                .name("ORIGINAL_PARENT")
+                .build());
+        final var child = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("ORIGINAL_CHILD")
+                .build()).get();
+        final var childCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", child.getId()));
+
+        relationDao.lockAndGetExecutor("0", List.of(childCriteria))
+                .lockAndMutate(lookupDao, "0",
+                        parent -> parent.setName("UPDATED_PARENT"))
+                .save(relationDao, rows -> SomeOtherObject.builder()
+                        .myId("0")
+                        .value("SAVED_FROM_BULK")
+                        .build())
+                .execute();
+
+        assertEquals("UPDATED_PARENT", lookupDao.get("0").get().getName());
+        assertEquals(2, relationDao.select(
+                "0",
+                DetachedCriteria.forClass(SomeOtherObject.class),
+                0,
+                10).size());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockedContextRollsBackLookupMutationAndRelationalSave() {
+        lookupDao.save(SomeLookupObject.builder()
+                .myId("0")
+                .name("ORIGINAL_PARENT")
+                .build());
+        final var child = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("ORIGINAL_CHILD")
+                .build()).get();
+        final var childCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", child.getId()));
+
+        assertThrows(RuntimeException.class, () ->
+                relationDao.lockAndGetExecutor("0", List.of(childCriteria))
+                        .mutateEach(row -> row.setValue("UPDATED_CHILD"))
+                        .lockAndMutate(lookupDao, "0",
+                                parent -> parent.setName("UPDATED_PARENT"))
+                        .save(relationDao, rows -> {
+                            throw new RuntimeException("simulated failure");
+                        })
+                        .execute());
+
+        assertEquals("ORIGINAL_CHILD",
+                relationDao.get("0", child.getId()).get().getValue());
+        assertEquals("ORIGINAL_PARENT", lookupDao.get("0").get().getName());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockedContextChainsRelationalUpdate() {
+        final var anchor = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("ANCHOR")
+                .build()).get();
+        final var target = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("TARGET")
+                .build()).get();
+
+        final var anchorCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", anchor.getId()));
+        final var targetCriteria = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", target.getId()));
+
+        relationDao.lockAndGetExecutor("0", List.of(anchorCriteria))
+                .update(
+                        relationDao,
+                        targetCriteria,
+                        row -> {
+                            row.setValue("UPDATED_TARGET");
+                            return row;
+                        },
+                        () -> true)
+                .execute();
+
+        assertEquals("UPDATED_TARGET",
+                relationDao.get("0", target.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockedContextRejectsReplacementOfInitiallyLockedEntity() {
+        final var locked = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("ORIGINAL")
+                .build()).get();
+        final var criteria = DetachedCriteria.forClass(SomeOtherObject.class)
+                .add(Restrictions.eq("id", locked.getId()));
+
+        final var exception = assertThrows(RuntimeException.class, () ->
+                relationDao.lockAndGetExecutor("0", List.of(criteria))
+                        .update(
+                                relationDao,
+                                criteria,
+                                row -> {
+                                    final var replacement = SomeOtherObject.builder()
+                                            .myId(row.getMyId())
+                                            .value("REPLACEMENT")
+                                            .build();
+                                    replacement.setId(row.getId());
+                                    return replacement;
+                                },
+                                () -> true)
+                        .mutateEach(row -> row.setValue("FINAL"))
+                        .execute());
+
+        assertTrue(exception.getCause() instanceof IllegalArgumentException);
+        assertEquals("ORIGINAL",
+                relationDao.get("0", locked.getId()).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockedContextLocksEveryCriteriaRowBeforeMutation() {
+        final var first = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("FIRST")
+                .build()).get();
+        final var second = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("SECOND")
+                .build()).get();
+        final var criteria = List.of(
+                DetachedCriteria.forClass(SomeOtherObject.class)
+                        .add(Restrictions.eq("id", first.getId())),
+                DetachedCriteria.forClass(SomeOtherObject.class)
+                        .add(Restrictions.eq("id", second.getId())));
+
+        final var mutationStarted = new CountDownLatch(1);
+        final var releaseMutation = new CountDownLatch(1);
+        final var executor = Executors.newSingleThreadExecutor();
+
+        final Future<?> firstTransaction = executor.submit(() ->
+                relationDao.lockAndGetExecutor("0", criteria)
+                        .mutateEach(row -> {
+                            mutationStarted.countDown();
+                            try {
+                                releaseMutation.await(5, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException(e);
+                            }
+                            row.setValue("UPDATED");
+                        })
+                        .execute());
+
+        try {
+            assertTrue(mutationStarted.await(5, TimeUnit.SECONDS));
+
+            assertThrows(RuntimeException.class, () ->
+                    relationDao.lockAndGetExecutor(
+                            "0",
+                            DetachedCriteria.forClass(SomeOtherObject.class)
+                                    .add(Restrictions.eq("id", second.getId())))
+                            .execute());
+        } finally {
+            releaseMutation.countDown();
+            firstTransaction.get(10, TimeUnit.SECONDS);
+            executor.shutdown();
+        }
+    }
+
+    @Test
+    @SneakyThrows
+    void testBulkLockFailureOnLaterRowReleasesEarlierRow() {
+        final var first = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("FIRST")
+                .build()).get();
+        final var second = relationDao.save("0", SomeOtherObject.builder()
+                .myId("0")
+                .value("SECOND")
+                .build()).get();
+        final var secondLocked = new CountDownLatch(1);
+        final var releaseSecond = new CountDownLatch(1);
+        final var executor = Executors.newSingleThreadExecutor();
+
+        final Future<?> holder = executor.submit(() ->
+                relationDao.lockAndGetExecutor(
+                        "0",
+                        DetachedCriteria.forClass(SomeOtherObject.class)
+                                .add(Restrictions.eq("id", second.getId())))
+                        .apply(row -> {
+                            secondLocked.countDown();
+                            try {
+                                releaseSecond.await(5, TimeUnit.SECONDS);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException(e);
+                            }
+                        })
+                        .execute());
+
+        try {
+            assertTrue(secondLocked.await(5, TimeUnit.SECONDS));
+
+            final var bulkCriteria = List.of(
+                    DetachedCriteria.forClass(SomeOtherObject.class)
+                            .add(Restrictions.eq("id", first.getId())),
+                    DetachedCriteria.forClass(SomeOtherObject.class)
+                            .add(Restrictions.eq("id", second.getId())));
+
+            assertThrows(RuntimeException.class,
+                    () -> relationDao.lockAndGetExecutor("0", bulkCriteria).execute());
+
+            relationDao.lockAndGetExecutor(
+                    "0",
+                    DetachedCriteria.forClass(SomeOtherObject.class)
+                            .add(Restrictions.eq("id", first.getId())))
+                    .execute();
+        } finally {
+            releaseSecond.countDown();
+            holder.get(10, TimeUnit.SECONDS);
+            executor.shutdown();
+        }
     }
 
     @Test
