@@ -1440,19 +1440,19 @@ public class MultiTenantLookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Counts the number of entities that match the provided {@code DetachedCriteria}. The count is
+         * Counts the number of entities that match the provided {@code QuerySpec}. The count is
          * based on the selection criteria specified in the query.
          *
-         * @param criteria The selection criteria to be applied for counting.
+         * @param querySpec The query specification that defines the criteria and conditions.
          * @return The number of matching entities.
          */
-        long count(QuerySpec<T, Long> criteria) {
+        long count(QuerySpec<T, Long> querySpec) {
             val session = currentSession();
             CriteriaBuilder criteriaBuilder = session.getCriteriaBuilder();
             CriteriaQuery<Long> criteriaQuery = criteriaBuilder.createQuery(Long.class);
             Root<T> root = criteriaQuery.from(entityClass);
             criteriaQuery.select(criteriaBuilder.count(root));
-            criteria.apply(root, criteriaQuery, criteriaBuilder);
+            querySpec.apply(root, criteriaQuery, criteriaBuilder);
             Query<Long> query = session.createQuery(criteriaQuery);
             return query.getSingleResult();
         }
