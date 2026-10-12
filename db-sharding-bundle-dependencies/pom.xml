@@ -23,13 +23,28 @@
         <dependencies>
 
             <!-- ===== Hibernate 6 ORM stack =====
-                 hibernate-core, hibernate-validator and jackson-datatype-hibernate6 are
-                 managed by dropwizard-dependencies 5.0.2. Only artifacts the DW5 BOM
-                 does not manage are pinned here. -->
+                 Pinned explicitly so this project can track the latest Hibernate releases
+                 independently of the Dropwizard BOM. hibernate-envers is kept in lockstep
+                 with hibernate-core. Import this BOM BEFORE dropwizard-bom so these win. -->
+            <dependency>
+                <groupId>org.hibernate.orm</groupId>
+                <artifactId>hibernate-core</artifactId>
+                <version>${hibernate.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.hibernate.orm</groupId>
                 <artifactId>hibernate-envers</artifactId>
-                <version>${hibernate-envers.version}</version>
+                <version>${hibernate.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.hibernate.validator</groupId>
+                <artifactId>hibernate-validator</artifactId>
+                <version>${hibernate-validator.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-hibernate6</artifactId>
+                <version>${jackson-datatype-hibernate6.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.phaneesh</groupId>

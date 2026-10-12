@@ -88,10 +88,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <dropwizard.version>5.0.2</dropwizard.version>
 
-        <!-- Hibernate 6 stack: hibernate-core/validator and jackson-datatype-hibernate6
-             are managed by dropwizard-dependencies 5.0.2 (via jackson-bom 2.21.4);
-             only artifacts the DW5 BOM does not manage are pinned here. -->
-        <hibernate-envers.version>6.6.52.Final</hibernate-envers.version>
+        <!-- Hibernate 6 stack: pinned explicitly (not left to the DW BOM) so this
+             project can upgrade ahead of the Dropwizard BOM to the latest available
+             releases. Keep hibernate-envers aligned with hibernate-core. -->
+        <hibernate.version>6.6.53.Final</hibernate.version>
+        <hibernate-validator.version>8.0.3.Final</hibernate-validator.version>
+        <jackson-datatype-hibernate6.version>2.21.4</jackson-datatype-hibernate6.version>
         <jasypt-hibernate6.version>1.9.6</jasypt-hibernate6.version>
 
         <!-- Library versions -->
