@@ -18,7 +18,6 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.appform.dropwizard.sharding.query.QuerySpec;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.util.List;
 import java.util.Optional;
@@ -69,11 +68,6 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
     @Override
     public Optional<T> save(String parentKey, T entity) throws Exception {
         return delegate.save(dbNamespace, parentKey, entity);
-    }
-
-    @Override
-    public List<T> select(String parentKey, DetachedCriteria criteria, int first, int numResults) throws Exception {
-        return delegate.select(dbNamespace, parentKey, criteria, first, numResults);
     }
 
     @Override

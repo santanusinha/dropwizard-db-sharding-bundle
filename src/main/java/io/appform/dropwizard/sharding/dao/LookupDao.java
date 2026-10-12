@@ -26,9 +26,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.Criteria;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 
 import java.lang.reflect.Field;
 import java.util.List;
@@ -82,7 +80,7 @@ public class LookupDao<T> implements ShardedDao<T> {
         return Optional.ofNullable(get(key, x -> x, t -> t));
     }
 
-    public Optional<T> get(String key, UnaryOperator<Criteria> criteriaUpdater) throws Exception {
+    public Optional<T> get(String key, UnaryOperator<QuerySpec<T, T>> criteriaUpdater) throws Exception {
         return Optional.ofNullable(get(key, criteriaUpdater, t -> t));
     }
 
@@ -103,7 +101,7 @@ public class LookupDao<T> implements ShardedDao<T> {
     }
 
     @SuppressWarnings("java:S112")
-    public <U> U get(String key, UnaryOperator<Criteria> criteriaUpdater, Function<T, U> handler)
+    public <U> U get(String key, UnaryOperator<QuerySpec<T, T>> criteriaUpdater, Function<T, U> handler)
             throws Exception {
         return delegate.get(dbNamespace, key, criteriaUpdater, handler);
     }
@@ -239,7 +237,7 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @param criteriaUpdater A method that lets clients add additional changes to the criteria before the get
      * @return A new ReadOnlyContext for executing read operations on the specified entity.
      */
-    public ReadOnlyContext<T> readOnlyExecutor(String id, UnaryOperator<Criteria> criteriaUpdater) {
+    public ReadOnlyContext<T> readOnlyExecutor(String id, UnaryOperator<QuerySpec<T, T>> criteriaUpdater) {
         return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, criteriaUpdater));
     }
 
@@ -262,7 +260,7 @@ public class LookupDao<T> implements ShardedDao<T> {
 
     public ReadOnlyContext<T> readOnlyExecutor(
             String id,
-            UnaryOperator<Criteria> criteriaUpdater,
+            UnaryOperator<QuerySpec<T, T>> criteriaUpdater,
             Supplier<Boolean> entityPopulator) {
         return new ReadOnlyContext<>(delegate.readOnlyExecutor(dbNamespace, id, criteriaUpdater, entityPopulator));
     }
@@ -281,20 +279,6 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     public LockedContext<T> saveAndGetExecutor(T entity) {
         return delegate.saveAndGetExecutor(dbNamespace, entity);
-    }
-
-    /**
-     * Queries using the specified criteria across all shards and returns the result.
-     * <b>Note:</b> This method runs the query serially, and it's usage is not recommended.
-     * Performs a scatter-gather operation by executing a query on all database shards
-     * and collecting the results into a list of entities.
-     *
-     * @param criteria The DetachedCriteria object representing the query criteria to be executed
-     *                 on all database shards.
-     * @return A list of entities obtained by executing the query criteria on all available shards.
-     */
-    public List<T> scatterGather(DetachedCriteria criteria) {
-        return delegate.scatterGather(dbNamespace, criteria);
     }
 
     /**
@@ -351,33 +335,6 @@ public class LookupDao<T> implements ShardedDao<T> {
      * max N * pageSize elements
      */
     public ScrollResult<T> scrollDown(
-            final DetachedCriteria inCriteria,
-            final ScrollPointer inPointer,
-            final int pageSize,
-            @NonNull final String sortFieldName) {
-        return delegate.scrollDown(dbNamespace, inCriteria, inPointer, pageSize, sortFieldName);
-    }
-
-    /**
-     * Provides a scroll api for records across shards. This api will scroll down in ascending order of the
-     * 'sortFieldName' field. Newly added records can be polled by passing the pointer repeatedly. If nothing new is
-     * available, it will return an empty set of results.
-     * If the passed pointer is null, it will return the first pageSize records with a pointer to be passed to get the
-     * next pageSize set of records.
-     * <p>
-     * NOTES:
-     * - Do not modify the criteria between subsequent calls
-     * - It is important to provide a sort field that is perpetually increasing
-     * - Pointer returned can be used to _only_ scroll down
-     *
-     * @param inCriteria    The core criteria for the query
-     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll session
-     * @param pageSize      Page size of scroll result
-     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an ever-increasing one
-     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of results with
-     * max N * pageSize elements
-     */
-    public ScrollResult<T> scrollDown(
             final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
@@ -406,56 +363,11 @@ public class LookupDao<T> implements ShardedDao<T> {
      */
     @SneakyThrows
     public ScrollResult<T> scrollUp(
-            final DetachedCriteria inCriteria,
-            final ScrollPointer inPointer,
-            final int pageSize,
-            @NonNull final String sortFieldName) {
-        return delegate.scrollUp(dbNamespace, inCriteria, inPointer, pageSize, sortFieldName);
-    }
-
-    /**
-     * Provides a scroll api for records across shards. This api will scroll up in descending order of the
-     * 'sortFieldName' field.
-     * As this api goes back in order, newly added records will not be available in the scroll.
-     * If the passed pointer is null, it will return the last pageSize records with a pointer to be passed to get the
-     * previous pageSize set of records.
-     * <p>
-     * NOTES:
-     * - Do not modify the criteria between subsequent calls
-     * - It is important to provide a sort field that is perpetually increasing
-     * - Pointer returned can be used to _only_ scroll up
-     *
-     * @param inCriteria    The core criteria for the query
-     * @param inPointer     Existing {@link ScrollPointer}, should be null at start of a scroll session
-     * @param pageSize      Count of records per shard
-     * @param sortFieldName Field to sort by. For correct sorting, the field needs to be an ever-increasing one
-     * @return A {@link ScrollResult} object that contains a {@link ScrollPointer} and a list of results with
-     * max N * pageSize elements
-     */
-    @SneakyThrows
-    public ScrollResult<T> scrollUp(
             final QuerySpec<T, T> inCriteria,
             final ScrollPointer inPointer,
             final int pageSize,
             @NonNull final String sortFieldName) {
         return delegate.scrollUp(dbNamespace, inCriteria, inPointer, pageSize, sortFieldName);
-    }
-
-    /**
-     * Counts the number of entities that match the specified criteria on each database shard.
-     *
-     * <p>This method executes a count operation on all available database shards serially,
-     * counting the entities that satisfy the provided criteria on each shard. The results are then
-     * collected into a list, where each element corresponds to the count of matching entities on
-     * a specific shard.
-     *
-     * @param criteria The DetachedCriteria object representing the criteria for counting entities.
-     * @return A list of counts, where each count corresponds to the number of entities matching
-     * the criteria on a specific shard.
-     * @throws java.lang.RuntimeException If an error occurs while querying the database.
-     */
-    public List<Long> count(DetachedCriteria criteria) {
-        return delegate.count(dbNamespace, criteria);
     }
 
     /**
@@ -482,32 +394,8 @@ public class LookupDao<T> implements ShardedDao<T> {
      * @return A map of shard vs result-list
      */
     @SuppressWarnings("rawtypes")
-    public Map<Integer, List<T>> run(DetachedCriteria criteria) {
-        return delegate.run(dbNamespace, criteria);
-    }
-
-    /**
-     * Run arbitrary read-only queries on all shards and return results.
-     *
-     * @param criteria The detached criteria. Typically, a grouping or counting query
-     * @return A map of shard vs result-list
-     */
-    @SuppressWarnings("rawtypes")
     public Map<Integer, List<T>> run(QuerySpec<T, T> criteria) {
         return delegate.run(dbNamespace, criteria);
-    }
-
-    /**
-     * Run read-only queries on all shards and transform them into required types
-     *
-     * @param criteria   The detached criteria. Typically, a grouping or counting query
-     * @param translator A method to transform results to required type
-     * @param <U>        Return type
-     * @return Translated result
-     */
-    @SuppressWarnings("rawtypes")
-    public <U> U run(DetachedCriteria criteria, Function<Map<Integer, List<T>>, U> translator) {
-        return delegate.run(dbNamespace, criteria, translator);
     }
 
     /**
@@ -630,28 +518,6 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entities based on a DetachedCriteria, retrieving a single related entity
-         *
-         * <p>This method reads and augments parent entities based on the specified {@code criteria}, retrieving only a
-         * single child entity, and then applies the provided {@code consumer} function to augment it with related child
-         * entity. The consumer function is applied to parent entity.</p>
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting and composing parent entities.
-         * @param consumer      A function that applies the child entity augmentation to the parent entity.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the consumer function.
-         */
-        public <U> ReadOnlyContext<T> readOneAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                BiConsumer<T, List<U>> consumer) {
-            delegate.readOneAugmentParent(relationalDao.getDelegate(), criteria, consumer);
-            return this;
-        }
-
-        /**
          * Read and augment parent entities based on a QuerySpec, retrieving a single related entity and applying
          * operation.
          *
@@ -672,33 +538,6 @@ public class LookupDao<T> implements ShardedDao<T> {
                 QuerySpec<U, U> querySpec,
                 BiConsumer<T, List<U>> consumer) {
             delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpec, consumer);
-            return this;
-        }
-
-        /**
-         * Read and augment parent entities based on a DetachedCriteria and apply operations selectively.
-         *
-         * <p>This method augments parent entities based on the child entities selected through specified {@code
-         * criteria}
-         * The provided {@code consumer} function is then applied to augment the selected parent
-         * entity with related child entities.</p>
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting and composing parent entities.
-         * @param first         The index of the first parent entity to retrieve.
-         * @param numResults    The maximum number of parent entities to retrieve.
-         * @param consumer      A function that applies the child entity augmentation to the parent entities.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the consumer function.
-         */
-        public <U> ReadOnlyContext<T> readAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                int first,
-                int numResults,
-                BiConsumer<T, List<U>> consumer) {
-            delegate.readAugmentParent(relationalDao.getDelegate(), criteria, first, numResults, consumer);
             return this;
         }
 
@@ -731,37 +570,6 @@ public class LookupDao<T> implements ShardedDao<T> {
         }
 
         /**
-         * Read and augment parent entity based on a {@link org.hibernate.criterion.DetachedCriteria} and apply
-         * operations selectively.
-         *
-         * <p>This method augments parent entity based on the single child entity selected through specified
-         * {@link org.hibernate.criterion.DetachedCriteria}
-         * The provided {@code consumer} function is then applied to augment the selected parent entity with related
-         * child entities.</p>
-         * The filter function selectively applies the consumer function to the chosen parent entity.
-         *
-         * @param <U>           The type of child entities.
-         * @param relationalDao The relational data access object used to retrieve child entities.
-         * @param criteria      The DetachedCriteria for selecting parent entities.
-         * @param consumer      A function that applies the child entity augmentation to the parent entity.
-         * @param filter        A predicate function to filter the parent entity on which the consumer function is
-         *                      applied.
-         * @return This {@code ReadOnlyContext} instance to allow for method chaining.
-         * @throws RuntimeException if an error occurs during the read operation or when applying the consumer function.
-         *                          {@code readOneAugmentParent} method that accepts a {@code QuerySpec} for better
-         *                          query composition and
-         *                          type-safety.
-         */
-        public <U> ReadOnlyContext<T> readOneAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                BiConsumer<T, List<U>> consumer,
-                Predicate<T> filter) {
-            delegate.readOneAugmentParent(relationalDao.getDelegate(), criteria, consumer, filter);
-            return this;
-        }
-
-        /**
          * Read and augment parent entity based on a {@link io.appform.dropwizard.sharding.query.QuerySpec} and apply
          * operations selectively.
          *
@@ -788,18 +596,6 @@ public class LookupDao<T> implements ShardedDao<T> {
             delegate.readOneAugmentParent(relationalDao.getDelegate(), querySpec, consumer, filter);
             return this;
         }
-
-        public <U> ReadOnlyContext<T> readAugmentParent(
-                RelationalDao<U> relationalDao,
-                DetachedCriteria criteria,
-                int first,
-                int numResults,
-                BiConsumer<T, List<U>> consumer,
-                Predicate<T> filter) {
-            delegate.readAugmentParent(relationalDao.getDelegate(), criteria, first, numResults, consumer, filter);
-            return this;
-        }
-
 
         /**
          * Reads and augments a parent entity using a relational DAO, applying a filter and consumer function.

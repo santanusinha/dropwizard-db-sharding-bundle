@@ -4,7 +4,6 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import lombok.val;
 import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
-import org.hibernate.criterion.DetachedCriteria;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -31,7 +30,7 @@ class UpdateWithScrollTest {
     Order o2 = Order.builder().id(2).customerId("C2").build();
 
     ScrollableResults scrollableResults = mock(ScrollableResults.class);
-    when(scrollableResults.get(0)).thenReturn(o, o2);
+    when(scrollableResults.get()).thenReturn(o, o2);
     when(scrollableResults.next()).thenReturn(true, true, false);
 
     Function<ScrollParam<Order>, ScrollableResults> spiedScroll = LambdaTestUtils.spiedFunction(
@@ -46,7 +45,7 @@ class UpdateWithScrollTest {
     val updateWithScroll = UpdateWithScroll.<Order>builder()
         .scrollParam(
             ScrollParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
+                .querySpec((queryRoot, query, criteriaBuilder) -> {})
                 .build())
         .scroll(spiedScroll)
         .updateNext(spiedUpdateNext)
@@ -67,7 +66,7 @@ class UpdateWithScrollTest {
     Order o2 = Order.builder().id(2).customerId("C2").build();
 
     ScrollableResults scrollableResults = mock(ScrollableResults.class);
-    when(scrollableResults.get(0)).thenReturn(null);
+    when(scrollableResults.get()).thenReturn(null);
     when(scrollableResults.next()).thenReturn(true, true, false);
 
     Function<ScrollParam<Order>, ScrollableResults> spiedScroll = LambdaTestUtils.spiedFunction(
@@ -82,7 +81,7 @@ class UpdateWithScrollTest {
     val updateWithScroll = UpdateWithScroll.<Order>builder()
         .scrollParam(
             ScrollParam.<Order>builder()
-                .criteria(DetachedCriteria.forClass(Order.class))
+                .querySpec((queryRoot, query, criteriaBuilder) -> {})
                 .build())
         .scroll(spiedScroll)
         .updateNext(spiedUpdateNext)

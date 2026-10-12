@@ -21,9 +21,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import javax.persistence.criteria.Order;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
+import jakarta.persistence.criteria.Order;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+
 import java.util.List;
 import java.util.Map;
 
@@ -174,22 +175,22 @@ public class ParentChildTest {
     }
 
 
-        private SessionFactory buildSessionFactory (String dbName){
-            Configuration configuration = new Configuration();
-            configuration.setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-            configuration.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
-            configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
-            configuration.setProperty("hibernate.hbm2ddl.auto", "create");
-            configuration.setProperty("hibernate.current_session_context_class", "managed");
-            configuration.setProperty("hibernate.show_sql", "true");
+    private SessionFactory buildSessionFactory(String dbName) {
+        Configuration configuration = new Configuration();
+        configuration.setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
+        configuration.setProperty("hibernate.connection.driver_class", "org.h2.Driver");
+        configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
+        configuration.setProperty("hibernate.hbm2ddl.auto", "create");
+        configuration.setProperty("hibernate.current_session_context_class", "managed");
+        configuration.setProperty("hibernate.show_sql", "true");
 
-            configuration.addAnnotatedClass(ParentClass.class);
-            configuration.addAnnotatedClass(ChildAClass.class);
-            configuration.addAnnotatedClass(ChildBClass.class);
+        configuration.addAnnotatedClass(ParentClass.class);
+        configuration.addAnnotatedClass(ChildAClass.class);
+        configuration.addAnnotatedClass(ChildBClass.class);
 
-            StandardServiceRegistry serviceRegistry
-                    = new StandardServiceRegistryBuilder().applySettings(
-                    configuration.getProperties()).build();
-            return configuration.buildSessionFactory(serviceRegistry);
-        }
+        StandardServiceRegistry serviceRegistry
+                = new StandardServiceRegistryBuilder().applySettings(
+                configuration.getProperties()).build();
+        return configuration.buildSessionFactory(serviceRegistry);
     }
+}

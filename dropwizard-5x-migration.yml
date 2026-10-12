@@ -1,0 +1,36 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: org.example.Dropwizard2to5Migration
+displayName: Dropwizard 2.x to 5.x Migration
+description: Migrates a Dropwizard application from version 2.x to 5.x.
+tags:
+  - dropwizard
+  - migration
+  - java
+
+recipeList:
+  - org.openrewrite.maven.ChangePropertyValue:
+      key: dropwizard.version
+      newValue: 5.0.0-rc.3
+  - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
+      oldGroupId: org.hibernate
+      oldArtifactId: hibernate-core
+      newGroupId: org.hibernate.orm
+      newArtifactId: hibernate-core
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.Application
+      newFullyQualifiedTypeName: io.dropwizard.core.Application
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.Configuration
+      newFullyQualifiedTypeName: io.dropwizard.core.Configuration
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.cli.Command
+      newFullyQualifiedTypeName: io.dropwizard.core.cli.Command
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.setup.Environment
+      newFullyQualifiedTypeName: io.dropwizard.core.setup.Environment
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.setup.Bootstrap
+      newFullyQualifiedTypeName: io.dropwizard.core.setup.Bootstrap
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: io.dropwizard.setup.AdminEnvironment
+      newFullyQualifiedTypeName: io.dropwizard.core.setup.AdminEnvironment

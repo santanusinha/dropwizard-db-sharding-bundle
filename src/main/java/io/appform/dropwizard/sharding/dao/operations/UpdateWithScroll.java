@@ -37,7 +37,7 @@ public class UpdateWithScroll<T> extends OpContext<Boolean> {
     boolean updateNextObject = true;
     try (scrollableResults) {
       while (scrollableResults.next() && updateNextObject) {
-        final T entity = (T) scrollableResults.get(0);
+        final T entity = (T) scrollableResults.get();
         if (null == entity) {
           return false;
         }

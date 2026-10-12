@@ -1,10 +1,10 @@
 package io.appform.dropwizard.sharding.hibernate;
 
 import io.appform.dropwizard.sharding.healthcheck.HealthCheckManager;
+import io.dropwizard.core.setup.Environment;
 import io.dropwizard.db.DatabaseConfiguration;
 import io.dropwizard.db.ManagedDataSource;
 import io.dropwizard.db.PooledDataSourceFactory;
-import io.dropwizard.setup.Environment;
 import io.dropwizard.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.SessionFactory;
@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
@@ -71,7 +72,8 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
                                                        final Map<String, String> properties) {
         final DatasourceConnectionProviderImpl connectionProvider = new DatasourceConnectionProviderImpl();
         connectionProvider.setDataSource(dataSource);
-        connectionProvider.configure(properties);
+        Map<String, Object> newProperties = properties.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        connectionProvider.configure(newProperties);
         return connectionProvider;
     }
 
@@ -80,20 +82,21 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
                                                final Map<String, String> properties,
                                                final List<Class<?>> entities) {
 
-        final BootstrapServiceRegistry bootstrapServiceRegistry = new BootstrapServiceRegistryBuilder().build();
+        final BootstrapServiceRegistry bootstrapServiceRegistry =
+                configureBootstrapServiceRegistryBuilder(new BootstrapServiceRegistryBuilder()).build();
+
         final Configuration configuration = new Configuration(bootstrapServiceRegistry);
         configuration.setProperty(AvailableSettings.CURRENT_SESSION_CONTEXT_CLASS, "managed");
         configuration.setProperty(AvailableSettings.USE_SQL_COMMENTS, Boolean.toString(dbConfig.isAutoCommentsEnabled()));
         configuration.setProperty(AvailableSettings.USE_GET_GENERATED_KEYS, "true");
         configuration.setProperty(AvailableSettings.GENERATE_STATISTICS, "true");
-        configuration.setProperty(AvailableSettings.USE_REFLECTION_OPTIMIZER, "true");
         configuration.setProperty(AvailableSettings.ORDER_UPDATES, "true");
         configuration.setProperty(AvailableSettings.ORDER_INSERTS, "true");
-        configuration.setProperty(AvailableSettings.USE_NEW_ID_GENERATOR_MAPPINGS, "true");
-        configuration.setProperty("jadira.usertype.autoRegisterUserTypes", "true");
+
         for (Map.Entry<String, String> property : properties.entrySet()) {
             configuration.setProperty(property.getKey(), property.getValue());
         }
+
         addAnnotatedClasses(configuration, entities);
         final ServiceRegistry registry = new StandardServiceRegistryBuilder(bootstrapServiceRegistry)
                 .addService(ConnectionProvider.class, connectionProvider)
@@ -104,6 +107,10 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
 
     public SessionFactory getSessionFactory() {
         return requireNonNull(sessionFactory);
+    }
+
+    protected BootstrapServiceRegistryBuilder configureBootstrapServiceRegistryBuilder(BootstrapServiceRegistryBuilder builder) {
+        return builder;
     }
 
     private void addAnnotatedClasses(final Configuration configuration,

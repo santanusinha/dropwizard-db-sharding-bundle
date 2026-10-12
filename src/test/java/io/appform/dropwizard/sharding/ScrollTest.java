@@ -7,16 +7,19 @@ import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
 import io.appform.dropwizard.sharding.dao.testdata.entities.ScrollTestEntity;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollPointer;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
-import org.hibernate.criterion.DetachedCriteria;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
- * Tests out functionality for {@link LookupDao#scrollDown(DetachedCriteria, ScrollPointer, int, String)}
+ * Tests out functionality for {@link LookupDao#scrollDown(QuerySpec, ScrollPointer, int, String)}
  */
 @Slf4j
 public class ScrollTest {
@@ -74,14 +77,16 @@ public class ScrollTest {
 
         //Now scroll up to read everything
         do {
-            result = lookupDao.scrollUp(DetachedCriteria.forClass(ScrollTestEntity.class),
-                                        pointer,
-                                        pageSize,
-                                        "id");
+            result = lookupDao.scrollUp((root, query, cb) -> {
+                        // No filter, just select all ScrollTestEntity
+                    },
+                    pointer,
+                    pageSize,
+                    "id");
             addValuesToSet(entities, result);
             pointer = result.getPointer();
             log.info("Received {} entities",
-                     result.getResult().stream().map(ScrollTestEntity::getId).collect(Collectors.toList()));
+                    result.getResult().stream().map(ScrollTestEntity::getId).collect(Collectors.toList()));
         } while (!result.getResult().isEmpty());
         val expected = new Integer[]{
                 399, 395, 394, 392, 400, 391, 398, 390, 397, 387, 396, 386, 393, 382, 389, 380, 388, 379, 385, 378,
@@ -106,7 +111,7 @@ public class ScrollTest {
         final List<Integer> expectedSortedValues = Arrays.asList(expected);
         assertEquals(expectedSortedValues, entities, "Seems like sort order is broken");
         assertTrue(entities.containsAll(ids),
-                   "There are " + Sets.difference(ids, Set.copyOf(entities)) + " ids missing in scroll");
+                "There are " + Sets.difference(ids, Set.copyOf(entities)) + " ids missing in scroll");
     }
 
     @Test
@@ -123,14 +128,16 @@ public class ScrollTest {
 
         //Now scroll up to read everything
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
-                                          pointer,
-                                          pageSize,
-                                          "id");
+            result = lookupDao.scrollDown((root, query, cb) -> {
+                        // No filter, just select all ScrollTestEntity
+                    },
+                    pointer,
+                    pageSize,
+                    "id");
             addValuesToSet(entities, result);
             pointer = result.getPointer();
             log.info("Received {} entities",
-                     result.getResult().stream().map(ScrollTestEntity::getId).collect(Collectors.toList()));
+                    result.getResult().stream().map(ScrollTestEntity::getId).collect(Collectors.toList()));
         } while (!result.getResult().isEmpty());
         val expected = new Integer[]{
                 1, 3, 2, 4, 6, 5, 8, 7, 9, 12, 10, 13, 11, 14, 15, 16, 19, 17, 20, 18, 21, 22, 23, 27, 24, 28, 25, 29
@@ -155,7 +162,7 @@ public class ScrollTest {
         final List<Integer> expectedSortedValues = Arrays.asList(expected);
         assertEquals(expectedSortedValues, entities, "Looks like sort order is broken");
         assertTrue(entities.containsAll(ids),
-                   "There are " + Sets.difference(ids, Set.copyOf(entities)) + " ids missing in scroll");
+                "There are " + Sets.difference(ids, Set.copyOf(entities)) + " ids missing in scroll");
     }
 
     @Test
@@ -168,33 +175,36 @@ public class ScrollTest {
         var result = (ScrollResult<ScrollTestEntity>) null;
         var pointer = (ScrollPointer) null;
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
-                                          pointer,
-                                          10,
-                                          "id");
+            result = lookupDao.scrollDown(
+                    (queryRoot, query, criteriaBuilder) -> {
+                    },
+                    pointer,
+                    10,
+                    "id");
             addValuesToSet(entities, result);
             pointer = result.getPointer();
             log.info("Received {} entities",
-                     result.getResult().stream().map(ScrollTestEntity::getId).collect(Collectors.toList()));
-        } while (result.getResult().size() != 0);
+                    result.getResult().stream().map(ScrollTestEntity::getId).collect(Collectors.toList()));
+        } while (!result.getResult().isEmpty());
         assertTrue(entities.containsAll(ids),
-                   "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
+                "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
         populateEntities(numEntities + 1, 2 * numEntities, ids);
 
         /*Pointer does not need to be reset here. This is because sort order is on the auto increment id field.
         If it is not such a field, the results of scroll would be wrong for obvious reasons*/
 
         do {
-            result = lookupDao.scrollDown(DetachedCriteria.forClass(ScrollTestEntity.class),
-                                          pointer,
-                                          10,
-                                          "id");
+            result = lookupDao.scrollDown(
+                    (queryRoot, query, criteriaBuilder) -> {},
+                    pointer,
+                    10,
+                    "id");
             addValuesToSet(entities, result);
             pointer = result.getPointer();
             log.info("Received {} entities", result.getResult().size());
         } while (result.getResult().size() != 0);
         assertTrue(entities.containsAll(ids),
-                   "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
+                "There are " + Sets.difference(ids, entities).size() + " ids missing in scroll");
     }
 
     @Test
@@ -350,9 +360,9 @@ public class ScrollTest {
     private SessionFactory buildSessionFactory(String dbName) {
         Configuration configuration = new Configuration();
         configuration.setProperty("hibernate.dialect",
-                                  "org.hibernate.dialect.H2Dialect");
+                "org.hibernate.dialect.H2Dialect");
         configuration.setProperty("hibernate.connection.driver_class",
-                                  "org.h2.Driver");
+                "org.h2.Driver");
         configuration.setProperty("hibernate.connection.url", "jdbc:h2:mem:" + dbName);
         configuration.setProperty("hibernate.hbm2ddl.auto", "create");
         configuration.setProperty("hibernate.current_session_context_class", "managed");
@@ -369,18 +379,17 @@ public class ScrollTest {
 
     private void populateEntities(int start, int end, HashSet<Integer> ids) {
         ids.addAll(IntStream.rangeClosed(start, end)
-                           .mapToObj(i -> {
-                               try {
-                                   return lookupDao.save(new ScrollTestEntity(0, "ID_" + i, i))
-                                           .orElse(null)
-                                           ;
-                               }
-                               catch (Exception e) {
-                                   throw new RuntimeException(e);
-                               }
-                           })
-                           .filter(Objects::nonNull)
-                           .map(ScrollTestEntity::getValue)
-                           .collect(Collectors.toSet()));
+                .mapToObj(i -> {
+                    try {
+                        return lookupDao.save(new ScrollTestEntity(0, "ID_" + i, i))
+                                .orElse(null)
+                                ;
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .filter(Objects::nonNull)
+                .map(ScrollTestEntity::getValue)
+                .collect(Collectors.toSet()));
     }
 }

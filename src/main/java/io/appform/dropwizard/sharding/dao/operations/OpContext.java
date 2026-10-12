@@ -4,10 +4,8 @@ import io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecut
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey;
-import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKeyByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao;
-import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
@@ -24,63 +22,53 @@ import java.util.function.Function;
 @Data
 public abstract class OpContext<T> implements Function<Session, T> {
 
-  public abstract OpType getOpType();
+    public abstract OpType getOpType();
 
-  public abstract <P> P visit(OpContextVisitor<P> visitor);
+    public abstract <P> P visit(OpContextVisitor<P> visitor);
 
-  public interface OpContextVisitor<P> {
+    public interface OpContextVisitor<P> {
 
-    P visit(Count opContext);
+        P visit(CountByQuerySpec opContext);
 
-    P visit(CountByQuerySpec opContext);
+        <T, G, R> P visit(GetByQuerySpec<T, G, R> opContext);
 
-    <T, R> P visit(Get<T, R> opContext);
+        <T, R> P visit(GetByLookupKeyByQuerySpec<T, R> opContext);
 
-    <T> P visit(GetAndUpdate<T> opContext);
+        <T> P visit(GetAndUpdateByLookupKey<T> opContext);
 
-    <T, R> P visit(GetByLookupKey<T, R> opContext);
+        <T> P visit(ReadOnlyForLookupDao<T> opContext);
 
-    <T> P visit(GetAndUpdateByLookupKey<T> opContext);
+        <T> P visit(ReadOnlyForRelationalDao<T> opContext);
 
-    <T> P visit(ReadOnlyForLookupDao<T> opContext);
+        <T> P visit(LockAndExecute<T> opContext);
 
-    <T> P visit(ReadOnlyForRelationalDao<T> opContext);
+        P visit(UpdateByQuery opContext);
 
-    <T> P visit(LockAndExecute<T> opContext);
+        <T> P visit(UpdateWithScroll<T> opContext);
 
-    P visit(UpdateByQuery opContext);
+        <T> P visit(UpdateAll<T> opContext);
 
-    <T> P visit(UpdateWithScroll<T> opContext);
+        <T> P visit(SelectAndUpdate<T> opContext);
 
-    <T> P visit(UpdateAll<T> opContext);
+        <T> P visit(RunInSession<T> opContext);
 
-    <T> P visit(SelectAndUpdate<T> opContext);
+        P visit(DeleteByLookupKey opContext);
 
-    <T> P visit(RunInSession<T> opContext);
+        <U, V> P visit(Save<U, V> opContext);
 
-    <T> P visit(RunWithCriteria<T> opContext);
+        <T> P visit(SaveAll<T> opContext);
 
-    P visit(DeleteByLookupKey opContext);
+        <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
 
-    <U, V> P visit(Save<U, V> opContext);
+        <U, T> P visit(CreateOrUpdateByQuerySpec<U, T> opContext);
 
-    <T> P visit(SaveAll<T> opContext);
+        <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
 
-    <T> P visit(CreateOrUpdateByLookupKey<T> opContext);
+        <T, R> P visit(Select<T, R> opContext);
 
-    <T> P visit(CreateOrUpdate<T> opContext);
+        <U, T> P visit(RunWithQuerySpec<U, T> opContext);
 
-    <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext);
-
-    <T, R> P visit(Select<T, R> opContext);
-
-    <T, R> P visit(GetByQuerySpec<T, R> opContext);
-
-    <U, T> P visit(RunWithQuerySpec<U, T> opContext);
-
-    <T, R> P visit(GetByLookupKeyByQuerySpec<T, R> opContext);
-
-    <U, T> P visit(CreateOrUpdateByQuerySpec<U, T> opContext);
-  }
+        <T> P visit(GetAndUpdateByQuerySpec<T> opContext);
+    }
 
 }

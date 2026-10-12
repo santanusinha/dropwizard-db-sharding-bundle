@@ -16,14 +16,14 @@ import java.util.function.Function;
  */
 @Data
 @Builder
-public class GetByQuerySpec<T, R> extends OpContext<R> {
+public class GetByQuerySpec<T, G,  R> extends OpContext<R> {
 
   @NonNull
   private QuerySpec<T, T> criteria;
   @NonNull
-  private Function<QuerySpec<T, T>, T> getter;
+  private Function<QuerySpec<T, T>, G> getter;
   @Builder.Default
-  private Function<T, R> afterGet = t -> (R) t;
+  private Function<G, R> afterGet = t -> (R) t;
 
 
   @Override

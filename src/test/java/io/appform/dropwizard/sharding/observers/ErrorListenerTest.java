@@ -8,11 +8,10 @@ import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
 import io.appform.dropwizard.sharding.listeners.TransactionListener;
 import io.appform.dropwizard.sharding.observers.entity.SimpleChild;
 import io.appform.dropwizard.sharding.observers.entity.SimpleParent;
+import io.appform.dropwizard.sharding.query.QuerySpec;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Property;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -124,8 +123,8 @@ public class ErrorListenerTest extends BundleBasedTestBase {
         assertThrows(Exception.class,
                 () -> parentDao.lockAndGetExecutor(parent.getName())
                         .update(childDao,
-                                DetachedCriteria.forClass(SimpleChild.class)
-                                        .add(Property.forName(SimpleChild.Fields.parent).eq(parent.getName())),
+                                (QuerySpec<SimpleChild, SimpleChild>) (queryRoot, query, criteriaBuilder) ->
+                                        query.where(criteriaBuilder.equal(queryRoot.get(SimpleChild.Fields.parent), parent.getName())),
                                 child -> {
                                     throw new RuntimeException("Test error");
                                 })
