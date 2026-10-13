@@ -18,6 +18,8 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.Getter;
 import lombok.val;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -80,6 +82,7 @@ class BundleMvccSnapshotTest {
 
     private LookupDao<TestEntity> writeLookupDao;
     private LookupDao<TestEntity> readLookupDao;
+    private SessionFactory readSessionFactory;
 
     @BeforeEach
     void setUp() {
@@ -106,6 +109,7 @@ class BundleMvccSnapshotTest {
                 .shardingOptions(ShardingBundleOptions.builder().build())
                 .build()));
         readLookupDao = readBundle.createParentObjectDao(TestEntity.class);
+        readSessionFactory = readBundle.getSessionFactories().get(0);
     }
 
     /**
@@ -199,6 +203,88 @@ class BundleMvccSnapshotTest {
         assertEquals("version-2", v2.get().getText(),
                 "After an errored optional read, onError() must roll back the connection so later "
                         + "reads see the latest commit — not a stale MVCC snapshot");
+    }
+
+    /**
+     * Pool-level safety net: a connection returned to the pool with an implicit transaction still
+     * open must not leak that transaction (and its REPEATABLE_READ snapshot) to the next borrower.
+     *
+     * <p>The bundle forces {@code autoCommit=false} on the pool, so ANY statement opens an implicit
+     * DB transaction. The bundle's own {@code TransactionHandler} always closes it, but code that
+     * uses the session factory outside a managed transaction (raw sessions, {@code doWork},
+     * third-party libraries) can still return a connection mid-transaction. The bundle therefore
+     * enables Tomcat JDBC {@code rollbackOnReturn}, which rolls back such a connection when it is
+     * returned to the pool.
+     *
+     * <p>Sequence (read pool has exactly one physical connection):
+     * <ol>
+     *   <li>Write {@code "version-1"} via writeBundle.</li>
+     *   <li>Raw session on the read session factory runs a SELECT via {@code doWork} WITHOUT a
+     *       managed transaction and closes — the implicit transaction is left open on C_read.</li>
+     *   <li>Update to {@code "version-2"} via writeBundle.</li>
+     *   <li>Read via readLookupDao on the same C_read:
+     *       <ul>
+     *         <li><b>With rollbackOnReturn:</b> the pool rolled back on return → fresh snapshot →
+     *             {@code "version-2"} ✓</li>
+     *         <li><b>Without:</b> the leaked transaction is still open; the bundle's
+     *             {@code beginTransaction()} is a no-op on an autoCommit=false connection, so the
+     *             read joins the old snapshot → stale {@code "version-1"} ✗</li>
+     *       </ul></li>
+     * </ol>
+     */
+    @Test
+    void get_afterLeakedImplicitTransactionOutsideBundle_seesLatestCommit() throws Exception {
+        // 1. Write "version-1"
+        writeLookupDao.save(TestEntity.builder()
+                .externalId("mvcc-leak-1")
+                .text("version-1")
+                .build());
+
+        // 2. Leak an implicit transaction on the single pooled read connection: run a SELECT
+        //    outside any managed transaction and close the session without commit/rollback.
+        try (Session session = readSessionFactory.openSession()) {
+            session.doWork(connection -> {
+                try (val stmt = connection.prepareStatement(
+                        "SELECT text FROM test_entity WHERE ext_id = ?")) {
+                    stmt.setString(1, "mvcc-leak-1");
+                    try (val rs = stmt.executeQuery()) {
+                        assertTrue(rs.next());
+                        assertEquals("version-1", rs.getString(1));
+                    }
+                }
+            });
+        }
+
+        // 3. Update to "version-2" via writeBundle — commits on a separate connection
+        writeLookupDao.update("mvcc-leak-1", entity -> {
+            entity.ifPresent(e -> e.setText("version-2"));
+            return entity.orElse(null);
+        });
+
+        // 4. Read again on the same physical C_read (pool_size=1)
+        val v2 = readLookupDao.get("mvcc-leak-1");
+        assertTrue(v2.isPresent());
+        assertEquals("version-2", v2.get().getText(),
+                "A connection returned with an open implicit transaction must be rolled back by "
+                        + "the pool so later reads see the latest commit — not a stale MVCC snapshot");
+    }
+
+    @Test
+    void bundleForcesRollbackOnReturnAndAutoCommitOff() {
+        val dsf = buildReadDataSourceFactory("jdbc:h2:mem:rbr_" + System.nanoTime()
+                + ";DB_CLOSE_DELAY=-1");
+        dsf.setAutoCommitByDefault(true);
+        dsf.setRollbackOnReturn(false);
+        dsf.setProperties(new HashMap<>(Map.of(
+                "hibernate.dialect", "org.hibernate.dialect.H2Dialect",
+                "hibernate.hbm2ddl.auto", "create")));
+        initBundle(new TestConfig(ShardedHibernateFactory.builder()
+                .shards(List.of(dsf))
+                .shardingOptions(ShardingBundleOptions.builder().build())
+                .build()));
+        assertEquals(Boolean.FALSE, dsf.getAutoCommitByDefault());
+        assertTrue(dsf.getRollbackOnReturn(),
+                "Bundle must enable rollbackOnReturn together with autoCommit=false");
     }
 
     // -------------------------------------------------------------------------

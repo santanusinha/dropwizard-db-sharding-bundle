@@ -71,7 +71,16 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
 
     private void disableAutoCommit(final PooledDataSourceFactory dbConfig) {
         if (dbConfig instanceof DataSourceFactory) {
-            ((DataSourceFactory) dbConfig).setAutoCommitByDefault(false);
+            final DataSourceFactory dataSourceFactory = (DataSourceFactory) dbConfig;
+            dataSourceFactory.setAutoCommitByDefault(false);
+            // With autoCommit=false every statement opens an implicit DB transaction. If a
+            // connection is returned to the pool with that transaction still open (e.g. SQL run
+            // outside a managed transaction by a raw session, doWork or a third-party library),
+            // the next borrower inherits its REPEATABLE_READ snapshot and pending writes. Roll
+            // back on return so the pool never hands out a connection mid-transaction. Drivers
+            // that track transaction state (e.g. MariaDB Connector/J) skip the ROLLBACK when no
+            // transaction is open, so the normal commit/rollback path pays nothing extra.
+            dataSourceFactory.setRollbackOnReturn(true);
         } else {
             throw new IllegalArgumentException(
                     "Unsupported type: " + dbConfig.getClass().getName()
