@@ -1,0 +1,18 @@
+server:
+  applicationConnectors:
+    - type: http
+      port: 0
+  adminConnectors:
+    - type: http
+      port: 0
+
+sharding:
+  shards:
+    - driverClass: org.h2.Driver
+      url: jdbc:h2:mem:e2e_baddriver
+      user: sa
+      password: ""
+      validationQuery: select 1
+      properties:
+        hibernate.dialect: org.hibernate.dialect.H2Dialect
+        hibernate.hbm2ddl.auto: create

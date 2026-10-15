@@ -7,22 +7,25 @@
     <parent>
         <groupId>io.appform.dropwizard.sharding</groupId>
         <artifactId>db-sharding-bundle-root</artifactId>
-        <version>2.1.12-HIBERNATE6-RC7</version>
+        <version>5.0.2-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>db-sharding-bundle-dependencies</artifactId>
     <packaging>pom</packaging>
     <name>Dropwizard Database Sharding Bundle Dependencies</name>
-    <description>Dependency management for Dropwizard DB Sharding Bundle — Hibernate 6 edition.
+        <description>Dependency management for Dropwizard DB Sharding Bundle — Dropwizard 5 / Hibernate 6 edition.
         Inherits from db-sharding-bundle-root which has no dependencyManagement, so consumers
         who import this BOM receive only these explicit entries with no transitive BOM pollution.
-        Import BEFORE dropwizard-bom so Hibernate 6 versions win.</description>
+        Import BEFORE dropwizard-bom so these entries win.</description>
 
     <dependencyManagement>
         <dependencies>
 
-            <!-- ===== Hibernate 6 ORM stack ===== -->
+            <!-- ===== Hibernate 6 ORM stack =====
+                 Pinned explicitly so this project can track the latest Hibernate releases
+                 independently of the Dropwizard BOM. hibernate-envers is kept in lockstep
+                 with hibernate-core. Import this BOM BEFORE dropwizard-bom so these win. -->
             <dependency>
                 <groupId>org.hibernate.orm</groupId>
                 <artifactId>hibernate-core</artifactId>
@@ -47,27 +50,6 @@
                 <groupId>com.github.phaneesh</groupId>
                 <artifactId>jasypt-hibernate6</artifactId>
                 <version>${jasypt-hibernate6.version}</version>
-            </dependency>
-
-            <!-- ===== JAXB 4.x stack =====
-                 Overrides dropwizard-bom's jakarta.xml.bind-api:2.3.3 pin (a legacy
-                 transition release whose jar contains javax.xml.bind.* classes, not
-                 jakarta.xml.bind.*). Hibernate 6 requires jakarta.xml.bind-api 4.x.
-                 IMPORTANT: import this BOM BEFORE dropwizard-bom so these entries win. -->
-            <dependency>
-                <groupId>jakarta.xml.bind</groupId>
-                <artifactId>jakarta.xml.bind-api</artifactId>
-                <version>${jaxb.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.glassfish.jaxb</groupId>
-                <artifactId>jaxb-runtime</artifactId>
-                <version>${jaxb.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>jakarta.activation</groupId>
-                <artifactId>jakarta.activation-api</artifactId>
-                <version>${jakarta.activation-api.version}</version>
             </dependency>
 
         </dependencies>

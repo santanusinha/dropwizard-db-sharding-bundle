@@ -1,8 +1,8 @@
 package io.appform.dropwizard.sharding.dao;
 
 import io.dropwizard.util.Generics;
+import jakarta.annotation.Nullable;
 import jakarta.persistence.criteria.CriteriaQuery;
-import org.checkerframework.checker.nullness.qual.Nullable;
 import org.hibernate.Hibernate;
 import org.hibernate.HibernateException;
 import org.hibernate.NonUniqueResultException;
