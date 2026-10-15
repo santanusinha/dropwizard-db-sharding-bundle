@@ -19,15 +19,15 @@ package io.appform.dropwizard.sharding.config;
 
 import com.google.common.collect.Lists;
 import io.dropwizard.db.DataSourceFactory;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.Singular;
-import org.hibernate.validator.constraints.NotEmpty;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /**
