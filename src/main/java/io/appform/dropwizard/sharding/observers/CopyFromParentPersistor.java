@@ -25,6 +25,7 @@ import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdat
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
 import io.appform.dropwizard.sharding.utils.CopyFromParentUtils;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -33,9 +34,12 @@ import java.util.List;
  * Visitor that intercepts {@link SaveWithParent} operations to perform
  * mismatch detection and field copying based on configuration.
  * <p>
+ * Immutable: a new instance is created by {@link CopyFromParentObserver} whenever the resolved configuration changes.
+ * <p>
  * This is an internal implementation detail of {@link CopyFromParentObserver}.
  */
 @Slf4j
+@Data
 class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
 
     private final boolean copyEnabled;
@@ -43,10 +47,17 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
     private final boolean copyIfDefaultOnly;
     private final CopyFromParentMismatchListener mismatchListener;
 
+    /**
+     * @throws IllegalArgumentException if {@code mismatchDetectionEnabled} is true and {@code mismatchListener} is
+     *                                  null. Detection that has been asked for must never be silently skipped.
+     */
     CopyFromParentPersistor(boolean copyEnabled,
                             boolean mismatchDetectionEnabled,
                             boolean copyIfDefaultOnly,
                             CopyFromParentMismatchListener mismatchListener) {
+        if (mismatchDetectionEnabled && mismatchListener == null) {
+            throw new IllegalArgumentException(CopyFromParentObserver.LISTENER_REQUIRED_MESSAGE);
+        }
         this.copyEnabled = copyEnabled;
         this.mismatchDetectionEnabled = mismatchDetectionEnabled;
         this.copyIfDefaultOnly = copyIfDefaultOnly;
@@ -60,7 +71,7 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
         final U parent = opContext.getParent();
         final T entity = opContext.getEntity();
 
-        if (mismatchDetectionEnabled && mismatchListener != null) {
+        if (mismatchDetectionEnabled) {
             try {
                 List<CopyFromParentUtils.FieldMismatch> mismatches =
                         CopyFromParentUtils.detectMismatches(parent, entity);

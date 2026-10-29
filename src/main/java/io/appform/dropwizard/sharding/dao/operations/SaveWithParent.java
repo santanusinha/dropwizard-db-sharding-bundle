@@ -1,45 +1,55 @@
 package io.appform.dropwizard.sharding.dao.operations;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
-import org.hibernate.Session;
+import lombok.ToString;
 
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
- * Persists a child entity to the DB along with a typed reference to its parent entity.
+ * A {@link Save} of a child entity performed within a {@link io.appform.dropwizard.sharding.dao.LockedContext},
+ * which additionally carries a typed reference to the locked parent entity.
  * <p>
- * This OpContext is used when a child entity is saved within a
- * {@link io.appform.dropwizard.sharding.dao.LockedContext} and the parent entity needs to be
- * available to observers for processing (e.g. copying annotated fields from parent to child
- * before persistence).
+ * Being a {@link Save}, it behaves exactly like one ({@code entity}, {@code saver}, {@code afterSave} and
+ * {@code apply} are inherited unchanged); the only addition is {@code getParent()}. Observers can use the parent to
+ * apply custom logic (e.g. copying annotated fields from parent to child) before the actual save is executed.
  * <p>
- * Consumers can register an observer that visits this OpContext and applies custom logic
- * (such as field copying) using the parent reference before the actual save is executed.
+ * Visitors that do not override {@link OpContextVisitor#visit(SaveWithParent)} receive this very instance through
+ * {@link OpContextVisitor#visit(Save)}, so whatever they do to it (wrap/replace the saver, replace afterSave, replace
+ * the entity, keep the reference) is what gets executed.
+ * <p>
+ * Build instances with {@code saveWithParentBuilder()}. Note that {@code SaveWithParent.builder()} resolves to the
+ * inherited {@code Save.builder()} and builds a plain {@link Save}.
  *
  * @param <T> Type of child entity to be saved.
  * @param <R> Return type of the operation after performing any afterSave method.
  * @param <P> Type of the parent entity (from LockedContext).
  */
-@Data
-@Builder
-public class SaveWithParent<T, R, P> extends OpContext<R> {
+@Getter
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class SaveWithParent<T, R, P> extends Save<T, R> {
 
   @NonNull
-  private T entity;
-  @NonNull
-  private UnaryOperator<T> saver;
-  @Builder.Default
-  private Function<T, R> afterSave = t -> (R) t;
-  @NonNull
-  private P parent;
+  private final P parent;
 
-  @Override
-  public R apply(Session session) {
-    T result = saver.apply(entity);
-    return afterSave.apply(result);
+  /**
+   * @param entity    child entity to save; must not be null (enforced by {@link Save}'s constructor).
+   * @param saver     function that persists the entity; must not be null (enforced by {@link Save}'s constructor).
+   * @param afterSave function applied to the saved entity; when not provided (null), the saved entity itself is
+   *                  returned, same as {@link Save}'s default.
+   * @param parent    parent entity held by the LockedContext; must not be null.
+   */
+  @Builder(builderMethodName = "saveWithParentBuilder")
+  private SaveWithParent(T entity,
+                         UnaryOperator<T> saver,
+                         Function<T, R> afterSave,
+                         @NonNull P parent) {
+    super(entity, saver, afterSave != null ? afterSave : identity());
+    this.parent = parent;
   }
 
   @Override
@@ -50,5 +60,10 @@ public class SaveWithParent<T, R, P> extends OpContext<R> {
   @Override
   public <R1> R1 visit(OpContextVisitor<R1> visitor) {
     return visitor.visit(this);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <T, R> Function<T, R> identity() {
+    return t -> (R) t;
   }
 }

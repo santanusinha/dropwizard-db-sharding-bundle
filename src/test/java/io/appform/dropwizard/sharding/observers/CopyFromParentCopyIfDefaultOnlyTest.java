@@ -70,7 +70,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
         TestChild child = new TestChild();  // All default values
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -105,7 +105,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -141,7 +141,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -176,7 +176,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -208,7 +208,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -237,7 +237,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
         TestChild child = new TestChild();  // All defaults
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)

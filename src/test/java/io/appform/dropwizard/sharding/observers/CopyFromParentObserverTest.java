@@ -80,7 +80,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -117,7 +117,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -150,7 +150,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -192,7 +192,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -227,7 +227,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -260,7 +260,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -294,7 +294,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -329,7 +329,7 @@ class CopyFromParentObserverTest {
         MismatchChild child = MismatchChild.builder().txnId("DIFF").childAmount(50).build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -347,41 +347,87 @@ class CopyFromParentObserverTest {
     }
 
     @Test
-    void testLazyListenerInit_supplierFailure_copyContinues() {
+    void testLazyListenerInit_supplierFailure_failsFast_notCached_retriedNextTransaction() {
+        AtomicInteger attempts = new AtomicInteger(0);
+        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        RuntimeException cause = new RuntimeException("Guice not initialized");
         CopyFromParentObserver observer = CopyFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> {
-                    throw new RuntimeException("Guice not initialized");
+                    if (attempts.incrementAndGet() == 1) {
+                        throw cause;
+                    }
+                    return mockListener;
                 })
                 .build();
 
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
         TestChild child = TestChild.builder().build();
-
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
                         .build();
-
         TransactionExecutionContext ctx = createContext(opContext);
+        AtomicBoolean saveExecuted = new AtomicBoolean(false);
 
-        // Should not throw - supplier failure should be caught and logged
+        // Detection is enabled but cannot run -> config error -> transaction fails before the save
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> observer.execute(ctx, () -> {
+                    saveExecuted.set(true);
+                    return opContext.apply(null);
+                }));
+        assertSame(cause, ex.getCause());
+        assertFalse(saveExecuted.get(), "Save must not run when the listener cannot be resolved");
+        assertNull(child.getTxnId(), "Entity must not be touched when the listener cannot be resolved");
+
+        // Failure is not cached: the next transaction retries and succeeds
         TestChild result = observer.execute(ctx, () -> opContext.apply(null));
-
-        // Copy should still work
         assertEquals("TXN", result.getTxnId());
-        assertEquals(100, result.getChildAmount());
+        assertEquals(2, attempts.get());
+
+        // Success is cached
+        observer.execute(ctx, () -> opContext.apply(null));
+        assertEquals(2, attempts.get());
     }
 
     @Test
-    void testNonSaveWithParent_proceedsWithoutError() {
+    void testLazyListenerInit_supplierReturnsNull_failsFast() {
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .mismatchDetectionEnabled(true)
+                .mismatchListener(() -> null)
+                .build();
+
+        SaveWithParent<TestChild, TestChild, TestParent> opContext =
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
+                        .entity(TestChild.builder().build())
+                        .parent(TestParent.builder().transactionId("TXN").build())
+                        .saver(e -> e)
+                        .build();
+        TransactionExecutionContext ctx = createContext(opContext);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> observer.execute(ctx, () -> opContext.apply(null)));
+        assertTrue(ex.getMessage().contains("returned null"));
+    }
+
+    @Test
+    void testNonSaveWithParent_proceedsWithoutError_andDoesNotResolveConfigOrListener() {
+        AtomicInteger configCalls = new AtomicInteger(0);
+        AtomicInteger listenerCalls = new AtomicInteger(0);
         CopyFromParentObserver observer = CopyFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
-                .mismatchListener(() -> mock(CopyFromParentMismatchListener.class))
+                .mismatchListener(() -> {
+                    listenerCalls.incrementAndGet();
+                    return null; // would fail fast if it were ever resolved
+                })
+                .configSupplier(() -> {
+                    configCalls.incrementAndGet();
+                    return null;
+                })
                 .build();
 
         Save<String, String> saveOp = Save.<String, String>builder()
@@ -394,6 +440,8 @@ class CopyFromParentObserverTest {
         String result = observer.execute(ctx, () -> "done");
 
         assertEquals("done", result);
+        assertEquals(0, configCalls.get(), "Config must not be resolved for non SaveWithParent operations");
+        assertEquals(0, listenerCalls.get(), "Listener must not be resolved for non SaveWithParent operations");
     }
 
     // Test: Builder validation
@@ -425,7 +473,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -455,7 +503,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -485,7 +533,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -513,7 +561,7 @@ class CopyFromParentObserverTest {
         AtomicBoolean afterSaveCalled = new AtomicBoolean(false);
 
         SaveWithParent<TestChild, String, TestParent> opContext =
-                SaveWithParent.<TestChild, String, TestParent>builder()
+                SaveWithParent.<TestChild, String, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -533,7 +581,7 @@ class CopyFromParentObserverTest {
         assertEquals("transformed", result);
     }
 
-    private <R> TransactionExecutionContext createContext(io.appform.dropwizard.sharding.dao.operations.OpContext<R> opContext) {
+    private static <R> TransactionExecutionContext createContext(io.appform.dropwizard.sharding.dao.operations.OpContext<R> opContext) {
         return TransactionExecutionContext.builder()
                 .opContext(opContext)
                 .commandName("testCommand")
@@ -575,7 +623,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -611,7 +659,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -649,7 +697,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -697,7 +745,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -734,7 +782,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -769,7 +817,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -802,7 +850,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -815,8 +863,252 @@ class CopyFromParentObserverTest {
         assertEquals("TXN-123", result.getTxnId(), "Should fall back to static value when config supplier throws");
         assertEquals(500, result.getChildAmount(), "Should fall back to static value when config supplier throws");
         
-        // Config supplier is called once during getPersistor() initialization
-        assertEquals(1, callCount.get(), "Config supplier should be called once during initialization");
+        // Config supplier is called once for this single transaction
+        assertEquals(1, callCount.get(), "Config supplier should be called once per transaction");
+    }
+
+    @Test
+    void testConfigSupplier_exceptionAfterSuccessfulResolution_keepsLastResolvedConfig() {
+        // A transient failure of the config source must not flip behaviour back to static values.
+        AtomicBoolean fail = new AtomicBoolean(false);
+        TestConfig config = TestConfig.builder().copyEnabled(false).build();
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .copyEnabled(true) // static would enable copy
+                .configSupplier(() -> {
+                    if (fail.get()) {
+                        throw new RuntimeException("Config service unavailable");
+                    }
+                    return config;
+                })
+                .build();
+        TestParent parent = TestParent.builder().transactionId("TXN-123").amount(500).build();
+
+        TestChild first = TestChild.builder().build();
+        runSaveWithParent(observer, first, parent);
+        assertNull(first.getTxnId(), "dynamic copyEnabled=false must apply");
+        CopyFromParentPersistor before = observer.getPersistor();
+
+        fail.set(true);
+        TestChild second = TestChild.builder().build();
+        runSaveWithParent(observer, second, parent);
+        assertNull(second.getTxnId(), "last resolved config (copyEnabled=false) must be kept, not static (true)");
+        assertSame(before, observer.getPersistor(), "persistor must not be re-created on config fetch failure");
+
+        // Recovery: new value is picked up again
+        fail.set(false);
+        config.setCopyEnabled(true);
+        TestChild third = TestChild.builder().build();
+        runSaveWithParent(observer, third, parent);
+        assertEquals("TXN-123", third.getTxnId());
+    }
+
+    @Test
+    void testConfigSupplier_resolvedOnEveryTransaction_persistorReusedWhileUnchanged() {
+        AtomicInteger supplierCallCount = new AtomicInteger(0);
+        TestConfig config = TestConfig.builder()
+                .copyEnabled(true)
+                .mismatchDetectionEnabled(false)
+                .copyIfDefaultOnly(false)
+                .build();
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .configSupplier(() -> {
+                    supplierCallCount.incrementAndGet();
+                    return config;
+                })
+                .build();
+        TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
+
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+        CopyFromParentPersistor first = observer.getPersistor(); // 2nd supplier call
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+
+        assertEquals(4, supplierCallCount.get(), "Config supplier must be called on every resolution");
+        assertSame(first, observer.getPersistor(), "Persistor must be reused while config is unchanged");
+    }
+
+    @Test
+    void testConfigSupplier_eachFlagChange_recreatesPersistor_andTakesEffect() {
+        CopyFromParentMismatchListener listener = mock(CopyFromParentMismatchListener.class);
+        AtomicInteger listenerSupplierCalls = new AtomicInteger(0);
+        TestConfig config = TestConfig.builder()
+                .copyEnabled(false)
+                .mismatchDetectionEnabled(false)
+                .copyIfDefaultOnly(false)
+                .build();
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .configSupplier(() -> config)
+                .mismatchListener(() -> {
+                    listenerSupplierCalls.incrementAndGet();
+                    return listener;
+                })
+                .build();
+        TestParent parent = TestParent.builder().transactionId("PARENT-TXN").amount(500).build();
+
+        // copyEnabled=false
+        TestChild c1 = TestChild.builder().build();
+        runSaveWithParent(observer, c1, parent);
+        assertNull(c1.getTxnId());
+        CopyFromParentPersistor p1 = observer.getPersistor();
+        assertPersistorFlags(p1, false, false, false);
+        assertNull(p1.getMismatchListener());
+        assertEquals(0, listenerSupplierCalls.get(), "listener must not be resolved while detection is off");
+
+        // flip copyEnabled -> true
+        config.setCopyEnabled(true);
+        TestChild c2 = TestChild.builder().build();
+        runSaveWithParent(observer, c2, parent);
+        assertEquals("PARENT-TXN", c2.getTxnId());
+        CopyFromParentPersistor p2 = observer.getPersistor();
+        assertNotSame(p1, p2);
+        assertPersistorFlags(p2, true, false, false);
+
+        // flip copyIfDefaultOnly -> true: non-default child value must now fail
+        config.setCopyIfDefaultOnly(true);
+        TestChild c3 = TestChild.builder().txnId("MANUAL").build();
+        assertThrows(IllegalStateException.class, () -> runSaveWithParent(observer, c3, parent));
+        CopyFromParentPersistor p3 = observer.getPersistor();
+        assertNotSame(p2, p3);
+        assertPersistorFlags(p3, true, false, true);
+
+        // flip mismatchDetectionEnabled -> true: listener resolved now, and used
+        config.setCopyIfDefaultOnly(false);
+        config.setMismatchDetectionEnabled(true);
+        TestChild c4 = TestChild.builder().txnId("CHILD-TXN").build();
+        runSaveWithParent(observer, c4, parent);
+        CopyFromParentPersistor p4 = observer.getPersistor();
+        assertPersistorFlags(p4, true, true, false);
+        assertSame(listener, p4.getMismatchListener());
+        verify(listener, times(1)).onMismatches(eq(parent), eq(c4), any());
+        assertEquals(1, listenerSupplierCalls.get());
+
+        // detection off and on again: the listener is cached, not resolved again
+        config.setMismatchDetectionEnabled(false);
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+        assertNull(observer.getPersistor().getMismatchListener());
+        config.setMismatchDetectionEnabled(true);
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+        assertSame(listener, observer.getPersistor().getMismatchListener());
+        assertEquals(1, listenerSupplierCalls.get(), "listener must be resolved only once");
+    }
+
+    @Test
+    void testConfigSupplier_nullValueFallsBackToStatic_changeBetweenNullAndExplicitIsDetected() {
+        TestConfig config = TestConfig.builder().build(); // all null
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .copyEnabled(false) // static
+                .configSupplier(() -> config)
+                .build();
+        TestParent parent = TestParent.builder().transactionId("PARENT-TXN").build();
+
+        TestChild c1 = TestChild.builder().build();
+        runSaveWithParent(observer, c1, parent);
+        assertNull(c1.getTxnId(), "null dynamic value -> static (false)");
+        CopyFromParentPersistor p1 = observer.getPersistor();
+
+        // Explicit value equal to the effective one: resolved flags unchanged -> same persistor
+        config.setCopyEnabled(false);
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+        assertSame(p1, observer.getPersistor());
+
+        config.setCopyEnabled(true);
+        TestChild c2 = TestChild.builder().build();
+        runSaveWithParent(observer, c2, parent);
+        assertEquals("PARENT-TXN", c2.getTxnId());
+        assertNotSame(p1, observer.getPersistor());
+    }
+
+    @Test
+    void testConfigSupplier_runtimeEnablesDetectionWithoutListener_failsFast_thenRecoversWhenDisabled() {
+        TestConfig config = TestConfig.builder().mismatchDetectionEnabled(false).build();
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .configSupplier(() -> config)
+                .build(); // no listener
+        TestParent parent = TestParent.builder().transactionId("PARENT-TXN").build();
+
+        runSaveWithParent(observer, TestChild.builder().build(), parent);
+        CopyFromParentPersistor p1 = observer.getPersistor();
+
+        config.setMismatchDetectionEnabled(true);
+        TestChild child = TestChild.builder().build();
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> runSaveWithParent(observer, child, parent));
+        assertEquals(CopyFromParentObserver.LISTENER_REQUIRED_MESSAGE, ex.getMessage());
+        assertNull(child.getTxnId(), "nothing must be applied when the transaction fails on config");
+
+        config.setMismatchDetectionEnabled(false);
+        assertSame(p1, observer.getPersistor(), "failed creation must not replace the current persistor");
+        TestChild c3 = TestChild.builder().build();
+        runSaveWithParent(observer, c3, parent);
+        assertEquals("PARENT-TXN", c3.getTxnId());
+    }
+
+    @Test
+    void testConcurrentTransactions_singlePersistorCreated_listenerResolvedOnce() throws Exception {
+        AtomicInteger listenerSupplierCalls = new AtomicInteger(0);
+        TestConfig config = TestConfig.builder().copyEnabled(true).mismatchDetectionEnabled(true).build();
+        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+                .configSupplier(() -> config)
+                .mismatchListener(() -> {
+                    listenerSupplierCalls.incrementAndGet();
+                    // widen the race window: without the lock + re-check, other threads would create their own
+                    sleepUninterruptibly(50);
+                    return mock(CopyFromParentMismatchListener.class);
+                })
+                .build();
+        TestParent parent = TestParent.builder().transactionId("PARENT-TXN").amount(5).build();
+
+        final int threads = 16;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        // Identity set: CopyFromParentPersistor is @Data, so distinct instances with equal flags are equals()
+        java.util.Set<CopyFromParentPersistor> seen =
+                java.util.Collections.synchronizedSet(java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+        java.util.List<java.util.concurrent.Future<TestChild>> futures = new java.util.ArrayList<>();
+        try {
+            for (int i = 0; i < threads; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    seen.add(observer.getPersistor());
+                    TestChild child = TestChild.builder().build();
+                    runSaveWithParent(observer, child, parent);
+                    return child;
+                }));
+            }
+            start.countDown();
+            for (java.util.concurrent.Future<TestChild> f : futures) {
+                assertEquals("PARENT-TXN", f.get(30, java.util.concurrent.TimeUnit.SECONDS).getTxnId());
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals(1, seen.size(), "Exactly one persistor must be created for an unchanged config");
+        assertEquals(1, listenerSupplierCalls.get(), "Listener must be resolved exactly once");
+    }
+
+    private static void sleepUninterruptibly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void runSaveWithParent(CopyFromParentObserver observer, TestChild child, TestParent parent) {
+        SaveWithParent<TestChild, TestChild, TestParent> op =
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
+                        .entity(child).parent(parent).saver(e -> e).build();
+        observer.execute(createContext(op), () -> op.apply(null));
+    }
+
+    private static void assertPersistorFlags(CopyFromParentPersistor persistor,
+                                             boolean copyEnabled,
+                                             boolean mismatchDetectionEnabled,
+                                             boolean copyIfDefaultOnly) {
+        assertEquals(copyEnabled, persistor.isCopyEnabled());
+        assertEquals(mismatchDetectionEnabled, persistor.isMismatchDetectionEnabled());
+        assertEquals(copyIfDefaultOnly, persistor.isCopyIfDefaultOnly());
     }
 
     @Test
@@ -845,7 +1137,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -862,7 +1154,7 @@ class CopyFromParentObserverTest {
     }
 
     @Test
-    void testConfigSupplier_lazyInit_calledOnce() {
+    void testConfigSupplier_calledOncePerSaveWithParentTransaction() {
         AtomicInteger supplierCallCount = new AtomicInteger(0);
 
         TestConfig config = TestConfig.builder()
@@ -882,7 +1174,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -895,9 +1187,8 @@ class CopyFromParentObserverTest {
         observer.execute(ctx, () -> opContext.apply(null));
         observer.execute(ctx, () -> opContext.apply(null));
 
-        // Config supplier is called once on first execution,
-        // but not called again on subsequent executions (persistor is cached)
-        assertEquals(1, supplierCallCount.get(), "Config supplier should be called once on first execution only");
+        // Dynamic config: read on every transaction, never snapshotted
+        assertEquals(3, supplierCallCount.get(), "Config supplier should be called once per transaction");
     }
 
     @Test
@@ -913,7 +1204,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -929,8 +1220,8 @@ class CopyFromParentObserverTest {
 
     @Test
     void testConfigSupplier_mismatchDetectionWithoutListener_throws() {
-        // Config enables mismatch detection but no listener provided
-        // Should log warning but continue with copy
+        // Config enables mismatch detection but no listener provided.
+        // Must fail fast exactly like the static path does at build(), never silently skip detection.
         TestConfig config = TestConfig.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)  // Enabled but no listener
@@ -952,7 +1243,7 @@ class CopyFromParentObserverTest {
                 .build();
 
         SaveWithParent<MismatchChild, MismatchChild, TestParent> opContext =
-                SaveWithParent.<MismatchChild, MismatchChild, TestParent>builder()
+                SaveWithParent.<MismatchChild, MismatchChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -960,8 +1251,14 @@ class CopyFromParentObserverTest {
 
         TransactionExecutionContext ctx = createContext(opContext);
 
-        assertThrows(IllegalArgumentException.class, () -> observer.execute(ctx, () -> opContext.apply(null)),
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> observer.execute(ctx, () -> opContext.apply(null)),
                 "Should throw when mismatchDetectionEnabled=true but listener is null");
+        // Same error as the static path (Builder#build)
+        IllegalArgumentException staticEx = assertThrows(IllegalArgumentException.class,
+                () -> CopyFromParentObserver.builder().mismatchDetectionEnabled(true).build());
+        assertEquals(staticEx.getMessage(), ex.getMessage());
+        assertEquals("CHILD-TXN", child.getTxnId(), "Entity must not be touched");
     }
 
     @Test
@@ -985,7 +1282,7 @@ class CopyFromParentObserverTest {
         TestChild childWithDefaults = TestChild.builder().build();
         
         SaveWithParent<TestChild, TestChild, TestParent> opContextDefaults =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(childWithDefaults)
                         .parent(parent)
                         .saver(e -> e)
@@ -1014,7 +1311,7 @@ class CopyFromParentObserverTest {
         TestChild child = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> opContext =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)

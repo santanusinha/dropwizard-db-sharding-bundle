@@ -453,7 +453,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     public <U> void save(LockedContext<U> context, T entity, U parent) {
         val tenantId = context.getTenantId();
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
-        val opContext = SaveWithParent.<T, T, U>builder()
+        val opContext = SaveWithParent.<T, T, U>saveWithParentBuilder()
                 .entity(entity).saver(dao::save).parent(parent).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
                 context.getShardId(), false);
@@ -470,7 +470,7 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler, U parent) {
         val tenantId = context.getTenantId();
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
-        val opContext = SaveWithParent.<T, T, U>builder()
+        val opContext = SaveWithParent.<T, T, U>saveWithParentBuilder()
                 .entity(entity).saver(dao::save).afterSave(handler).parent(parent).build();
         transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
                 context.getShardId(), false);

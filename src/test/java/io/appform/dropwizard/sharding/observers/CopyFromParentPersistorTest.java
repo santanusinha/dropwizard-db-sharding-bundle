@@ -78,7 +78,7 @@ class CopyFromParentPersistorTest {
 
         AtomicReference<TestChild> savedEntity = new AtomicReference<>();
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> {
@@ -111,7 +111,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -134,7 +134,7 @@ class CopyFromParentPersistorTest {
 
         AtomicReference<String> sideEffect = new AtomicReference<>("not-called");
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> {
@@ -166,7 +166,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -190,7 +190,7 @@ class CopyFromParentPersistorTest {
 
         AtomicBoolean saverCalled = new AtomicBoolean(false);
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> {
@@ -223,7 +223,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -256,7 +256,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -269,24 +269,17 @@ class CopyFromParentPersistorTest {
     }
 
     @Test
-    void testMismatchDetection_listenerNull_doesNotFail() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
-                true, true, false, null);
+    void testMismatchDetection_listenerNull_failsFast() {
+        // Detection enabled without a listener is a configuration error: it must never be silently skipped.
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> new CopyFromParentPersistor(true, true, false, null));
+        assertEquals(CopyFromParentObserver.LISTENER_REQUIRED_MESSAGE, ex.getMessage());
+    }
 
-        TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
-        TestChild child = TestChild.builder().txnId("DIFF").childAmount(50).build();
-
-        SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
-                        .entity(child)
-                        .parent(parent)
-                        .saver(e -> e)
-                        .build();
-
-        persistor.visit(op);
-        
-        // Should not throw even with null listener
-        assertDoesNotThrow(() -> op.apply(null));
+    @Test
+    void testMismatchDetectionDisabled_listenerNull_allowed() {
+        assertDoesNotThrow(() -> new CopyFromParentPersistor(true, false, true, null));
+        assertDoesNotThrow(() -> new CopyFromParentPersistor(false, false, false, null));
     }
 
     @Test
@@ -308,7 +301,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -340,7 +333,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -364,12 +357,64 @@ class CopyFromParentPersistorTest {
         CopyFromParentPersistor persistor = new CopyFromParentPersistor(
                 true, false, false, null);
 
+        UnaryOperator<String> saver = e -> e;
         Save<String, String> saveOp = Save.<String, String>builder()
                 .entity("entity")
-                .saver(e -> e)
+                .saver(saver)
                 .build();
 
-        assertDoesNotThrow(() -> persistor.visit(saveOp));
+        assertNull(saveOp.visit(persistor));
+        assertEquals("entity", saveOp.getEntity());
+        assertSame(saver, saveOp.getSaver());
+    }
+
+    @Test
+    void testVisit_saveWithParentDispatchesToOverride_notToVisitSave() {
+        CopyFromParentPersistor persistor = new CopyFromParentPersistor(true, false, false, null);
+        TestParent parent = TestParent.builder().transactionId("TXN").amount(7).build();
+        TestChild child = TestChild.builder().build();
+        SaveWithParent<TestChild, TestChild, TestParent> op =
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
+                        .entity(child).parent(parent).saver(e -> e).build();
+
+        // Dispatch through OpContext#visit, exactly as the observer does
+        assertNull(op.visit(persistor));
+
+        assertEquals("TXN", child.getTxnId(), "visit(SaveWithParent) override must run (visit(Save) is a no-op)");
+        assertEquals(7, child.getChildAmount());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void testVisit_allOtherOpContexts_areNoop() {
+        CopyFromParentPersistor persistor = new CopyFromParentPersistor(true, false, false, null);
+
+        assertNull(persistor.visit(mock(Count.class)));
+        assertNull(persistor.visit(mock(CountByQuerySpec.class)));
+        assertNull(persistor.visit(mock(GetAndUpdate.class)));
+        assertNull(persistor.visit(mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey.class)));
+        assertNull(persistor.visit(
+                mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.GetAndUpdateByLookupKey.class)));
+        assertNull(persistor.visit(
+                mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.ReadOnlyForLookupDao.class)));
+        assertNull(persistor.visit(mock(
+                io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao.class)));
+        assertNull(persistor.visit(
+                mock(io.appform.dropwizard.sharding.dao.operations.lockedcontext.LockAndExecute.class)));
+        assertNull(persistor.visit(mock(UpdateByQuery.class)));
+        assertNull(persistor.visit(mock(UpdateWithScroll.class)));
+        assertNull(persistor.visit(mock(UpdateAll.class)));
+        assertNull(persistor.visit(mock(SelectAndUpdate.class)));
+        assertNull(persistor.visit(mock(RunInSession.class)));
+        assertNull(persistor.visit(mock(RunWithCriteria.class)));
+        assertNull(persistor.visit(mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey.class)));
+        assertNull(persistor.visit(mock(SaveAll.class)));
+        assertNull(persistor.visit(
+                mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.CreateOrUpdateByLookupKey.class)));
+        assertNull(persistor.visit(mock(io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate.class)));
+        assertNull(persistor.visit(mock(
+                io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext.class)));
+        assertNull(persistor.visit(mock(Select.class)));
     }
 
     @Test
@@ -393,7 +438,7 @@ class CopyFromParentPersistorTest {
         TestChild child1 = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op1 =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child1)
                         .parent(parent1)
                         .saver(e -> e)
@@ -410,7 +455,7 @@ class CopyFromParentPersistorTest {
         TestChild child2 = TestChild.builder().build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op2 =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child2)
                         .parent(parent2)
                         .saver(e -> e)
@@ -436,7 +481,7 @@ class CopyFromParentPersistorTest {
         AtomicInteger saverOrder = new AtomicInteger(-1);
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> {
@@ -466,7 +511,7 @@ class CopyFromParentPersistorTest {
         AtomicBoolean afterSaveCalled = new AtomicBoolean(false);
 
         SaveWithParent<TestChild, String, TestParent> op =
-                SaveWithParent.<TestChild, String, TestParent>builder()
+                SaveWithParent.<TestChild, String, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -500,7 +545,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -535,7 +580,7 @@ class CopyFromParentPersistorTest {
         }).when(mockListener).onMismatches(any(), any(), any());
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -559,7 +604,7 @@ class CopyFromParentPersistorTest {
         TestChild child = TestChild.builder().txnId("CHILD").childAmount(100).build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -589,7 +634,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -622,7 +667,7 @@ class CopyFromParentPersistorTest {
                 .build();
 
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(e -> e)
@@ -643,7 +688,7 @@ class CopyFromParentPersistorTest {
 
         UnaryOperator<TestChild> originalSaver = e -> e;
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(originalSaver)
@@ -673,7 +718,7 @@ class CopyFromParentPersistorTest {
 
         UnaryOperator<TestChild> originalSaver = e -> e;
         SaveWithParent<TestChild, TestChild, TestParent> op =
-                SaveWithParent.<TestChild, TestChild, TestParent>builder()
+                SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child)
                         .parent(parent)
                         .saver(originalSaver)
