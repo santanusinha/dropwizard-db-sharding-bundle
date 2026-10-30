@@ -71,6 +71,29 @@ public abstract class OpContext<T> implements Function<Session, T> {
 
     <T, R> P visit(Select<T, R> opContext);
 
+    /**
+     * Visits a {@link SaveWithParent}, i.e. a {@link Save} of a child entity within a
+     * {@link io.appform.dropwizard.sharding.dao.LockedContext} that also carries the locked parent.
+     * <p>
+     * The default delegates to {@link #visit(Save)} with <b>the same instance</b> ({@link SaveWithParent} is a
+     * {@link Save}), so visitors that predate {@link SaveWithParent} keep their exact {@link Save} behaviour: anything
+     * they change on the op (saver, afterSave, entity), now or later, is what gets executed. Such visitors can still
+     * reach the parent via {@code instanceof SaveWithParent}. Visitors that need the parent override this method.
+     * <p>
+     * Why this is a default and not abstract: LockedContext child saves were emitted as {@link Save} before
+     * {@link SaveWithParent} existed. An abstract method would make every visitor compiled against an older version of
+     * this library fail at runtime with {@link AbstractMethodError} on every such save.
+     * <p>
+     * <b>This must remain the only default method of this interface.</b> A default is only acceptable for an op that
+     * specialises (extends) an op already emitted on the same code path, and it must delegate to that op's
+     * {@code visit}. Any new, unrelated {@link OpContext} must be added as an abstract method so every visitor is
+     * forced to handle it. This rule is enforced by {@code OpContextVisitorContractTest}.
+     */
+    default <T, R, U> P visit(SaveWithParent<T, R, U> opContext) {
+      // The upcast is required: without it overload resolution picks this very method again (infinite recursion).
+      return visit((Save<T, R>) opContext);
+    }
+
   }
 
 }
