@@ -25,11 +25,11 @@ import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,9 +51,14 @@ class CriteriaLiteralBindingTest {
         }
 
         static List<String> selectStatementsForAmount() {
-            return CAPTURED_SQL.stream()
-                    .filter(sql -> sql.toLowerCase().contains("select") && sql.toLowerCase().contains("amount"))
-                    .collect(Collectors.toList());
+            val result = new ArrayList<String>();
+            for (String sql : CAPTURED_SQL) {
+                val lower = sql.toLowerCase();
+                if (lower.contains("select") && lower.contains("amount")) {
+                    result.add(sql);
+                }
+            }
+            return result;
         }
 
         @Override
@@ -73,6 +78,8 @@ class CriteriaLiteralBindingTest {
     }
 
     private final HealthCheckRegistry healthChecks = mock(HealthCheckRegistry.class);
+    private final HealthCheckRegistry bootstrapHealthChecks = mock(HealthCheckRegistry.class);
+    private final ObjectMapper objectMapper = mock(ObjectMapper.class);
     private final JerseyEnvironment jerseyEnvironment = mock(JerseyEnvironment.class);
     private final LifecycleEnvironment lifecycleEnvironment = mock(LifecycleEnvironment.class);
     private final Environment environment = mock(Environment.class);
@@ -90,8 +97,8 @@ class CriteriaLiteralBindingTest {
         when(environment.lifecycle()).thenReturn(lifecycleEnvironment);
         when(environment.healthChecks()).thenReturn(healthChecks);
         when(environment.admin()).thenReturn(adminEnvironment);
-        when(bootstrap.getHealthCheckRegistry()).thenReturn(mock(HealthCheckRegistry.class));
-        when(bootstrap.getObjectMapper()).thenReturn(mock(ObjectMapper.class));
+        when(bootstrap.getHealthCheckRegistry()).thenReturn(bootstrapHealthChecks);
+        when(bootstrap.getObjectMapper()).thenReturn(objectMapper);
 
         String dbUrl = "jdbc:h2:mem:criteria_bind_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1";
         val ds = new DataSourceFactory();
