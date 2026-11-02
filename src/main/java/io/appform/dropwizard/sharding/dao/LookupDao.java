@@ -224,6 +224,13 @@ public class LookupDao<T> implements ShardedDao<T> {
         return delegate.lockAndGetExecutor(dbNamespace, id);
     }
 
+    public <U> T lockAndMutate(
+            final BulkLockedContext<U> context,
+            final String key,
+            final LockedContext.Mutator<T> mutator) {
+        return delegate.lockAndMutate(context, key, mutator);
+    }
+
     public ReadOnlyContext<T> readOnlyExecutor(String id) {
         return readOnlyExecutor(id, x -> x);
     }

@@ -146,6 +146,10 @@ public class RelationalDao<T> implements ShardedDao<T> {
         delegate.save(context, entity);
     }
 
+    public <U> void save(BulkLockedContext<U> context, T entity) {
+        delegate.save(context, entity);
+    }
+
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         delegate.save(context, entity, handler);
     }
@@ -187,6 +191,14 @@ public class RelationalDao<T> implements ShardedDao<T> {
      */
     <U> boolean update(
             LockedContext<U> context,
+            DetachedCriteria criteria,
+            UnaryOperator<T> updater,
+            BooleanSupplier updateNext) {
+        return delegate.update(context, criteria, updater, updateNext);
+    }
+
+    <U> boolean update(
+            BulkLockedContext<U> context,
             DetachedCriteria criteria,
             UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
@@ -402,6 +414,12 @@ public class RelationalDao<T> implements ShardedDao<T> {
 
     public LockedContext<T> lockAndGetExecutor(String parentKey, DetachedCriteria criteria) {
         return delegate.lockAndGetExecutor(tenantId, parentKey, criteria);
+    }
+
+    public BulkLockedContext<T> lockAndGetExecutor(
+            String parentKey,
+            List<DetachedCriteria> criteriaList) {
+        return delegate.lockAndGetExecutor(tenantId, parentKey, criteriaList);
     }
 
 

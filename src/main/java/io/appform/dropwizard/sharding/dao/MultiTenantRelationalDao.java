@@ -78,17 +78,22 @@ import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 
+import javax.persistence.EntityNotFoundException;
 import javax.persistence.Id;
 import javax.persistence.LockModeType;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Root;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
@@ -442,6 +447,14 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
     }
 
     public <U> void save(LockedContext<U> context, T entity) {
+        saveInternal(context, entity);
+    }
+
+    public <U> void save(BulkLockedContext<U> context, T entity) {
+        saveInternal(context, entity);
+    }
+
+    private void saveInternal(LockedTransactionContext context, T entity) {
         val tenantId = context.getTenantId();
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
         val opContext = Save.<T, T>builder().entity(entity).saver(dao::save).build();
@@ -499,6 +512,22 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
      */
     <U> boolean update(
             LockedContext<U> context,
+            DetachedCriteria criteria,
+            UnaryOperator<T> updater,
+            BooleanSupplier updateNext) {
+        return updateInternal(context, criteria, updater, updateNext);
+    }
+
+    <U> boolean update(
+            BulkLockedContext<U> context,
+            DetachedCriteria criteria,
+            UnaryOperator<T> updater,
+            BooleanSupplier updateNext) {
+        return updateInternal(context, criteria, updater, updateNext);
+    }
+
+    private boolean updateInternal(
+            LockedTransactionContext context,
             DetachedCriteria criteria,
             UnaryOperator<T> updater,
             BooleanSupplier updateNext) {
@@ -982,6 +1011,54 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
         RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
         return new LockedContext<>(tenantId, shardId, dao.sessionFactory, () -> dao.getLockedForWrite(criteria),
                 DaoType.RELATIONAL, entityClass, shardInfoProviders.get(tenantId), observer);
+    }
+
+    public BulkLockedContext<T> lockAndGetExecutor(
+            String tenantId,
+            String parentKey,
+            List<DetachedCriteria> criteriaList) {
+        Preconditions.checkArgument(daos.containsKey(tenantId), "Unknown tenant: " + tenantId);
+        Preconditions.checkArgument(criteriaList != null && !criteriaList.isEmpty(),
+                "criteriaList must not be null or empty");
+        Preconditions.checkArgument(criteriaList.stream().allMatch(criteria -> criteria != null),
+                "criteriaList must not contain null elements");
+        int shardId = shardCalculator.shardId(tenantId, parentKey);
+        RelationalDaoPriv dao = daos.get(tenantId).get(shardId);
+        List<DetachedCriteria> criteriaCopy = new ArrayList<>(criteriaList);
+        return new BulkLockedContext<>(
+                tenantId,
+                shardId,
+                dao.sessionFactory,
+                () -> lockRows(dao, criteriaCopy),
+                entityClass,
+                shardInfoProviders.get(tenantId),
+                observer);
+    }
+
+    private List<T> lockRows(
+            RelationalDaoPriv dao,
+            List<DetachedCriteria> criteriaList) {
+        List<T> result = new ArrayList<>(criteriaList.size());
+        Set<Object> identifiers = new HashSet<>();
+        for (DetachedCriteria criteria : criteriaList) {
+            T entity = dao.getLockedForWrite(criteria);
+            if (entity == null) {
+                throw new EntityNotFoundException("Entity not found for criteria: " + criteria);
+            }
+            Object identifier = getEntityIdentifier(entity);
+            Preconditions.checkArgument(identifiers.add(identifier),
+                    "Duplicate entity matched by bulk lock criteria: " + identifier);
+            result.add(entity);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    private Object getEntityIdentifier(T entity) {
+        try {
+            return keyField.get(entity);
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("Unable to read entity identifier", e);
+        }
     }
 
 

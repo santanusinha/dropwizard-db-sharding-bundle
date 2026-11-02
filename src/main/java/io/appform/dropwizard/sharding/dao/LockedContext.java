@@ -29,7 +29,7 @@ import java.util.function.UnaryOperator;
  * @param <T> The type of the entity on which the operations are performed.
  */
 @Getter
-public class LockedContext<T> {
+public class LockedContext<T> implements LockedTransactionContext {
 
     @FunctionalInterface
     public interface Mutator<T> {
