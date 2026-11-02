@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -206,31 +207,12 @@ class BundleMvccSnapshotTest {
     }
 
     /**
-     * Pool-level safety net: a connection returned to the pool with an implicit transaction still
-     * open must not leak that transaction (and its REPEATABLE_READ snapshot) to the next borrower.
-     *
-     * <p>The bundle forces {@code autoCommit=false} on the pool, so ANY statement opens an implicit
-     * DB transaction. The bundle's own {@code TransactionHandler} always closes it, but code that
-     * uses the session factory outside a managed transaction (raw sessions, {@code doWork},
-     * third-party libraries) can still return a connection mid-transaction. The bundle therefore
-     * enables Tomcat JDBC {@code rollbackOnReturn}, which rolls back such a connection when it is
-     * returned to the pool.
-     *
-     * <p>Sequence (read pool has exactly one physical connection):
-     * <ol>
-     *   <li>Write {@code "version-1"} via writeBundle.</li>
-     *   <li>Raw session on the read session factory runs a SELECT via {@code doWork} WITHOUT a
-     *       managed transaction and closes — the implicit transaction is left open on C_read.</li>
-     *   <li>Update to {@code "version-2"} via writeBundle.</li>
-     *   <li>Read via readLookupDao on the same C_read:
-     *       <ul>
-     *         <li><b>With rollbackOnReturn:</b> the pool rolled back on return → fresh snapshot →
-     *             {@code "version-2"} ✓</li>
-     *         <li><b>Without:</b> the leaked transaction is still open; the bundle's
-     *             {@code beginTransaction()} is a no-op on an autoCommit=false connection, so the
-     *             read joins the old snapshot → stale {@code "version-1"} ✗</li>
-     *       </ul></li>
-     * </ol>
+     * Pool-level safety net for SQL run outside a managed transaction (raw sessions,
+     * {@code doWork}, third-party libraries sharing the session factory). With the forced
+     * {@code autoCommit=false}, such SQL leaves an implicit transaction open when the
+     * connection is returned to the pool. The bundle's {@code rollbackOnReturn} rolls it
+     * back on return, so the next borrower does not inherit the stale REPEATABLE_READ
+     * snapshot; without it, the later read below would see stale {@code "version-1"}.
      */
     @Test
     void get_afterLeakedImplicitTransactionOutsideBundle_seesLatestCommit() throws Exception {
@@ -240,8 +222,8 @@ class BundleMvccSnapshotTest {
                 .text("version-1")
                 .build());
 
-        // 2. Leak an implicit transaction on the single pooled read connection: run a SELECT
-        //    outside any managed transaction and close the session without commit/rollback.
+        // 2. Leak an implicit transaction: SELECT outside any managed transaction, then
+        //    close the session without commit/rollback (pool_size=1 reuses the connection)
         try (Session session = readSessionFactory.openSession()) {
             session.doWork(connection -> {
                 try (val stmt = connection.prepareStatement(
@@ -261,14 +243,17 @@ class BundleMvccSnapshotTest {
             return entity.orElse(null);
         });
 
-        // 4. Read again on the same physical C_read (pool_size=1)
+        // 4. Read again on the same physical C_read
         val v2 = readLookupDao.get("mvcc-leak-1");
         assertTrue(v2.isPresent());
         assertEquals("version-2", v2.get().getText(),
                 "A connection returned with an open implicit transaction must be rolled back by "
-                        + "the pool so later reads see the latest commit — not a stale MVCC snapshot");
+                        + "the pool so later reads see the latest commit");
     }
 
+    /**
+     * Both pool settings are forced regardless of user configuration.
+     */
     @Test
     void bundleForcesRollbackOnReturnAndAutoCommitOff() {
         val dsf = buildReadDataSourceFactory("jdbc:h2:mem:rbr_" + System.nanoTime()
@@ -282,7 +267,7 @@ class BundleMvccSnapshotTest {
                 .shards(List.of(dsf))
                 .shardingOptions(ShardingBundleOptions.builder().build())
                 .build()));
-        assertEquals(Boolean.FALSE, dsf.getAutoCommitByDefault());
+        assertFalse(dsf.getAutoCommitByDefault());
         assertTrue(dsf.getRollbackOnReturn(),
                 "Bundle must enable rollbackOnReturn together with autoCommit=false");
     }
