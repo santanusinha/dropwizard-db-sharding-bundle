@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.12-10]
+- Enabled Tomcat JDBC `rollbackOnReturn` on every shard pool, together with the existing forced `autoCommitByDefault=false`.
+
+  **Reason**: With `autoCommit=false`, any statement opens an implicit DB transaction. If a connection is returned to the pool with that transaction still open (SQL run outside a managed transaction, e.g. raw sessions, `doWork`, or third-party libraries), the next borrower inherits its REPEATABLE_READ snapshot and stale reads follow.
+  - The pool now rolls such a connection back when it is returned.
+  - Drivers that track transaction state (e.g. MariaDB Connector/J) skip the `ROLLBACK` when no transaction is open, so normal commit/rollback paths send no extra statement.
+  - With MySQL Connector/J, set `useLocalTransactionState=true` on the JDBC URL to get the same behaviour; otherwise a `ROLLBACK` is sent on every return.
+  - Like `autoCommitByDefault`, this setting is forced and cannot be overridden through configuration.
+
 ## [2.1.12-7]
 - Added logs to print the original exception during DB exception handling.
 

@@ -18,6 +18,8 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.Getter;
 import lombok.val;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -80,6 +83,7 @@ class BundleMvccSnapshotTest {
 
     private LookupDao<TestEntity> writeLookupDao;
     private LookupDao<TestEntity> readLookupDao;
+    private SessionFactory readSessionFactory;
 
     @BeforeEach
     void setUp() {
@@ -106,6 +110,7 @@ class BundleMvccSnapshotTest {
                 .shardingOptions(ShardingBundleOptions.builder().build())
                 .build()));
         readLookupDao = readBundle.createParentObjectDao(TestEntity.class);
+        readSessionFactory = readBundle.getSessionFactories().get(0);
     }
 
     /**
@@ -199,6 +204,72 @@ class BundleMvccSnapshotTest {
         assertEquals("version-2", v2.get().getText(),
                 "After an errored optional read, onError() must roll back the connection so later "
                         + "reads see the latest commit — not a stale MVCC snapshot");
+    }
+
+    /**
+     * Pool-level safety net for SQL run outside a managed transaction (raw sessions,
+     * {@code doWork}, third-party libraries sharing the session factory). With the forced
+     * {@code autoCommit=false}, such SQL leaves an implicit transaction open when the
+     * connection is returned to the pool. The bundle's {@code rollbackOnReturn} rolls it
+     * back on return, so the next borrower does not inherit the stale REPEATABLE_READ
+     * snapshot; without it, the later read below would see stale {@code "version-1"}.
+     */
+    @Test
+    void get_afterLeakedImplicitTransactionOutsideBundle_seesLatestCommit() throws Exception {
+        // 1. Write "version-1"
+        writeLookupDao.save(TestEntity.builder()
+                .externalId("mvcc-leak-1")
+                .text("version-1")
+                .build());
+
+        // 2. Leak an implicit transaction: SELECT outside any managed transaction, then
+        //    close the session without commit/rollback (pool_size=1 reuses the connection)
+        try (Session session = readSessionFactory.openSession()) {
+            session.doWork(connection -> {
+                try (val stmt = connection.prepareStatement(
+                        "SELECT text FROM test_entity WHERE ext_id = ?")) {
+                    stmt.setString(1, "mvcc-leak-1");
+                    try (val rs = stmt.executeQuery()) {
+                        assertTrue(rs.next());
+                        assertEquals("version-1", rs.getString(1));
+                    }
+                }
+            });
+        }
+
+        // 3. Update to "version-2" via writeBundle — commits on a separate connection
+        writeLookupDao.update("mvcc-leak-1", entity -> {
+            entity.ifPresent(e -> e.setText("version-2"));
+            return entity.orElse(null);
+        });
+
+        // 4. Read again on the same physical C_read
+        val v2 = readLookupDao.get("mvcc-leak-1");
+        assertTrue(v2.isPresent());
+        assertEquals("version-2", v2.get().getText(),
+                "A connection returned with an open implicit transaction must be rolled back by "
+                        + "the pool so later reads see the latest commit");
+    }
+
+    /**
+     * Both pool settings are forced regardless of user configuration.
+     */
+    @Test
+    void bundleForcesRollbackOnReturnAndAutoCommitOff() {
+        val dsf = buildReadDataSourceFactory("jdbc:h2:mem:rbr_" + System.nanoTime()
+                + ";DB_CLOSE_DELAY=-1");
+        dsf.setAutoCommitByDefault(true);
+        dsf.setRollbackOnReturn(false);
+        dsf.setProperties(new HashMap<>(Map.of(
+                "hibernate.dialect", "org.hibernate.dialect.H2Dialect",
+                "hibernate.hbm2ddl.auto", "create")));
+        initBundle(new TestConfig(ShardedHibernateFactory.builder()
+                .shards(List.of(dsf))
+                .shardingOptions(ShardingBundleOptions.builder().build())
+                .build()));
+        assertFalse(dsf.getAutoCommitByDefault());
+        assertTrue(dsf.getRollbackOnReturn(),
+                "Bundle must enable rollbackOnReturn together with autoCommit=false");
     }
 
     // -------------------------------------------------------------------------
