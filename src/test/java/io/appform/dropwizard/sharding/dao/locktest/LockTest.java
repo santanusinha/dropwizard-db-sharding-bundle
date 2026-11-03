@@ -30,9 +30,14 @@ import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
 import io.appform.dropwizard.sharding.dao.RelationalDao;
 import io.appform.dropwizard.sharding.dao.UpdateOperationMeta;
 import io.appform.dropwizard.sharding.dao.interceptors.DaoClassLocalObserver;
+import io.appform.dropwizard.sharding.dao.operations.SaveWithParent;
+import io.appform.dropwizard.sharding.dao.operations.OpType;
+import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
+import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.query.QuerySpec;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.SneakyThrows;
@@ -48,6 +53,7 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1370,6 +1376,155 @@ public class LockTest {
         assertEquals(p1.getMyId(), lookupDao.get("0").get().getMyId());
         assertEquals("Changed", lookupDao.get("0").get().getName());
         assertEquals("Changed", relationDao.get("0", 1L).get().getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testSaveProducesSaveWithParentOpContext() {
+        // Wire a capturing observer into the chain to record OpContexts
+        val capturedContexts = new ArrayList<TransactionExecutionContext>();
+        val capturingObserver = new TransactionObserver(new TerminalTransactionObserver()) {
+            @Override
+            public <T> T execute(TransactionExecutionContext context, Supplier<T> supplier) {
+                capturedContexts.add(context);
+                return proceed(context, supplier);
+            }
+        };
+
+        // Build DAOs with capturing observer: DaoClassLocalObserver -> capturingObserver -> TerminalTransactionObserver
+        val capturingLookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        SomeLookupObject.class,
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new BalancedShardManager(sessionFactories.size())),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
+                        new DaoClassLocalObserver(capturingObserver)));
+        val capturingRelationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        SomeOtherObject.class,
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new BalancedShardManager(sessionFactories.size())),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
+                        new DaoClassLocalObserver(capturingObserver)));
+
+        // Save parent
+        val parent = SomeLookupObject.builder().myId("0").name("Parent 1").build();
+        capturingLookupDao.save(parent);
+
+        // Before save — no SaveWithParent should exist yet
+        val noCopyContextsBefore = capturedContexts.stream()
+                .filter(ctx -> ctx.getOpContext() != null
+                        && ctx.getOpContext().getOpType() == OpType.SAVE_WITH_PARENT)
+                .count();
+        assertEquals(0, noCopyContextsBefore,
+                "No SaveWithParent OpContext should exist before LockedContext.save()");
+
+        // Use LockedContext.save() — should produce SaveWithParent
+        capturingLookupDao.lockAndGetExecutor("0")
+                .filter(p -> !Strings.isNullOrEmpty(p.getName()))
+                .save(capturingRelationDao, p -> SomeOtherObject.builder()
+                        .myId(p.getMyId())
+                        .value("Hello")
+                        .build())
+                .mutate(p -> p.setName("Changed"))
+                .execute();
+
+        // Find the SaveWithParent context among captured contexts
+        val saveWithParentContexts = capturedContexts.stream()
+                .filter(ctx -> ctx.getOpContext() != null
+                        && ctx.getOpContext().getOpType() == OpType.SAVE_WITH_PARENT)
+                .collect(Collectors.toList());
+
+        assertEquals(1, saveWithParentContexts.size(), "Expected exactly one SaveWithParent OpContext");
+
+        val opContext = (SaveWithParent<?, ?, ?>) saveWithParentContexts.get(0).getOpContext();
+        assertNotNull(opContext.getEntity(), "Child entity reference must not be null");
+        assertNotNull(opContext.getParent(), "Parent reference must not be null");
+        assertTrue(opContext.getParent() instanceof SomeLookupObject,
+                "Parent should be SomeLookupObject");
+        assertEquals("Changed", ((SomeLookupObject) opContext.getParent()).getName());
+
+        // Verify the child was actually saved
+        val children = capturingRelationDao.select("0",
+                DetachedCriteria.forClass(SomeOtherObject.class), 0, 10);
+        assertEquals(1, children.size());
+        assertNotNull(children.get(0));
+        assertEquals("Hello", children.get(0).getValue());
+    }
+
+    @Test
+    @SneakyThrows
+    public void testSaveAllProducesSaveWithParentOpContexts() {
+        val capturedContexts = new ArrayList<TransactionExecutionContext>();
+        val capturingObserver = new TransactionObserver(new TerminalTransactionObserver()) {
+            @Override
+            public <T> T execute(TransactionExecutionContext context, Supplier<T> supplier) {
+                capturedContexts.add(context);
+                return proceed(context, supplier);
+            }
+        };
+
+        val capturingLookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        SomeLookupObject.class,
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new BalancedShardManager(sessionFactories.size())),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
+                        new DaoClassLocalObserver(capturingObserver)));
+        val capturingRelationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+                        SomeOtherObject.class,
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new BalancedShardManager(sessionFactories.size())),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
+                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
+                        new DaoClassLocalObserver(capturingObserver)));
+
+        val parent = SomeLookupObject.builder().myId("0").name("Parent 1").build();
+        capturingLookupDao.save(parent);
+
+        // Before saveAll — no SaveWithParent should exist yet
+        val noCopyContextsBefore = capturedContexts.stream()
+                .filter(ctx -> ctx.getOpContext() != null
+                        && ctx.getOpContext().getOpType() == OpType.SAVE_WITH_PARENT)
+                .count();
+        assertEquals(0, noCopyContextsBefore,
+                "No SaveWithParent OpContext should exist before LockedContext.saveAll()");
+
+        // Use LockedContext.saveAll() — should produce multiple SaveWithParent
+        capturingLookupDao.lockAndGetExecutor("0")
+                .filter(p -> !Strings.isNullOrEmpty(p.getName()))
+                .saveAll(capturingRelationDao,
+                        p -> IntStream.range(0, 3)
+                                .mapToObj(i -> SomeOtherObject.builder()
+                                        .myId(p.getMyId())
+                                        .value("Child_" + i)
+                                        .build())
+                                .collect(Collectors.toList()))
+                .execute();
+
+        val saveWithParentContexts = capturedContexts.stream()
+                .filter(ctx -> ctx.getOpContext() != null
+                        && ctx.getOpContext().getOpType() == OpType.SAVE_WITH_PARENT)
+                .collect(Collectors.toList());
+
+        assertEquals(3, saveWithParentContexts.size(),
+                "Expected 3 SaveWithParent OpContexts for saveAll with 3 entities");
+
+        // Each should carry the parent and entity references
+        for (val ctx : saveWithParentContexts) {
+            val opCtx = (SaveWithParent<?, ?, ?>) ctx.getOpContext();
+            assertNotNull(opCtx.getEntity());
+            assertNotNull(opCtx.getParent());
+            assertTrue(opCtx.getParent() instanceof SomeLookupObject);
+        }
+
+        // Verify children were saved
+        val children = capturingRelationDao.select("0",
+                DetachedCriteria.forClass(SomeOtherObject.class), 0, 10);
+        assertEquals(3, children.size());
+        for (val child : children) {
+            assertNotNull(child);
+        }
     }
 
     private boolean saveEntity(LockedContext<SomeLookupObject> lockedContext) {

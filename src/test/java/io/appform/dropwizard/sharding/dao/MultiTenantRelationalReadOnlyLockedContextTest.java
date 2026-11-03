@@ -6,7 +6,13 @@ import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.interceptors.TimerObserver;
 import io.appform.dropwizard.sharding.dao.listeners.LoggingListener;
+import io.appform.dropwizard.sharding.dao.operations.OpContext;
+import io.appform.dropwizard.sharding.dao.operations.OpType;
+import io.appform.dropwizard.sharding.dao.operations.SaveWithParent;
+import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
+import io.appform.dropwizard.sharding.observers.TransactionObserver;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
+import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import lombok.AllArgsConstructor;
@@ -38,6 +44,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class MultiTenantRelationalReadOnlyLockedContextTest {
 
@@ -240,6 +249,55 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     Assertions.assertNotNull(respCompanyCase2.getCeo());
     Assertions.assertTrue(respCompanyCase2.getDepartments().stream()
         .allMatch(e -> e.getCompanyExtId().equals(companyToRetrieve)));
+  }
+
+  @Test
+  @SneakyThrows
+  void testLockedContextSaveAndSaveAll_multiTenantDao_emitSaveWithParentPerChild() {
+    val captured = new ArrayList<OpContext<?>>();
+    val capturingObserver = new TransactionObserver(new TerminalTransactionObserver()) {
+      @Override
+      public <T> T execute(TransactionExecutionContext context, Supplier<T> supplier) {
+        captured.add(context.getOpContext());
+        return proceed(context, supplier);
+      }
+    };
+    final Map<String, ShardManager> shardManager = new HashMap<>();
+    sessionFactories.forEach((tenant, sf) -> shardManager.put(tenant, new BalancedShardManager(sf.size())));
+    final Map<String, ShardingBundleOptions> options = Map.of("TENANT1", new ShardingBundleOptions(),
+        "TENANT2", new ShardingBundleOptions());
+    final Map<String, ShardInfoProvider> shardInfo = Map.of("TENANT1", new ShardInfoProvider("TENANT1"),
+        "TENANT2", new ShardInfoProvider("TENANT2"));
+    val companyDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class, shardManager, options,
+        shardInfo, capturingObserver);
+    val deptDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class, shardManager, options,
+        shardInfo, capturingObserver);
+
+    val parentKey = "PARENT_KEY_SWP";
+    val company = Company.builder().companyId(11L).companyUsageId("CMP-SWP").name("SWP").build();
+    companyDao.saveAndGetExecutor("TENANT1", parentKey, company)
+        .save(deptDao, p -> Department.builder().name("SINGLE").companyExtId(p.getCompanyUsageId()).build())
+        .saveAll(deptDao, p -> List.of(
+            Department.builder().name("D1").companyExtId(p.getCompanyUsageId()).build(),
+            Department.builder().name("D2").companyExtId(p.getCompanyUsageId()).build()))
+        .execute();
+
+    val childSaves = captured.stream()
+        .filter(SaveWithParent.class::isInstance)
+        .map(op -> (SaveWithParent<?, ?, ?>) op)
+        .collect(Collectors.toList());
+    Assertions.assertEquals(3, childSaves.size(), "one SaveWithParent per child (1 save + 2 saveAll)");
+    for (val op : childSaves) {
+      Assertions.assertEquals(OpType.SAVE_WITH_PARENT, op.getOpType());
+      Assertions.assertTrue(op.getParent() instanceof Company);
+      Assertions.assertEquals("CMP-SWP", ((Company) op.getParent()).getCompanyUsageId());
+      Assertions.assertTrue(op.getEntity() instanceof Department);
+    }
+
+    val persisted = deptDao.select("TENANT1", parentKey,
+        DetachedCriteria.forClass(Department.class).add(Restrictions.eq("companyExtId", "CMP-SWP")), 0, 10);
+    Assertions.assertEquals(Set.of("SINGLE", "D1", "D2"),
+        persisted.stream().map(Department::getName).collect(Collectors.toSet()));
   }
 
   private void generateData(String parentKey) {
