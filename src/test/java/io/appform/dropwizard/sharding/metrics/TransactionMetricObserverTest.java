@@ -66,9 +66,7 @@ class TransactionMetricObserverTest {
                 .failed(new Meter())
                 .build();
 
-        Mockito.doReturn(entityOpMetricData).when(metricManager).getEntityOpMetricData(context);
-        Mockito.doReturn(shardMetricData).when(metricManager).getShardMetricData(context.getShardName());
-        Mockito.doReturn(true).when(metricManager).isMetricApplicable(context.getEntityClass());
+        setupTransactionMetricManagerGetEntityOpMetricDataAnd2MoreStubs(entityOpMetricData, context, shardMetricData);
 
         assertEquals(terminate(), transactionMetricObserver.execute(context, this::terminate));
         validateCache(entityOpMetricData, shardMetricData, context);
@@ -98,10 +96,7 @@ class TransactionMetricObserverTest {
                 .failed(new Meter())
                 .build();
 
-        Mockito.doReturn(entityOpMetricData).when(metricManager).getEntityOpMetricData(context);
-        Mockito.doReturn(shardMetricData).when(metricManager).getShardMetricData(context.getShardName());
-
-        Mockito.doReturn(true).when(metricManager).isMetricApplicable(context.getEntityClass());
+        setupTransactionMetricManagerGetEntityOpMetricDataAnd2MoreStubs(entityOpMetricData, context, shardMetricData);
 
         assertThrows(RuntimeException.class, () -> transactionMetricObserver.execute(context, this::terminateWithException));
         validateCache(entityOpMetricData, shardMetricData, context);
@@ -147,5 +142,11 @@ class TransactionMetricObserverTest {
 
     private Integer terminateWithException() {
         throw new RuntimeException();
+    }
+
+    private void setupTransactionMetricManagerGetEntityOpMetricDataAnd2MoreStubs(MetricData entityOpMetricData, TransactionExecutionContext context, MetricData shardMetricData) {
+        Mockito.doReturn(entityOpMetricData).when(metricManager).getEntityOpMetricData(context);
+        Mockito.doReturn(shardMetricData).when(metricManager).getShardMetricData(context.getShardName());
+        Mockito.doReturn(true).when(metricManager).isMetricApplicable(context.getEntityClass());
     }
 }
