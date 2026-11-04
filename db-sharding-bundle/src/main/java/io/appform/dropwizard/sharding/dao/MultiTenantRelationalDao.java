@@ -29,6 +29,7 @@ import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
 import io.appform.dropwizard.sharding.dao.operations.RunWithClause;
+import io.appform.dropwizard.sharding.dao.operations.SaveWithParent;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveAll;
 import io.appform.dropwizard.sharding.dao.operations.ScrollParam;
@@ -416,6 +417,15 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 context.getShardId(), false);
     }
 
+    public <U> void save(LockedContext<U> context, T entity, U parent) {
+        val tenantId = context.getTenantId();
+        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        val opContext = SaveWithParent.<T, T, U>saveWithParentBuilder()
+                .entity(entity).saver(dao::save).parent(parent).build();
+        transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
+                context.getShardId(), false);
+    }
+
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         val tenantId = context.getTenantId();
         RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
@@ -424,6 +434,14 @@ public class MultiTenantRelationalDao<T> implements ShardedDao<T> {
                 context.getShardId(), false);
     }
 
+    <U> void save(LockedContext<U> context, T entity, Function<T, T> handler, U parent) {
+        val tenantId = context.getTenantId();
+        RelationalDaoPriv dao = daos.get(tenantId).get(context.getShardId());
+        val opContext = SaveWithParent.<T, T, U>saveWithParentBuilder()
+                .entity(entity).saver(dao::save).afterSave(handler).parent(parent).build();
+        transactionExecutor.get(tenantId).execute(context.getSessionFactory(), false, "save", opContext,
+                context.getShardId(), false);
+    }
     /**
      * Updates an entity within a locked context using a specific ID and an updater function.
      * <p>

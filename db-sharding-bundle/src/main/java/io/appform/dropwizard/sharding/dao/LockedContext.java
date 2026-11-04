@@ -169,7 +169,7 @@ public class LockedContext<T> {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
-                relationalDao.save(this, entity);
+                relationalDao.save(this, entity, parent);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -194,7 +194,7 @@ public class LockedContext<T> {
         return apply(parent -> {
             try {
                 U entity = entityGenerator.apply(parent);
-                relationalDao.save(this, entity);
+                relationalDao.save(this, entity, parent);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -220,7 +220,7 @@ public class LockedContext<T> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
-                    relationalDao.save(this, entity);
+                    relationalDao.save(this, entity, parent);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -247,7 +247,7 @@ public class LockedContext<T> {
             try {
                 List<U> entities = entityGenerator.apply(parent);
                 for (U entity : entities) {
-                    relationalDao.save(this, entity);
+                    relationalDao.save(this, entity, parent);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -299,7 +299,7 @@ public class LockedContext<T> {
     public <U> LockedContext<T> save(RelationalDao<U> relationalDao, U entity, Function<U, U> handler) {
         return apply(parent -> {
             try {
-                relationalDao.save(this, entity, handler);
+                relationalDao.save(this, entity, handler, parent);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
