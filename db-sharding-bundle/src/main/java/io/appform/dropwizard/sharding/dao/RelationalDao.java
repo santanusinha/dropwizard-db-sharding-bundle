@@ -169,10 +169,17 @@ public class RelationalDao<T> implements ShardedDao<T> {
         delegate.save(context, entity);
     }
 
+    public <U> void save(LockedContext<U> context, T entity, U parent) {
+        delegate.save(context, entity, parent);
+    }
+
     <U> void save(LockedContext<U> context, T entity, Function<T, T> handler) {
         delegate.save(context, entity, handler);
     }
 
+    <U> void save(LockedContext<U> context, T entity, Function<T, T> handler, U parent) {
+        delegate.save(context, entity, handler, parent);
+    }
     /**
      * Updates an entity within a locked context using a specific ID and an updater function.
      * <p>
