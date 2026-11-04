@@ -315,7 +315,7 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     }
 
     val persisted = deptDao.select("TENANT1", parentKey,
-        DetachedCriteria.forClass(Department.class).add(Restrictions.eq("companyExtId", "CMP-SWP")), 0, 10);
+        (root, q, cb) -> q.where(cb.equal(root.get("companyExtId"), "CMP-SWP")), 0, 10);
     Assertions.assertEquals(Set.of("SINGLE", "D1", "D2"),
         persisted.stream().map(Department::getName).collect(Collectors.toSet()));
   }

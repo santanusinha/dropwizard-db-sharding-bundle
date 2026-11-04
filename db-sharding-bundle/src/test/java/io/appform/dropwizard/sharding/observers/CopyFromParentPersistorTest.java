@@ -390,7 +390,6 @@ class CopyFromParentPersistorTest {
         CopyFromParentPersistor persistor = new CopyFromParentPersistor(true, false, false, null);
 
         assertNull(persistor.visit(mock(Count.class)));
-        assertNull(persistor.visit(mock(CountByQuerySpec.class)));
         assertNull(persistor.visit(mock(GetAndUpdate.class)));
         assertNull(persistor.visit(mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.GetByLookupKey.class)));
         assertNull(persistor.visit(
@@ -406,7 +405,7 @@ class CopyFromParentPersistorTest {
         assertNull(persistor.visit(mock(UpdateAll.class)));
         assertNull(persistor.visit(mock(SelectAndUpdate.class)));
         assertNull(persistor.visit(mock(RunInSession.class)));
-        assertNull(persistor.visit(mock(RunWithCriteria.class)));
+        assertNull(persistor.visit(mock(RunWithClause.class)));
         assertNull(persistor.visit(mock(io.appform.dropwizard.sharding.dao.operations.lookupdao.DeleteByLookupKey.class)));
         assertNull(persistor.visit(mock(SaveAll.class)));
         assertNull(persistor.visit(
@@ -422,7 +421,7 @@ class CopyFromParentPersistorTest {
         CopyFromParentPersistor persistor = new CopyFromParentPersistor(
                 true, false, false, null);
 
-        Get<String, String> getOp = mock(Get.class);
+        Get<String, String, String> getOp = mock(Get.class);
         assertNull(persistor.visit(getOp));
     }
 

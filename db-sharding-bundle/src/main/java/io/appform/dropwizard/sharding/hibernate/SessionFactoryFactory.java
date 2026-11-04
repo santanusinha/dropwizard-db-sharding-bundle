@@ -16,7 +16,7 @@ import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.cfg.Configuration;
 import org.hibernate.engine.jdbc.connections.internal.DatasourceConnectionProviderImpl;
 import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider;
-import org.hibernate.query.criteria.LiteralHandlingMode;
+import org.hibernate.query.criteria.ValueHandlingMode;
 import org.hibernate.service.ServiceRegistry;
 
 import javax.sql.DataSource;
@@ -108,7 +108,7 @@ public abstract class SessionFactoryFactory<T> implements DatabaseConfiguration<
         }
         // Must be set after user properties to prevent override — paired with disableAutoCommit() on the pool
         configuration.setProperty(AvailableSettings.CONNECTION_PROVIDER_DISABLES_AUTOCOMMIT, "true");
-        configuration.setProperty(AvailableSettings.CRITERIA_LITERAL_HANDLING_MODE, LiteralHandlingMode.BIND.name());
+        configuration.setProperty(AvailableSettings.CRITERIA_VALUE_HANDLING_MODE, ValueHandlingMode.BIND.name());
         addAnnotatedClasses(configuration, entities);
         final ServiceRegistry registry = new StandardServiceRegistryBuilder(bootstrapServiceRegistry)
                 .addService(ConnectionProvider.class, connectionProvider)

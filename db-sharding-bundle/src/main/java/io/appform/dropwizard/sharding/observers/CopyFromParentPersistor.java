@@ -2,12 +2,11 @@ package io.appform.dropwizard.sharding.observers;
 
 import io.appform.dropwizard.sharding.dao.operations.SaveWithParent;
 import io.appform.dropwizard.sharding.dao.operations.Count;
-import io.appform.dropwizard.sharding.dao.operations.CountByQuerySpec;
 import io.appform.dropwizard.sharding.dao.operations.Get;
 import io.appform.dropwizard.sharding.dao.operations.GetAndUpdate;
 import io.appform.dropwizard.sharding.dao.operations.OpContext;
 import io.appform.dropwizard.sharding.dao.operations.RunInSession;
-import io.appform.dropwizard.sharding.dao.operations.RunWithCriteria;
+import io.appform.dropwizard.sharding.dao.operations.RunWithClause;
 import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveAll;
 import io.appform.dropwizard.sharding.dao.operations.Select;
@@ -93,10 +92,7 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
     public Void visit(Count opContext) { return null; }
 
     @Override
-    public Void visit(CountByQuerySpec opContext) { return null; }
-
-    @Override
-    public <T, R> Void visit(Get<T, R> opContext) { return null; }
+    public <T, G, R> Void visit(Get<T, G, R> opContext) { return null; }
 
     @Override
     public <T> Void visit(GetAndUpdate<T> opContext) { return null; }
@@ -132,7 +128,7 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
     public <T> Void visit(RunInSession<T> opContext) { return null; }
 
     @Override
-    public <T> Void visit(RunWithCriteria<T> opContext) { return null; }
+    public <U, T> Void visit(RunWithClause<U, T> opContext) { return null; }
 
     @Override
     public Void visit(DeleteByLookupKey opContext) { return null; }
@@ -147,7 +143,7 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
     public <T> Void visit(CreateOrUpdateByLookupKey<T> opContext) { return null; }
 
     @Override
-    public <T> Void visit(CreateOrUpdate<T> opContext) { return null; }
+    public <U, T> Void visit(CreateOrUpdate<U, T> opContext) { return null; }
 
     @Override
     public <T, U> Void visit(CreateOrUpdateInLockedContext<T, U> opContext) { return null; }

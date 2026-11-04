@@ -6,7 +6,7 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import lombok.val;
 import org.hibernate.cfg.AvailableSettings;
-import org.hibernate.query.criteria.LiteralHandlingMode;
+import org.hibernate.query.criteria.ValueHandlingMode;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +32,7 @@ class CriteriaLiteralBindingTest extends BundleBasedTestBase {
     protected DBShardingBundleBase<TestConfig> getBundle() {
         testConfig.getShards().getShards().forEach(shard -> {
             shard.getProperties().put(
-                    AvailableSettings.CRITERIA_LITERAL_HANDLING_MODE, LiteralHandlingMode.INLINE.name());
+                    AvailableSettings.CRITERIA_VALUE_HANDLING_MODE, ValueHandlingMode.INLINE.name());
             shard.getProperties().put(
                     AvailableSettings.STATEMENT_INSPECTOR, CapturingInspector.class.getName());
         });
@@ -52,8 +52,8 @@ class CriteriaLiteralBindingTest extends BundleBasedTestBase {
 
         bundle.getSessionFactories().forEach(sf ->
                 assertEquals(
-                        LiteralHandlingMode.BIND.name(),
-                        sf.getProperties().get(AvailableSettings.CRITERIA_LITERAL_HANDLING_MODE)));
+                        ValueHandlingMode.BIND.name(),
+                        sf.getProperties().get(AvailableSettings.CRITERIA_VALUE_HANDLING_MODE)));
 
         RelationalDao<Order> orderDao = bundle.createRelatedObjectDao(Order.class);
         final String customer = "cust-1";

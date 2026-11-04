@@ -13,8 +13,6 @@ import io.appform.dropwizard.sharding.observers.entity.CopyFromParentIntegration
 import io.appform.dropwizard.sharding.observers.entity.CopyFromParentIntegrationParent;
 import lombok.SneakyThrows;
 import lombok.val;
-import org.hibernate.criterion.DetachedCriteria;
-import org.hibernate.criterion.Property;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -84,8 +82,7 @@ class CopyFromParentIntegrationTest extends BundleBasedTestBase {
 
         List<CopyFromParentIntegrationChild> children = childDao.select(
                 PARENT_NAME,
-                DetachedCriteria.forClass(CopyFromParentIntegrationChild.class)
-                        .add(Property.forName(CopyFromParentIntegrationChild.Fields.parentRef).eq(PARENT_NAME)),
+                (root, q, cb) -> q.where(cb.equal(root.get(CopyFromParentIntegrationChild.Fields.parentRef), PARENT_NAME)),
                 0, 10);
 
         assertEquals(1, children.size());
@@ -131,8 +128,7 @@ class CopyFromParentIntegrationTest extends BundleBasedTestBase {
         assertTrue(parentDao.get("PV11").isEmpty(), "parent save must have been rolled back");
         List<CopyFromParentIntegrationChild> children = childDao.select(
                 "PV11",
-                DetachedCriteria.forClass(CopyFromParentIntegrationChild.class)
-                        .add(Property.forName(CopyFromParentIntegrationChild.Fields.parentRef).eq("PV11")),
+                (root, q, cb) -> q.where(cb.equal(root.get(CopyFromParentIntegrationChild.Fields.parentRef), "PV11")),
                 0, 10);
         assertEquals(0, children.size(), "child save must have been rolled back");
     }
@@ -167,8 +163,7 @@ class CopyFromParentIntegrationTest extends BundleBasedTestBase {
 
         List<CopyFromParentIntegrationChild> children = childDao.select(
                 PARENT_NAME,
-                DetachedCriteria.forClass(CopyFromParentIntegrationChild.class)
-                        .add(Property.forName(CopyFromParentIntegrationChild.Fields.parentRef).eq(PARENT_NAME)),
+                (root, q, cb) -> q.where(cb.equal(root.get(CopyFromParentIntegrationChild.Fields.parentRef), PARENT_NAME)),
                 0, 10);
         assertEquals(1, children.size());
         assertEquals("TXN-REF-H", children.get(0).getTxnRef());
@@ -236,8 +231,7 @@ class CopyFromParentIntegrationTest extends BundleBasedTestBase {
                 "the legacy visitor's saver wrap must run exactly once, for the child save only");
 
         val children = childDao.select(PARENT_NAME,
-                DetachedCriteria.forClass(CopyFromParentIntegrationChild.class)
-                        .add(Property.forName(CopyFromParentIntegrationChild.Fields.parentRef).eq(PARENT_NAME)),
+                (root, q, cb) -> q.where(cb.equal(root.get(CopyFromParentIntegrationChild.Fields.parentRef), PARENT_NAME)),
                 0, 10);
         assertEquals(1, children.size());
         assertEquals("TXN-REF-L", children.get(0).getTxnRef());
@@ -320,8 +314,7 @@ class CopyFromParentIntegrationTest extends BundleBasedTestBase {
     private static List<CopyFromParentIntegrationChild> childrenOf(RelationalDao<CopyFromParentIntegrationChild> dao,
                                                                    String parentName) {
         return dao.select(parentName,
-                DetachedCriteria.forClass(CopyFromParentIntegrationChild.class)
-                        .add(Property.forName(CopyFromParentIntegrationChild.Fields.parentRef).eq(parentName)),
+                (root, q, cb) -> q.where(cb.equal(root.get(CopyFromParentIntegrationChild.Fields.parentRef), parentName)),
                 0, 10);
     }
 

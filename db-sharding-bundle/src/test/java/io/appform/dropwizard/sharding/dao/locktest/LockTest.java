@@ -1457,7 +1457,7 @@ public class LockTest {
 
         // Verify the child was actually saved
         val children = capturingRelationDao.select("0",
-                DetachedCriteria.forClass(SomeOtherObject.class), 0, 10);
+                (root, q, cb) -> { }, 0, 10);
         assertEquals(1, children.size());
         assertNotNull(children.get(0));
         assertEquals("Hello", children.get(0).getValue());
@@ -1531,7 +1531,7 @@ public class LockTest {
 
         // Verify children were saved
         val children = capturingRelationDao.select("0",
-                DetachedCriteria.forClass(SomeOtherObject.class), 0, 10);
+                (root, q, cb) -> { }, 0, 10);
         assertEquals(3, children.size());
         for (val child : children) {
             assertNotNull(child);

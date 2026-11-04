@@ -24,10 +24,7 @@ public abstract class LegacyOpContextVisitor<P> implements OpContext.OpContextVi
     public P visit(Count opContext) { return null; }
 
     @Override
-    public P visit(CountByQuerySpec opContext) { return null; }
-
-    @Override
-    public <T, R> P visit(Get<T, R> opContext) { return null; }
+    public <T, G, R> P visit(Get<T, G, R> opContext) { return null; }
 
     @Override
     public <T> P visit(GetAndUpdate<T> opContext) { return null; }
@@ -63,7 +60,7 @@ public abstract class LegacyOpContextVisitor<P> implements OpContext.OpContextVi
     public <T> P visit(RunInSession<T> opContext) { return null; }
 
     @Override
-    public <T> P visit(RunWithCriteria<T> opContext) { return null; }
+    public <U, T> P visit(RunWithClause<U, T> opContext) { return null; }
 
     @Override
     public P visit(DeleteByLookupKey opContext) { return null; }
@@ -75,7 +72,7 @@ public abstract class LegacyOpContextVisitor<P> implements OpContext.OpContextVi
     public <T> P visit(CreateOrUpdateByLookupKey<T> opContext) { return null; }
 
     @Override
-    public <T> P visit(CreateOrUpdate<T> opContext) { return null; }
+    public <U, T> P visit(CreateOrUpdate<U, T> opContext) { return null; }
 
     @Override
     public <T, U> P visit(CreateOrUpdateInLockedContext<T, U> opContext) { return null; }

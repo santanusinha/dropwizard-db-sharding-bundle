@@ -142,7 +142,7 @@ class CopyFromParentProcessorTest {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
                 String.join("\n",
                         "package test;",
-                        "import javax.persistence.Transient;",
+                        "import jakarta.persistence.Transient;",
                         "public class Parent {",
                         "    @Transient",
                         "    private String tempValue;",
