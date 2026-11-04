@@ -41,7 +41,6 @@ import java.util.Set;
 })
 public class CopyFromParentProcessor extends AbstractProcessor {
 
-    private static final String TRANSIENT_ANNOTATION = "javax.persistence.Transient";
     private static final String JAKARTA_TRANSIENT_ANNOTATION = "jakarta.persistence.Transient";
 
     @Override
@@ -220,8 +219,7 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         return field.getAnnotationMirrors().stream()
                 .anyMatch(am -> {
                     String fqn = am.getAnnotationType().toString();
-                    return TRANSIENT_ANNOTATION.equals(fqn)
-                            || JAKARTA_TRANSIENT_ANNOTATION.equals(fqn);
+                    return JAKARTA_TRANSIENT_ANNOTATION.equals(fqn);
                 });
     }
 
