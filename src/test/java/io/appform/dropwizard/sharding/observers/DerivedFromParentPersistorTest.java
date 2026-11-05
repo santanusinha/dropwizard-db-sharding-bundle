@@ -1,9 +1,9 @@
 package io.appform.dropwizard.sharding.observers;
 
 import io.appform.dropwizard.sharding.dao.operations.*;
-import io.appform.dropwizard.sharding.sharding.CopyFromParent;
+import io.appform.dropwizard.sharding.sharding.DerivedFromParent;
 import io.appform.dropwizard.sharding.sharding.ParentEntity;
-import io.appform.dropwizard.sharding.utils.CopyFromParentUtils;
+import io.appform.dropwizard.sharding.utils.DerivedFromParentUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,7 +20,7 @@ import java.util.function.UnaryOperator;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class CopyFromParentPersistorTest {
+class DerivedFromParentPersistorTest {
 
     // Test entities
     @Data
@@ -39,10 +39,10 @@ class CopyFromParentPersistorTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class TestChild {
-        @CopyFromParent(field = "transactionId")
+        @DerivedFromParent(field = "transactionId")
         private String txnId;
 
-        @CopyFromParent(field = "amount")
+        @DerivedFromParent(field = "amount")
         private long childAmount;
 
         private String ownField;
@@ -54,10 +54,10 @@ class CopyFromParentPersistorTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class NoOverrideChild {
-        @CopyFromParent(field = "transactionId", override = false)
+        @DerivedFromParent(field = "transactionId", override = false)
         private String txnId;
 
-        @CopyFromParent(field = "amount", override = false)
+        @DerivedFromParent(field = "amount", override = false)
         private long childAmount;
     }
 
@@ -65,7 +65,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testDefaultConfig_wrapsAndCopies() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder()
@@ -98,7 +98,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testCopyEnabled_overwritesExistingValues() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder()
@@ -126,7 +126,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testCopyEnabled_preservesOriginalSaverBehavior() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder().transactionId("T").amount(0).build();
@@ -153,7 +153,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testCopyDisabled_doesNotCopyFields() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 false, false, false, null);
 
         TestParent parent = TestParent.builder()
@@ -182,7 +182,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testCopyDisabled_saverStillExecuted() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 false, false, false, null);
 
         TestParent parent = TestParent.builder().transactionId("T").build();
@@ -209,8 +209,8 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testMismatchDetection_callsListenerWhenMismatchesFound() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, true, false, mockListener);
 
         TestParent parent = TestParent.builder()
@@ -232,18 +232,18 @@ class CopyFromParentPersistorTest {
         persistor.visit(op);
         op.apply(null);
 
-        ArgumentCaptor<List<CopyFromParentUtils.FieldMismatch>> mismatchCaptor =
+        ArgumentCaptor<List<DerivedFromParentUtils.FieldMismatch>> mismatchCaptor =
                 ArgumentCaptor.forClass(List.class);
         verify(mockListener).onMismatches(eq(parent), eq(child), mismatchCaptor.capture());
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches = mismatchCaptor.getValue();
+        List<DerivedFromParentUtils.FieldMismatch> mismatches = mismatchCaptor.getValue();
         assertEquals(2, mismatches.size());
     }
 
     @Test
     void testMismatchDetection_listenerNotCalledWhenNoMismatches() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, true, false, mockListener);
 
         TestParent parent = TestParent.builder()
@@ -272,23 +272,23 @@ class CopyFromParentPersistorTest {
     void testMismatchDetection_listenerNull_failsFast() {
         // Detection enabled without a listener is a configuration error: it must never be silently skipped.
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> new CopyFromParentPersistor(true, true, false, null));
-        assertEquals(CopyFromParentObserver.LISTENER_REQUIRED_MESSAGE, ex.getMessage());
+                () -> new DerivedFromParentPersistor(true, true, false, null));
+        assertEquals(DerivedFromParentObserver.LISTENER_REQUIRED_MESSAGE, ex.getMessage());
     }
 
     @Test
     void testMismatchDetectionDisabled_listenerNull_allowed() {
-        assertDoesNotThrow(() -> new CopyFromParentPersistor(true, false, true, null));
-        assertDoesNotThrow(() -> new CopyFromParentPersistor(false, false, false, null));
+        assertDoesNotThrow(() -> new DerivedFromParentPersistor(true, false, true, null));
+        assertDoesNotThrow(() -> new DerivedFromParentPersistor(false, false, false, null));
     }
 
     @Test
     void testMismatchDetection_listenerExceptionDoesNotBreakCopy() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
         doThrow(new RuntimeException("Listener explosion"))
                 .when(mockListener).onMismatches(any(), any(), any());
 
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, true, false, mockListener);
 
         TestParent parent = TestParent.builder()
@@ -319,8 +319,8 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testValidationMode_detectsButDoesNotCopy() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 false, true, false, mockListener);
 
         TestParent parent = TestParent.builder()
@@ -354,7 +354,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testVisit_saveOpContext_isNoop() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         UnaryOperator<String> saver = e -> e;
@@ -370,7 +370,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testVisit_saveWithParentDispatchesToOverride_notToVisitSave() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(true, false, false, null);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(true, false, false, null);
         TestParent parent = TestParent.builder().transactionId("TXN").amount(7).build();
         TestChild child = TestChild.builder().build();
         SaveWithParent<TestChild, TestChild, TestParent> op =
@@ -387,7 +387,7 @@ class CopyFromParentPersistorTest {
     @Test
     @SuppressWarnings("unchecked")
     void testVisit_allOtherOpContexts_areNoop() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(true, false, false, null);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(true, false, false, null);
 
         assertNull(persistor.visit(mock(Count.class)));
         assertNull(persistor.visit(mock(CountByQuerySpec.class)));
@@ -419,7 +419,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testVisit_getOpContext_isNoop() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         Get<String, String> getOp = mock(Get.class);
@@ -430,7 +430,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testMultipleInvocations_eachCopiesCorrectly() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         // First invocation
@@ -470,7 +470,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testSaverWrapping_preservesExecutionOrder() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
@@ -502,7 +502,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testAfterSaveFunction_executesAfterCopyAndSave() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
@@ -532,7 +532,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testNullValues_handledCorrectly() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder()
@@ -562,8 +562,8 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testMismatchDetection_runsBeforeCopy() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, true, false, mockListener);
 
         TestParent parent = TestParent.builder().transactionId("PARENT").amount(500).build();
@@ -596,8 +596,8 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testMismatchDetectionDisabled_listenerNotCalled() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, mockListener);  // mismatchDetectionEnabled = false
 
         TestParent parent = TestParent.builder().transactionId("PARENT").amount(500).build();
@@ -622,7 +622,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testCopyAppliesImmediatelyDuringVisit_beforeApplyIsEverCalled() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, false, false, null);
 
         TestParent parent = TestParent.builder()
@@ -653,8 +653,8 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testMismatchDetectionRunsImmediatelyDuringVisit_beforeApplyIsEverCalled() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 true, true, false, mockListener);
 
         TestParent parent = TestParent.builder()
@@ -680,8 +680,8 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testVisitDoesNotWrapOrReplaceTheSaver() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
-                true, true, false, mock(CopyFromParentMismatchListener.class));
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
+                true, true, false, mock(DerivedFromParentMismatchListener.class));
 
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
         TestChild child = TestChild.builder().build();
@@ -704,7 +704,7 @@ class CopyFromParentPersistorTest {
 
     @Test
     void testCopyDisabledAndNoMismatchDetection_visitIsNoopOnEntityAndSaver() {
-        CopyFromParentPersistor persistor = new CopyFromParentPersistor(
+        DerivedFromParentPersistor persistor = new DerivedFromParentPersistor(
                 false, false, false, null);
 
         TestParent parent = TestParent.builder()

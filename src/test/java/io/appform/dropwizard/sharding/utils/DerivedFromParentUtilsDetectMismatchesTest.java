@@ -1,6 +1,6 @@
 package io.appform.dropwizard.sharding.utils;
 
-import io.appform.dropwizard.sharding.sharding.CopyFromParent;
+import io.appform.dropwizard.sharding.sharding.DerivedFromParent;
 import io.appform.dropwizard.sharding.sharding.ParentEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,10 +13,10 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Comprehensive tests for CopyFromParentUtils.detectMismatches() functionality.
+ * Comprehensive tests for DerivedFromParentUtils.detectMismatches() functionality.
  * Tests all permutations of mismatch scenarios.
  */
-class CopyFromParentUtilsDetectMismatchesTest {
+class DerivedFromParentUtilsDetectMismatchesTest {
 
     // Test entities
     @Data
@@ -36,13 +36,13 @@ class CopyFromParentUtilsDetectMismatchesTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class TestChild {
-        @CopyFromParent(field = "transactionId")
+        @DerivedFromParent(field = "transactionId")
         private String txnId;
 
-        @CopyFromParent(field = "amount")
+        @DerivedFromParent(field = "amount")
         private long childAmount;
 
-        @CopyFromParent(field = "customerId")
+        @DerivedFromParent(field = "customerId")
         private String customerId;
 
         private String ownField;
@@ -54,13 +54,13 @@ class CopyFromParentUtilsDetectMismatchesTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class ChildWithOverrideFlags {
-        @CopyFromParent(field = "transactionId", override = true)
+        @DerivedFromParent(field = "transactionId", override = true)
         private String txnId;
 
-        @CopyFromParent(field = "amount", override = false)
+        @DerivedFromParent(field = "amount", override = false)
         private long childAmount;
 
-        @CopyFromParent(field = "customerId", override = true)
+        @DerivedFromParent(field = "customerId", override = true)
         private String customerId;
     }
 
@@ -87,8 +87,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId("CUST-1")
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertTrue(mismatches.isEmpty(), "Should return empty list when all fields match");
     }
@@ -106,12 +106,12 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId("CHILD-CUST")
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(3, mismatches.size(), "Should detect all 3 mismatched fields");
 
-        CopyFromParentUtils.FieldMismatch mismatch1 = mismatches.get(0);
+        DerivedFromParentUtils.FieldMismatch mismatch1 = mismatches.get(0);
         assertEquals("transactionId", mismatch1.getParentFieldName());
         assertEquals("txnId", mismatch1.getChildFieldName());
         assertEquals("PARENT-TXN", mismatch1.getParentValue());
@@ -131,8 +131,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId("DIFFERENT-CHILD")  // Mismatch
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(2, mismatches.size(), "Should detect only the 2 mismatched fields");
 
@@ -164,8 +164,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId(null)  // Null vs "PARENT-CUST"
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(2, mismatches.size());
 
@@ -189,8 +189,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId("CHILD-CUST")
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(3, mismatches.size());
     }
@@ -208,8 +208,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId(null)
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertTrue(mismatches.isEmpty(), "null == null is not be a mismatch");
     }
@@ -225,8 +225,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .build();
         TestChild child = new TestChild();  // All defaults: null, 0, null
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(3, mismatches.size(),
                 "Default values should be detected as mismatches when parent has non-default values");
@@ -245,8 +245,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId("CHILD-CUST")
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(3, mismatches.size(),
                 "Should detect mismatches even when parent has default values");
@@ -257,8 +257,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
         TestParent parent = TestParent.builder().build();  // All defaults
         TestChild child = new TestChild();  // All defaults
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertTrue(mismatches.isEmpty(),
                 "Default values on both sides should not be mismatches");
@@ -279,8 +279,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .customerId("CHILD-CUST") // override=true, mismatches
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(3, mismatches.size(),
                 "detectMismatches should check ALL fields regardless of override flag");
@@ -292,8 +292,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
     void testDetectMismatches_nullParent_returnsEmpty() {
         TestChild child = TestChild.builder().txnId("TXN").build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(null, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(null, child);
 
         assertTrue(mismatches.isEmpty());
     }
@@ -302,16 +302,16 @@ class CopyFromParentUtilsDetectMismatchesTest {
     void testDetectMismatches_nullChild_returnsEmpty() {
         TestParent parent = TestParent.builder().transactionId("TXN").build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, null);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, null);
 
         assertTrue(mismatches.isEmpty());
     }
 
     @Test
     void testDetectMismatches_bothNull_returnsEmpty() {
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(null, null);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(null, null);
 
         assertTrue(mismatches.isEmpty());
     }
@@ -321,8 +321,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
         TestParent parent = TestParent.builder().transactionId("TXN").build();
         PlainEntity plain = PlainEntity.builder().name("value").build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, plain);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, plain);
 
         assertTrue(mismatches.isEmpty(),
                 "Should return empty for entities without @ParentEntity");
@@ -335,12 +335,12 @@ class CopyFromParentUtilsDetectMismatchesTest {
         TestParent parent = TestParent.builder().transactionId("PARENT").build();
         TestChild child = TestChild.builder().txnId("CHILD").build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertEquals(1, mismatches.size());
 
-        CopyFromParentUtils.FieldMismatch mismatch = mismatches.get(0);
+        DerivedFromParentUtils.FieldMismatch mismatch = mismatches.get(0);
         assertEquals("transactionId", mismatch.getParentFieldName(),
                 "Parent field name should match the field on parent class");
         assertEquals("txnId", mismatch.getChildFieldName(),
@@ -358,10 +358,10 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .childAmount(100)
                 .build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
-        CopyFromParentUtils.FieldMismatch txnMismatch = mismatches.stream()
+        DerivedFromParentUtils.FieldMismatch txnMismatch = mismatches.stream()
                 .filter(m -> m.getParentFieldName().equals("transactionId"))
                 .findFirst()
                 .orElseThrow();
@@ -369,7 +369,7 @@ class CopyFromParentUtilsDetectMismatchesTest {
         assertEquals("PARENT-TXN", txnMismatch.getParentValue());
         assertEquals("CHILD-TXN", txnMismatch.getChildValue());
 
-        CopyFromParentUtils.FieldMismatch amountMismatch = mismatches.stream()
+        DerivedFromParentUtils.FieldMismatch amountMismatch = mismatches.stream()
                 .filter(m -> m.getParentFieldName().equals("amount"))
                 .findFirst()
                 .orElseThrow();
@@ -385,8 +385,8 @@ class CopyFromParentUtilsDetectMismatchesTest {
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
         TestChild child = TestChild.builder().txnId("TXN").childAmount(100).build();
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                DerivedFromParentUtils.detectMismatches(parent, child);
 
         assertTrue(mismatches.isEmpty(),
                 "Different object instances with same values should not be mismatches");
@@ -406,16 +406,16 @@ class CopyFromParentUtilsDetectMismatchesTest {
                 .build();
 
         // Detect mismatches BEFORE copy
-        List<CopyFromParentUtils.FieldMismatch> mismatchesBefore =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatchesBefore =
+                DerivedFromParentUtils.detectMismatches(parent, child);
         assertEquals(2, mismatchesBefore.size(), "Should detect mismatches before copy");
 
         // Copy fields
-        CopyFromParentUtils.copyFields(parent, child, false);
+        DerivedFromParentUtils.copyFields(parent, child, false);
 
         // Detect mismatches AFTER copy
-        List<CopyFromParentUtils.FieldMismatch> mismatchesAfter =
-                CopyFromParentUtils.detectMismatches(parent, child);
+        List<DerivedFromParentUtils.FieldMismatch> mismatchesAfter =
+                DerivedFromParentUtils.detectMismatches(parent, child);
         assertEquals(0, mismatchesAfter.size(), "Should have no mismatches after copy");
     }
 }
