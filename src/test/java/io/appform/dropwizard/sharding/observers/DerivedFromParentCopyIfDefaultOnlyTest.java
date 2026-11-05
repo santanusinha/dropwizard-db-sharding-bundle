@@ -3,7 +3,7 @@ package io.appform.dropwizard.sharding.observers;
 import io.appform.dropwizard.sharding.dao.operations.SaveWithParent;
 import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
-import io.appform.dropwizard.sharding.sharding.CopyFromParent;
+import io.appform.dropwizard.sharding.sharding.DerivedFromParent;
 import io.appform.dropwizard.sharding.sharding.ParentEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * This flag is used during migration rollout to detect lingering manual setters.
  * When copyIfDefaultOnly=true and a non-default value is found, the operation fails.
  */
-class CopyFromParentCopyIfDefaultOnlyTest {
+class DerivedFromParentCopyIfDefaultOnlyTest {
 
     // Test entities with mixed primitive and reference types
     @Data
@@ -38,16 +38,16 @@ class CopyFromParentCopyIfDefaultOnlyTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class TestChild {
-        @CopyFromParent(field = "transactionId")
+        @DerivedFromParent(field = "transactionId")
         private String txnId;
 
-        @CopyFromParent(field = "amount")
+        @DerivedFromParent(field = "amount")
         private long childAmount;
 
-        @CopyFromParent(field = "customerId")
+        @DerivedFromParent(field = "customerId")
         private String customerId;
 
-        @CopyFromParent(field = "nullableField")
+        @DerivedFromParent(field = "nullableField")
         private Integer nullableField;
 
         private String ownField;
@@ -55,7 +55,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
 
     @Test
     void testCopyIfDefaultOnly_allDefaults_copiesSuccessfully() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .copyIfDefaultOnly(true)
                 .build();
@@ -87,7 +87,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
 
     @Test
     void testCopyIfDefaultOnly_nonDefaultReferenceType_throwsException() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .copyIfDefaultOnly(true)
                 .build();
@@ -123,7 +123,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
 
     @Test
     void testCopyIfDefaultOnly_nonDefaultPrimitive_throwsException() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .copyIfDefaultOnly(true)
                 .build();
@@ -158,7 +158,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
 
     @Test
     void testCopyIfDefaultOnly_false_copiesEverything() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .copyIfDefaultOnly(false)  // Normal mode - overwrites everything
                 .build();
@@ -192,7 +192,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
 
     @Test
     void testCopyDisabled_withCopyIfDefaultOnly_noEffect() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(false)  // Copy disabled
                 .copyIfDefaultOnly(true)  // Should have no effect
                 .build();
@@ -224,7 +224,7 @@ class CopyFromParentCopyIfDefaultOnlyTest {
 
     @Test
     void testCopyIfDefaultOnly_nullParentValue_copies() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .copyIfDefaultOnly(true)
                 .build();

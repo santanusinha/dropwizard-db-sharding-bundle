@@ -1,21 +1,21 @@
 package io.appform.dropwizard.sharding.observers;
 
-import io.appform.dropwizard.sharding.utils.CopyFromParentUtils;
+import io.appform.dropwizard.sharding.utils.DerivedFromParentUtils;
 
 import java.util.List;
 
 /**
  * Callback interface for handling field mismatches between parent and child entities
- * during {@code @CopyFromParent} processing.
+ * during {@code @DerivedFromParent} processing.
  * <p>
  * Consumers implement this interface to define what happens when a mismatch is detected
  * (e.g. publish a Foxtrot event, log a warning, increment a metric).
  * <p>
  *
- * @see CopyFromParentObserver.Builder#mismatchListener
+ * @see DerivedFromParentObserver.Builder#mismatchListener
  */
 @FunctionalInterface
-public interface CopyFromParentMismatchListener {
+public interface DerivedFromParentMismatchListener {
 
     /**
      * Called when one or more field mismatches are detected between the parent and child entities.
@@ -24,5 +24,5 @@ public interface CopyFromParentMismatchListener {
      * @param child      the child entity
      * @param mismatches non-empty list of detected field mismatches
      */
-    void onMismatches(Object parent, Object child, List<CopyFromParentUtils.FieldMismatch> mismatches);
+    void onMismatches(Object parent, Object child, List<DerivedFromParentUtils.FieldMismatch> mismatches);
 }

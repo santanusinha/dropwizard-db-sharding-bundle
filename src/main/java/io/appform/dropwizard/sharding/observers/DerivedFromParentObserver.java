@@ -9,25 +9,25 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.function.Supplier;
 
 /**
- * Observer that handles {@code @CopyFromParent} field processing for child entities
+ * Observer that handles {@code @DerivedFromParent} field processing for child entities
  * saved within a {@link io.appform.dropwizard.sharding.dao.LockedContext}.
  * <p>
  * This observer is opt-in. Register it during bundle initialization:
  *
  * <pre>
- *     dbShardingBundle.registerObserver(CopyFromParentObserver.builder()
+ *     dbShardingBundle.registerObserver(DerivedFromParentObserver.builder()
  *         .copyEnabled(true) //static
  *         .mismatchDetectionEnabled(true) //static
  *         .copyIfDefaultOnly(true) //static
- *         .configSupplier(() -&gt; configProviderBundle.getDataProvider().getData().getCopyFromParentObserverConfig())
- *         .mismatchListener(() -&gt; guiceBundle.getInjector().getInstance(CopyFromParentMismatchListener.class))
+ *         .configSupplier(() -&gt; configProviderBundle.getDataProvider().getData().getDerivedFromParentObserverConfig())
+ *         .mismatchListener(() -&gt; guiceBundle.getInjector().getInstance(DerivedFromParentMismatchListener.class))
  *         .build());
  * </pre>
  * <p>
  * Configuration options:
  * Priority: config > static > default
  * <ul>
- *     <li>{@code copyEnabled} — whether to copy {@code @CopyFromParent(override=true)} fields
+ *     <li>{@code copyEnabled} — whether to copy {@code @DerivedFromParent(override=true)} fields
  *         from parent to child before persistence (default: {@code true})</li>
  *     <li>{@code copyIfDefaultOnly} — when {@code true}, copy only if child field has default value,
  *         otherwise fail the operation. Used for migration validation. (default: {@code false})</li>
@@ -44,7 +44,7 @@ import java.util.function.Supplier;
  * <p>
  * Runtime semantics:
  * <ul>
- *     <li>The flags are resolved per {@link SaveWithParent} transaction. The current {@link CopyFromParentPersistor}
+ *     <li>The flags are resolved per {@link SaveWithParent} transaction. The current {@link DerivedFromParentPersistor}
  *         is reused while its flags match the resolved ones; on any difference a new persistor is created (under a
  *         lock, double-checked). Each transaction is always processed with a persistor matching the flags it
  *         resolved.</li>
@@ -56,11 +56,11 @@ import java.util.function.Supplier;
  *         Failures are not cached; the next transaction retries.</li>
  * </ul>
  *
- * @see CopyFromParentMismatchListener
- * @see io.appform.dropwizard.sharding.utils.CopyFromParentUtils
+ * @see DerivedFromParentMismatchListener
+ * @see io.appform.dropwizard.sharding.utils.DerivedFromParentUtils
  */
 @Slf4j
-public class CopyFromParentObserver extends TransactionObserver {
+public class DerivedFromParentObserver extends TransactionObserver {
 
     static final String LISTENER_REQUIRED_MESSAGE =
             "mismatchListener must be provided when mismatchDetectionEnabled is true";
@@ -71,21 +71,21 @@ public class CopyFromParentObserver extends TransactionObserver {
     private final Boolean staticCopyIfDefaultOnly;
 
     // For dynamic configuration (values fetched on every SaveWithParent transaction)
-    private final Supplier<CopyFromParentObserverConfig> configSupplier;
+    private final Supplier<DerivedFromParentObserverConfig> configSupplier;
 
-    private final Supplier<CopyFromParentMismatchListener> mismatchListenerSupplier;
+    private final Supplier<DerivedFromParentMismatchListener> mismatchListenerSupplier;
 
     // Persistor for the most recently resolved configuration. Never mutated, only replaced.
-    private volatile CopyFromParentPersistor persistor;
+    private volatile DerivedFromParentPersistor persistor;
 
     // Resolved lazily, the first time mismatch detection is needed. Guarded by "this".
-    private CopyFromParentMismatchListener mismatchListener;
+    private DerivedFromParentMismatchListener mismatchListener;
 
-    private CopyFromParentObserver(Boolean staticCopyEnabled,
+    private DerivedFromParentObserver(Boolean staticCopyEnabled,
                                    Boolean staticMismatchDetectionEnabled,
                                    Boolean staticCopyIfDefaultOnly,
-                                   Supplier<CopyFromParentObserverConfig> configSupplier,
-                                   Supplier<CopyFromParentMismatchListener> mismatchListenerSupplier) {
+                                   Supplier<DerivedFromParentObserverConfig> configSupplier,
+                                   Supplier<DerivedFromParentMismatchListener> mismatchListenerSupplier) {
         super(null);
         this.staticCopyEnabled = staticCopyEnabled;
         this.staticMismatchDetectionEnabled = staticMismatchDetectionEnabled;
@@ -97,7 +97,7 @@ public class CopyFromParentObserver extends TransactionObserver {
     /**
      * Configuration object that needs to be provided by external config classes.
      */
-    public interface CopyFromParentObserverConfig {
+    public interface DerivedFromParentObserverConfig {
         Boolean getCopyEnabled();
         Boolean getMismatchDetectionEnabled();
         Boolean getCopyIfDefaultOnly();
@@ -120,12 +120,12 @@ public class CopyFromParentObserver extends TransactionObserver {
     /**
      * @return a persistor whose flags match the currently resolved configuration.
      */
-    CopyFromParentPersistor getPersistor() {
+    DerivedFromParentPersistor getPersistor() {
         final ResolvedConfig config;
         try {
             config = resolveConfig(configSupplier != null ? configSupplier.get() : null);
         } catch (Exception e) {
-            final CopyFromParentPersistor last = persistor;
+            final DerivedFromParentPersistor last = persistor;
             if (last != null) {
                 log.warn("Failed to fetch dynamic config, continuing with the last resolved config", e);
                 return last;
@@ -136,23 +136,23 @@ public class CopyFromParentObserver extends TransactionObserver {
         return getOrCreatePersistor(config);
     }
 
-    private CopyFromParentPersistor getOrCreatePersistor(ResolvedConfig config) {
-        final CopyFromParentPersistor current = persistor;
+    private DerivedFromParentPersistor getOrCreatePersistor(ResolvedConfig config) {
+        final DerivedFromParentPersistor current = persistor;
         if (config.matches(current)) {
             return current;
         }
         synchronized (this) {
-            final CopyFromParentPersistor latest = persistor;
+            final DerivedFromParentPersistor latest = persistor;
             if (config.matches(latest)) {
                 return latest;
             }
-            final CopyFromParentPersistor created = new CopyFromParentPersistor(
+            final DerivedFromParentPersistor created = new DerivedFromParentPersistor(
                     config.isCopyEnabled(),
                     config.isMismatchDetectionEnabled(),
                     config.isCopyIfDefaultOnly(),
                     config.isMismatchDetectionEnabled() ? getMismatchListener() : null);
             persistor = created;
-            log.info("CopyFromParentPersistor {} with copyEnabled={}, mismatchDetectionEnabled={}, copyIfDefaultOnly={}",
+            log.info("DerivedFromParentPersistor {} with copyEnabled={}, mismatchDetectionEnabled={}, copyIfDefaultOnly={}",
                     latest == null ? "initialized" : "re-created on config change",
                     config.isCopyEnabled(), config.isMismatchDetectionEnabled(), config.isCopyIfDefaultOnly());
             return created;
@@ -162,7 +162,7 @@ public class CopyFromParentObserver extends TransactionObserver {
     /**
      * Resolves each flag in order of precedence: dynamic value (if non-null), static value (if non-null), default.
      */
-    private ResolvedConfig resolveConfig(CopyFromParentObserverConfig dynamicConfig) {
+    private ResolvedConfig resolveConfig(DerivedFromParentObserverConfig dynamicConfig) {
         return new ResolvedConfig(
                 resolveConfigValue(dynamicConfig != null ? dynamicConfig.getCopyEnabled() : null,
                         staticCopyEnabled, true),
@@ -187,23 +187,23 @@ public class CopyFromParentObserver extends TransactionObserver {
      * Any problem is a configuration error and is thrown (failing the transaction) rather than disabling detection;
      * nothing is cached on failure, so the next transaction retries.
      */
-    private CopyFromParentMismatchListener getMismatchListener() {
+    private DerivedFromParentMismatchListener getMismatchListener() {
         if (mismatchListener == null) {
             mismatchListener = resolveMismatchListener();
         }
         return mismatchListener;
     }
 
-    private CopyFromParentMismatchListener resolveMismatchListener() {
+    private DerivedFromParentMismatchListener resolveMismatchListener() {
         if (mismatchListenerSupplier == null) {
             throw new IllegalArgumentException(LISTENER_REQUIRED_MESSAGE);
         }
-        final CopyFromParentMismatchListener resolved;
+        final DerivedFromParentMismatchListener resolved;
         try {
             resolved = mismatchListenerSupplier.get();
         } catch (Exception e) {
             throw new IllegalStateException(
-                    "Failed to resolve CopyFromParentMismatchListener while mismatchDetectionEnabled is true", e);
+                    "Failed to resolve DerivedFromParentMismatchListener while mismatchDetectionEnabled is true", e);
         }
         if (resolved == null) {
             throw new IllegalStateException(
@@ -218,7 +218,7 @@ public class CopyFromParentObserver extends TransactionObserver {
         boolean mismatchDetectionEnabled;
         boolean copyIfDefaultOnly;
 
-        boolean matches(CopyFromParentPersistor candidate) {
+        boolean matches(DerivedFromParentPersistor candidate) {
             return candidate != null
                     && candidate.isCopyEnabled() == copyEnabled
                     && candidate.isMismatchDetectionEnabled() == mismatchDetectionEnabled
@@ -230,8 +230,8 @@ public class CopyFromParentObserver extends TransactionObserver {
         private Boolean copyEnabled;
         private Boolean mismatchDetectionEnabled;
         private Boolean copyIfDefaultOnly;
-        private Supplier<CopyFromParentObserverConfig> configSupplier;
-        private Supplier<CopyFromParentMismatchListener> mismatchListenerSupplier;
+        private Supplier<DerivedFromParentObserverConfig> configSupplier;
+        private Supplier<DerivedFromParentMismatchListener> mismatchListenerSupplier;
 
         private Builder() {}
 
@@ -239,7 +239,7 @@ public class CopyFromParentObserver extends TransactionObserver {
          * Supplier for dynamic configuration, invoked on every {@link SaveWithParent} transaction. Non-null values it
          * returns take precedence over the static values set on this builder.
          */
-        public Builder configSupplier(Supplier<CopyFromParentObserverConfig> configSupplier) {
+        public Builder configSupplier(Supplier<DerivedFromParentObserverConfig> configSupplier) {
             this.configSupplier = configSupplier;
             return this;
         }
@@ -282,18 +282,18 @@ public class CopyFromParentObserver extends TransactionObserver {
          *     .mismatchListener(() -&gt; guiceBundle.getInjector().getInstance(MyListener.class))
          * </pre>
          */
-        public Builder mismatchListener(Supplier<CopyFromParentMismatchListener> mismatchListenerSupplier) {
+        public Builder mismatchListener(Supplier<DerivedFromParentMismatchListener> mismatchListenerSupplier) {
             this.mismatchListenerSupplier = mismatchListenerSupplier;
             return this;
         }
 
-        public CopyFromParentObserver build() {
+        public DerivedFromParentObserver build() {
             // Validation: if static mismatchDetectionEnabled is true, must have listener
             if (Boolean.TRUE.equals(mismatchDetectionEnabled) && mismatchListenerSupplier == null) {
                 throw new IllegalArgumentException(LISTENER_REQUIRED_MESSAGE);
             }
 
-            return new CopyFromParentObserver(copyEnabled, mismatchDetectionEnabled,
+            return new DerivedFromParentObserver(copyEnabled, mismatchDetectionEnabled,
                     copyIfDefaultOnly, configSupplier, mismatchListenerSupplier);
         }
     }

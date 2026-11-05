@@ -4,9 +4,9 @@ import io.appform.dropwizard.sharding.dao.operations.Save;
 import io.appform.dropwizard.sharding.dao.operations.SaveWithParent;
 import io.appform.dropwizard.sharding.execution.DaoType;
 import io.appform.dropwizard.sharding.execution.TransactionExecutionContext;
-import io.appform.dropwizard.sharding.sharding.CopyFromParent;
+import io.appform.dropwizard.sharding.sharding.DerivedFromParent;
 import io.appform.dropwizard.sharding.sharding.ParentEntity;
-import io.appform.dropwizard.sharding.utils.CopyFromParentUtils;
+import io.appform.dropwizard.sharding.utils.DerivedFromParentUtils;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class CopyFromParentObserverTest {
+class DerivedFromParentObserverTest {
 
     // Test entities
     @Data
@@ -40,10 +40,10 @@ class CopyFromParentObserverTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class TestChild {
-        @CopyFromParent(field = "transactionId")
+        @DerivedFromParent(field = "transactionId")
         private String txnId;
 
-        @CopyFromParent(field = "amount")
+        @DerivedFromParent(field = "amount")
         private long childAmount;
 
         private String ownField;
@@ -55,10 +55,10 @@ class CopyFromParentObserverTest {
     @AllArgsConstructor
     @ParentEntity(TestParent.class)
     static class MismatchChild {
-        @CopyFromParent(field = "transactionId")
+        @DerivedFromParent(field = "transactionId")
         private String txnId;
 
-        @CopyFromParent(field = "amount")
+        @DerivedFromParent(field = "amount")
         private long childAmount;
     }
 
@@ -66,7 +66,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testDefaultConfig_copiesFields_noMismatchDetection() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(false)
                 .build();
@@ -102,7 +102,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testDefaultConfig_overwritesExistingValues() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(false)
                 .build();
@@ -132,9 +132,9 @@ class CopyFromParentObserverTest {
 
     @Test
     void testCopyAndDetect_copiesFields_detectsMismatches() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> mockListener)
@@ -160,11 +160,11 @@ class CopyFromParentObserverTest {
         MismatchChild result = observer.execute(ctx, () -> opContext.apply(null));
 
         // Verify mismatch detection was called
-        ArgumentCaptor<List<CopyFromParentUtils.FieldMismatch>> mismatchCaptor =
+        ArgumentCaptor<List<DerivedFromParentUtils.FieldMismatch>> mismatchCaptor =
                 ArgumentCaptor.forClass(List.class);
         verify(mockListener).onMismatches(eq(parent), eq(child), mismatchCaptor.capture());
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches = mismatchCaptor.getValue();
+        List<DerivedFromParentUtils.FieldMismatch> mismatches = mismatchCaptor.getValue();
         assertEquals(2, mismatches.size(), "Should detect 2 mismatches");
 
         // Verify fields were still copied (mismatch detection doesn't prevent copy)
@@ -174,9 +174,9 @@ class CopyFromParentObserverTest {
 
     @Test
     void testCopyAndDetect_noMismatchesDetected_listenerNotCalled() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> mockListener)
@@ -207,11 +207,11 @@ class CopyFromParentObserverTest {
 
     @Test
     void testCopyAndDetect_listenerExceptionDoesNotBreakCopy() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
         doThrow(new RuntimeException("Listener explosion"))
                 .when(mockListener).onMismatches(any(), any(), any());
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> mockListener)
@@ -245,7 +245,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testNoCopyNoDetect_doesNotCopyFields() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(false)
                 .mismatchDetectionEnabled(false)
                 .build();
@@ -276,9 +276,9 @@ class CopyFromParentObserverTest {
 
     @Test
     void testValidationMode_detectsButDoesNotCopy() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(false)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> mockListener)
@@ -314,9 +314,9 @@ class CopyFromParentObserverTest {
     @Test
     void testLazyListenerInit_supplierCalledOnlyOnce() {
         AtomicInteger supplierCallCount = new AtomicInteger(0);
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> {
@@ -349,9 +349,9 @@ class CopyFromParentObserverTest {
     @Test
     void testLazyListenerInit_supplierFailure_failsFast_notCached_retriedNextTransaction() {
         AtomicInteger attempts = new AtomicInteger(0);
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
         RuntimeException cause = new RuntimeException("Guice not initialized");
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> {
@@ -395,7 +395,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testLazyListenerInit_supplierReturnsNull_failsFast() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> null)
                 .build();
@@ -417,7 +417,7 @@ class CopyFromParentObserverTest {
     void testNonSaveWithParent_proceedsWithoutError_andDoesNotResolveConfigOrListener() {
         AtomicInteger configCalls = new AtomicInteger(0);
         AtomicInteger listenerCalls = new AtomicInteger(0);
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true)
                 .mismatchListener(() -> {
@@ -447,7 +447,7 @@ class CopyFromParentObserverTest {
     // Test: Builder validation
     @Test
     void testBuilder_mismatchDetectionEnabledWithoutListener_throwsException() {
-        var builder = CopyFromParentObserver.builder()
+        var builder = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(true);
         assertThrows(IllegalArgumentException.class, builder::build,
@@ -457,7 +457,7 @@ class CopyFromParentObserverTest {
     @Test
     void testBuilder_mismatchDetectionDisabled_listenerNotRequired() {
         assertDoesNotThrow(() ->
-                CopyFromParentObserver.builder()
+                DerivedFromParentObserver.builder()
                         .copyEnabled(true)
                         .mismatchDetectionEnabled(false)
                         .build(),
@@ -467,7 +467,7 @@ class CopyFromParentObserverTest {
     @Test
     void testBuilder_defaultValues() {
         // Default: copyEnabled=true, mismatchDetectionEnabled=false
-        CopyFromParentObserver observer = CopyFromParentObserver.builder().build();
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder().build();
 
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
         TestChild child = TestChild.builder().build();
@@ -489,7 +489,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testMultipleFieldsCopied() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .build();
 
@@ -519,7 +519,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testNullParentValues_copiedCorrectly() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .build();
 
@@ -548,7 +548,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testAfterSaveFunction_executedAfterCopy() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .build();
 
@@ -596,7 +596,7 @@ class CopyFromParentObserverTest {
      */
     @Data
     @Builder
-    static class TestConfig implements CopyFromParentObserver.CopyFromParentObserverConfig {
+    static class TestConfig implements DerivedFromParentObserver.DerivedFromParentObserverConfig {
         private Boolean copyEnabled;
         private Boolean mismatchDetectionEnabled;
         private Boolean copyIfDefaultOnly;
@@ -610,7 +610,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(false)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .build();
 
@@ -645,7 +645,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(false)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .build();
 
@@ -674,7 +674,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testConfigSupplier_enablesMismatchDetection() {
-        CopyFromParentMismatchListener mockListener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener mockListener = mock(DerivedFromParentMismatchListener.class);
 
         TestConfig config = TestConfig.builder()
                 .copyEnabled(true)
@@ -682,7 +682,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(false)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .mismatchListener(() -> mockListener)
                 .build();
@@ -707,11 +707,11 @@ class CopyFromParentObserverTest {
         MismatchChild result = observer.execute(ctx, () -> opContext.apply(null));
 
         // Verify mismatch detection was called
-        ArgumentCaptor<List<CopyFromParentUtils.FieldMismatch>> mismatchCaptor =
+        ArgumentCaptor<List<DerivedFromParentUtils.FieldMismatch>> mismatchCaptor =
                 ArgumentCaptor.forClass(List.class);
         verify(mockListener).onMismatches(eq(parent), eq(child), mismatchCaptor.capture());
 
-        List<CopyFromParentUtils.FieldMismatch> mismatches = mismatchCaptor.getValue();
+        List<DerivedFromParentUtils.FieldMismatch> mismatches = mismatchCaptor.getValue();
         assertEquals(2, mismatches.size(), "Should detect 2 mismatches via config supplier");
 
         assertEquals("PARENT-TXN", result.getTxnId());
@@ -728,11 +728,11 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(false)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)  // Static value - should be overridden
                 .mismatchDetectionEnabled(true)  // Static value - should be overridden
                 .configSupplier(() -> config)  // Dynamic config takes precedence
-                .mismatchListener(() -> mock(CopyFromParentMismatchListener.class))
+                .mismatchListener(() -> mock(DerivedFromParentMismatchListener.class))
                 .build();
 
         TestParent parent = TestParent.builder()
@@ -769,7 +769,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(null)  // Null - should fall back to static
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)  // Static fallback
                 .mismatchDetectionEnabled(false)  // Static fallback
                 .configSupplier(() -> config)
@@ -806,7 +806,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(null)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .build();
 
@@ -835,7 +835,7 @@ class CopyFromParentObserverTest {
     void testConfigSupplier_exception_fallbackToStatic() {
         AtomicInteger callCount = new AtomicInteger(0);
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)  // Static fallback
                 .configSupplier(() -> {
                     callCount.incrementAndGet();
@@ -872,7 +872,7 @@ class CopyFromParentObserverTest {
         // A transient failure of the config source must not flip behaviour back to static values.
         AtomicBoolean fail = new AtomicBoolean(false);
         TestConfig config = TestConfig.builder().copyEnabled(false).build();
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true) // static would enable copy
                 .configSupplier(() -> {
                     if (fail.get()) {
@@ -886,7 +886,7 @@ class CopyFromParentObserverTest {
         TestChild first = TestChild.builder().build();
         runSaveWithParent(observer, first, parent);
         assertNull(first.getTxnId(), "dynamic copyEnabled=false must apply");
-        CopyFromParentPersistor before = observer.getPersistor();
+        DerivedFromParentPersistor before = observer.getPersistor();
 
         fail.set(true);
         TestChild second = TestChild.builder().build();
@@ -910,7 +910,7 @@ class CopyFromParentObserverTest {
                 .mismatchDetectionEnabled(false)
                 .copyIfDefaultOnly(false)
                 .build();
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> {
                     supplierCallCount.incrementAndGet();
                     return config;
@@ -919,7 +919,7 @@ class CopyFromParentObserverTest {
         TestParent parent = TestParent.builder().transactionId("TXN").amount(100).build();
 
         runSaveWithParent(observer, TestChild.builder().build(), parent);
-        CopyFromParentPersistor first = observer.getPersistor(); // 2nd supplier call
+        DerivedFromParentPersistor first = observer.getPersistor(); // 2nd supplier call
         runSaveWithParent(observer, TestChild.builder().build(), parent);
         runSaveWithParent(observer, TestChild.builder().build(), parent);
 
@@ -929,14 +929,14 @@ class CopyFromParentObserverTest {
 
     @Test
     void testConfigSupplier_eachFlagChange_recreatesPersistor_andTakesEffect() {
-        CopyFromParentMismatchListener listener = mock(CopyFromParentMismatchListener.class);
+        DerivedFromParentMismatchListener listener = mock(DerivedFromParentMismatchListener.class);
         AtomicInteger listenerSupplierCalls = new AtomicInteger(0);
         TestConfig config = TestConfig.builder()
                 .copyEnabled(false)
                 .mismatchDetectionEnabled(false)
                 .copyIfDefaultOnly(false)
                 .build();
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .mismatchListener(() -> {
                     listenerSupplierCalls.incrementAndGet();
@@ -949,7 +949,7 @@ class CopyFromParentObserverTest {
         TestChild c1 = TestChild.builder().build();
         runSaveWithParent(observer, c1, parent);
         assertNull(c1.getTxnId());
-        CopyFromParentPersistor p1 = observer.getPersistor();
+        DerivedFromParentPersistor p1 = observer.getPersistor();
         assertPersistorFlags(p1, false, false, false);
         assertNull(p1.getMismatchListener());
         assertEquals(0, listenerSupplierCalls.get(), "listener must not be resolved while detection is off");
@@ -959,7 +959,7 @@ class CopyFromParentObserverTest {
         TestChild c2 = TestChild.builder().build();
         runSaveWithParent(observer, c2, parent);
         assertEquals("PARENT-TXN", c2.getTxnId());
-        CopyFromParentPersistor p2 = observer.getPersistor();
+        DerivedFromParentPersistor p2 = observer.getPersistor();
         assertNotSame(p1, p2);
         assertPersistorFlags(p2, true, false, false);
 
@@ -967,7 +967,7 @@ class CopyFromParentObserverTest {
         config.setCopyIfDefaultOnly(true);
         TestChild c3 = TestChild.builder().txnId("MANUAL").build();
         assertThrows(IllegalStateException.class, () -> runSaveWithParent(observer, c3, parent));
-        CopyFromParentPersistor p3 = observer.getPersistor();
+        DerivedFromParentPersistor p3 = observer.getPersistor();
         assertNotSame(p2, p3);
         assertPersistorFlags(p3, true, false, true);
 
@@ -976,7 +976,7 @@ class CopyFromParentObserverTest {
         config.setMismatchDetectionEnabled(true);
         TestChild c4 = TestChild.builder().txnId("CHILD-TXN").build();
         runSaveWithParent(observer, c4, parent);
-        CopyFromParentPersistor p4 = observer.getPersistor();
+        DerivedFromParentPersistor p4 = observer.getPersistor();
         assertPersistorFlags(p4, true, true, false);
         assertSame(listener, p4.getMismatchListener());
         verify(listener, times(1)).onMismatches(eq(parent), eq(c4), any());
@@ -995,7 +995,7 @@ class CopyFromParentObserverTest {
     @Test
     void testConfigSupplier_nullValueFallsBackToStatic_changeBetweenNullAndExplicitIsDetected() {
         TestConfig config = TestConfig.builder().build(); // all null
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(false) // static
                 .configSupplier(() -> config)
                 .build();
@@ -1004,7 +1004,7 @@ class CopyFromParentObserverTest {
         TestChild c1 = TestChild.builder().build();
         runSaveWithParent(observer, c1, parent);
         assertNull(c1.getTxnId(), "null dynamic value -> static (false)");
-        CopyFromParentPersistor p1 = observer.getPersistor();
+        DerivedFromParentPersistor p1 = observer.getPersistor();
 
         // Explicit value equal to the effective one: resolved flags unchanged -> same persistor
         config.setCopyEnabled(false);
@@ -1021,19 +1021,19 @@ class CopyFromParentObserverTest {
     @Test
     void testConfigSupplier_runtimeEnablesDetectionWithoutListener_failsFast_thenRecoversWhenDisabled() {
         TestConfig config = TestConfig.builder().mismatchDetectionEnabled(false).build();
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .build(); // no listener
         TestParent parent = TestParent.builder().transactionId("PARENT-TXN").build();
 
         runSaveWithParent(observer, TestChild.builder().build(), parent);
-        CopyFromParentPersistor p1 = observer.getPersistor();
+        DerivedFromParentPersistor p1 = observer.getPersistor();
 
         config.setMismatchDetectionEnabled(true);
         TestChild child = TestChild.builder().build();
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> runSaveWithParent(observer, child, parent));
-        assertEquals(CopyFromParentObserver.LISTENER_REQUIRED_MESSAGE, ex.getMessage());
+        assertEquals(DerivedFromParentObserver.LISTENER_REQUIRED_MESSAGE, ex.getMessage());
         assertNull(child.getTxnId(), "nothing must be applied when the transaction fails on config");
 
         config.setMismatchDetectionEnabled(false);
@@ -1047,13 +1047,13 @@ class CopyFromParentObserverTest {
     void testConcurrentTransactions_singlePersistorCreated_listenerResolvedOnce() throws Exception {
         AtomicInteger listenerSupplierCalls = new AtomicInteger(0);
         TestConfig config = TestConfig.builder().copyEnabled(true).mismatchDetectionEnabled(true).build();
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .mismatchListener(() -> {
                     listenerSupplierCalls.incrementAndGet();
                     // widen the race window: without the lock + re-check, other threads would create their own
                     sleepUninterruptibly(50);
-                    return mock(CopyFromParentMismatchListener.class);
+                    return mock(DerivedFromParentMismatchListener.class);
                 })
                 .build();
         TestParent parent = TestParent.builder().transactionId("PARENT-TXN").amount(5).build();
@@ -1061,8 +1061,8 @@ class CopyFromParentObserverTest {
         final int threads = 16;
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
         java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
-        // Identity set: CopyFromParentPersistor is @Data, so distinct instances with equal flags are equals()
-        java.util.Set<CopyFromParentPersistor> seen =
+        // Identity set: DerivedFromParentPersistor is @Data, so distinct instances with equal flags are equals()
+        java.util.Set<DerivedFromParentPersistor> seen =
                 java.util.Collections.synchronizedSet(java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
         java.util.List<java.util.concurrent.Future<TestChild>> futures = new java.util.ArrayList<>();
         try {
@@ -1095,14 +1095,14 @@ class CopyFromParentObserverTest {
         }
     }
 
-    private static void runSaveWithParent(CopyFromParentObserver observer, TestChild child, TestParent parent) {
+    private static void runSaveWithParent(DerivedFromParentObserver observer, TestChild child, TestParent parent) {
         SaveWithParent<TestChild, TestChild, TestParent> op =
                 SaveWithParent.<TestChild, TestChild, TestParent>saveWithParentBuilder()
                         .entity(child).parent(parent).saver(e -> e).build();
         observer.execute(createContext(op), () -> op.apply(null));
     }
 
-    private static void assertPersistorFlags(CopyFromParentPersistor persistor,
+    private static void assertPersistorFlags(DerivedFromParentPersistor persistor,
                                              boolean copyEnabled,
                                              boolean mismatchDetectionEnabled,
                                              boolean copyIfDefaultOnly) {
@@ -1120,11 +1120,11 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(null)  // Null - should use static or default
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)  // Static - should be overridden by config
                 .mismatchDetectionEnabled(true)  // Static - should be used (config is null)
                 .configSupplier(() -> config)
-                .mismatchListener(() -> mock(CopyFromParentMismatchListener.class))
+                .mismatchListener(() -> mock(DerivedFromParentMismatchListener.class))
                 .build();
 
         TestParent parent = TestParent.builder()
@@ -1163,7 +1163,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(false)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> {
                     supplierCallCount.incrementAndGet();
                     return config;
@@ -1193,7 +1193,7 @@ class CopyFromParentObserverTest {
 
     @Test
     void testConfigSupplier_nullConfig_fallbackToDefaults() {
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> null)  // Supplier returns null
                 .build();
 
@@ -1228,7 +1228,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(false)
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 // No mismatchListener provided
                 .build();
@@ -1256,7 +1256,7 @@ class CopyFromParentObserverTest {
                 "Should throw when mismatchDetectionEnabled=true but listener is null");
         // Same error as the static path (Builder#build)
         IllegalArgumentException staticEx = assertThrows(IllegalArgumentException.class,
-                () -> CopyFromParentObserver.builder().mismatchDetectionEnabled(true).build());
+                () -> DerivedFromParentObserver.builder().mismatchDetectionEnabled(true).build());
         assertEquals(staticEx.getMessage(), ex.getMessage());
         assertEquals("CHILD-TXN", child.getTxnId(), "Entity must not be touched");
     }
@@ -1269,7 +1269,7 @@ class CopyFromParentObserverTest {
                 .copyIfDefaultOnly(true)  // Enable strict mode
                 .build();
 
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .configSupplier(() -> config)
                 .build();
 
@@ -1299,7 +1299,7 @@ class CopyFromParentObserverTest {
     @Test
     void testBackwardCompatibility_staticValuesStillWork() {
         // Code without config supplier should also to work
-        CopyFromParentObserver observer = CopyFromParentObserver.builder()
+        DerivedFromParentObserver observer = DerivedFromParentObserver.builder()
                 .copyEnabled(true)
                 .mismatchDetectionEnabled(false)
                 .build();

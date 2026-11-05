@@ -17,20 +17,20 @@ import javax.persistence.Table;
 
 /**
  * Lookup (parent) entity used to verify, end to end through a real transaction/observer chain
- * and a real database, that {@code @CopyFromParent} field copying and bucket-key computation
- * for a related {@link CopyFromParentIntegrationChild} happen in the correct order (copy, then
+ * and a real database, that {@code @DerivedFromParent} field copying and bucket-key computation
+ * for a related {@link DerivedFromParentIntegrationChild} happen in the correct order (copy, then
  * bucket calculation, then save) - and that a {@code copyIfDefaultOnly} violation rolls back the
  * whole {@link io.appform.dropwizard.sharding.dao.LockedContext} transaction.
  */
 @Entity
-@Table(name = "cfp_integration_parent")
+@Table(name = "dfp_integration_parent")
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldNameConstants
-public class CopyFromParentIntegrationParent {
+public class DerivedFromParentIntegrationParent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

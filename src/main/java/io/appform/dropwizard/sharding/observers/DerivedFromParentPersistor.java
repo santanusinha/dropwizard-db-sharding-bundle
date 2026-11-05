@@ -24,7 +24,7 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.R
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
-import io.appform.dropwizard.sharding.utils.CopyFromParentUtils;
+import io.appform.dropwizard.sharding.utils.DerivedFromParentUtils;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,29 +34,29 @@ import java.util.List;
  * Visitor that intercepts {@link SaveWithParent} operations to perform
  * mismatch detection and field copying based on configuration.
  * <p>
- * Immutable: a new instance is created by {@link CopyFromParentObserver} whenever the resolved configuration changes.
+ * Immutable: a new instance is created by {@link DerivedFromParentObserver} whenever the resolved configuration changes.
  * <p>
- * This is an internal implementation detail of {@link CopyFromParentObserver}.
+ * This is an internal implementation detail of {@link DerivedFromParentObserver}.
  */
 @Slf4j
 @Data
-class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
+class DerivedFromParentPersistor implements OpContext.OpContextVisitor<Void> {
 
     private final boolean copyEnabled;
     private final boolean mismatchDetectionEnabled;
     private final boolean copyIfDefaultOnly;
-    private final CopyFromParentMismatchListener mismatchListener;
+    private final DerivedFromParentMismatchListener mismatchListener;
 
     /**
      * @throws IllegalArgumentException if {@code mismatchDetectionEnabled} is true and {@code mismatchListener} is
      *                                  null. Detection that has been asked for must never be silently skipped.
      */
-    CopyFromParentPersistor(boolean copyEnabled,
+    DerivedFromParentPersistor(boolean copyEnabled,
                             boolean mismatchDetectionEnabled,
                             boolean copyIfDefaultOnly,
-                            CopyFromParentMismatchListener mismatchListener) {
+                            DerivedFromParentMismatchListener mismatchListener) {
         if (mismatchDetectionEnabled && mismatchListener == null) {
-            throw new IllegalArgumentException(CopyFromParentObserver.LISTENER_REQUIRED_MESSAGE);
+            throw new IllegalArgumentException(DerivedFromParentObserver.LISTENER_REQUIRED_MESSAGE);
         }
         this.copyEnabled = copyEnabled;
         this.mismatchDetectionEnabled = mismatchDetectionEnabled;
@@ -73,8 +73,8 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
 
         if (mismatchDetectionEnabled) {
             try {
-                List<CopyFromParentUtils.FieldMismatch> mismatches =
-                        CopyFromParentUtils.detectMismatches(parent, entity);
+                List<DerivedFromParentUtils.FieldMismatch> mismatches =
+                        DerivedFromParentUtils.detectMismatches(parent, entity);
                 if (!mismatches.isEmpty()) {
                     mismatchListener.onMismatches(parent, entity, mismatches);
                 }
@@ -84,7 +84,7 @@ class CopyFromParentPersistor implements OpContext.OpContextVisitor<Void> {
             }
         }
         if (copyEnabled) {
-            CopyFromParentUtils.copyFields(parent, entity, copyIfDefaultOnly);
+            DerivedFromParentUtils.copyFields(parent, entity, copyIfDefaultOnly);
         }
         return null;
     }

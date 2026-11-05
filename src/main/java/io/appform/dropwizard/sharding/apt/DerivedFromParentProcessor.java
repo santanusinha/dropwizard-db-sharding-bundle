@@ -1,6 +1,6 @@
 package io.appform.dropwizard.sharding.apt;
 
-import io.appform.dropwizard.sharding.sharding.CopyFromParent;
+import io.appform.dropwizard.sharding.sharding.DerivedFromParent;
 import io.appform.dropwizard.sharding.sharding.ParentEntity;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -23,12 +23,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Compile-time annotation processor that validates {@link CopyFromParent} and
+ * Compile-time annotation processor that validates {@link DerivedFromParent} and
  * {@link ParentEntity} usage:
  * <ul>
- *   <li>{@code @CopyFromParent} without {@code @ParentEntity} anywhere in the enclosing class's
+ *   <li>{@code @DerivedFromParent} without {@code @ParentEntity} anywhere in the enclosing class's
  *       superclass hierarchy → error</li>
- *   <li>{@code @CopyFromParent(field = "x")} where {@code x} does not exist on the parent → error</li>
+ *   <li>{@code @DerivedFromParent(field = "x")} where {@code x} does not exist on the parent → error</li>
  *   <li>Type mismatch between the parent field and the annotated child field → error</li>
  *   <li>Parent field annotated with {@code @Transient} (JPA) → error</li>
  *   <li>Parent/child field declared {@code static}, or child field declared {@code final} → error,
@@ -36,10 +36,10 @@ import java.util.Set;
  * </ul>
  */
 @SupportedAnnotationTypes({
-        "io.appform.dropwizard.sharding.sharding.CopyFromParent",
+        "io.appform.dropwizard.sharding.sharding.DerivedFromParent",
         "io.appform.dropwizard.sharding.sharding.ParentEntity"
 })
-public class CopyFromParentProcessor extends AbstractProcessor {
+public class DerivedFromParentProcessor extends AbstractProcessor {
 
     private static final String TRANSIENT_ANNOTATION = "javax.persistence.Transient";
     private static final String JAKARTA_TRANSIENT_ANNOTATION = "jakarta.persistence.Transient";
@@ -57,7 +57,7 @@ public class CopyFromParentProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        for (Element element : roundEnv.getElementsAnnotatedWith(CopyFromParent.class)) {
+        for (Element element : roundEnv.getElementsAnnotatedWith(DerivedFromParent.class)) {
             if (element instanceof VariableElement) {
                 validateField((VariableElement) element);
             }
@@ -70,12 +70,12 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         TypeElement childClass = (TypeElement) childField.getEnclosingElement();
         TypeElement annotatedClass = findParentEntityDeclaringClass(childClass);
 
-        // 1. @CopyFromParent without @ParentEntity anywhere up the superclass hierarchy.
-        // @CopyFromParent field declared on a subclass is valid
+        // 1. @DerivedFromParent without @ParentEntity anywhere up the superclass hierarchy.
+        // @DerivedFromParent field declared on a subclass is valid
         // as long as some superclass (or the class itself) carries @ParentEntity.
         if (annotatedClass == null) {
             error(childField,
-                    "@CopyFromParent on %s.%s requires @ParentEntity on the enclosing class %s "
+                    "@DerivedFromParent on %s.%s requires @ParentEntity on the enclosing class %s "
                             + "or one of its superclasses",
                     childClass.getSimpleName(), childField.getSimpleName(),
                     childClass.getQualifiedName());
@@ -92,13 +92,13 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         }
 
         // 2. Check parent field exists
-        CopyFromParent copyAnn = childField.getAnnotation(CopyFromParent.class);
-        String parentFieldName = copyAnn.field();
+        DerivedFromParent derivedAnn = childField.getAnnotation(DerivedFromParent.class);
+        String parentFieldName = derivedAnn.field();
         VariableElement parentField = findField(parentClass, parentFieldName);
 
         if (parentField == null) {
             error(childField,
-                    "@CopyFromParent(field=\"%s\") on %s.%s: field '%s' not found on parent %s",
+                    "@DerivedFromParent(field=\"%s\") on %s.%s: field '%s' not found on parent %s",
                     parentFieldName, childClass.getSimpleName(),
                     childField.getSimpleName(), parentFieldName,
                     parentClass.getQualifiedName());
@@ -106,10 +106,10 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         }
 
         // 3. Modifier checks: static source/target fields and final target fields cannot be
-        // read/written safely via the instance MethodHandles that CopyFromParentUtils builds.
+        // read/written safely via the instance MethodHandles that DerivedFromParentUtils builds.
         if (parentField.getModifiers().contains(Modifier.STATIC)) {
             error(childField,
-                    "@CopyFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is static "
+                    "@DerivedFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is static "
                             + "and cannot be copied",
                     parentFieldName, childClass.getSimpleName(),
                     childField.getSimpleName(), parentFieldName,
@@ -118,13 +118,13 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         }
         if (childField.getModifiers().contains(Modifier.STATIC)) {
             error(childField,
-                    "@CopyFromParent on %s.%s: field is static and cannot be a copy target",
+                    "@DerivedFromParent on %s.%s: field is static and cannot be a copy target",
                     childClass.getSimpleName(), childField.getSimpleName());
             return;
         }
         if (childField.getModifiers().contains(Modifier.FINAL)) {
             error(childField,
-                    "@CopyFromParent on %s.%s: field is final and cannot be a copy target",
+                    "@DerivedFromParent on %s.%s: field is final and cannot be a copy target",
                     childClass.getSimpleName(), childField.getSimpleName());
             return;
         }
@@ -134,7 +134,7 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         TypeMirror childFieldType = childField.asType();
         if (!processingEnv.getTypeUtils().isAssignable(parentFieldType, childFieldType)) {
             error(childField,
-                    "@CopyFromParent type mismatch on %s.%s: parent field '%s' is %s, "
+                    "@DerivedFromParent type mismatch on %s.%s: parent field '%s' is %s, "
                             + "child field is %s",
                     childClass.getSimpleName(), childField.getSimpleName(),
                     parentFieldName, parentFieldType, childFieldType);
@@ -143,7 +143,7 @@ public class CopyFromParentProcessor extends AbstractProcessor {
         // 5. @Transient check on parent field
         if (hasTransientAnnotation(parentField)) {
             error(childField,
-                    "@CopyFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is "
+                    "@DerivedFromParent(field=\"%s\") on %s.%s: parent field '%s' on %s is "
                             + "marked @Transient and will not be persisted",
                     parentFieldName, childClass.getSimpleName(),
                     childField.getSimpleName(), parentFieldName,

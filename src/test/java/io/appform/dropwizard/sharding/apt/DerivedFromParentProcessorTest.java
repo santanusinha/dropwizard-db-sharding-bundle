@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class CopyFromParentProcessorTest {
+class DerivedFromParentProcessorTest {
 
     @Test
     void testValidAnnotation_compiles() {
@@ -41,34 +41,34 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private String childName;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).succeeded();
     }
 
     @Test
-    void testCopyFromParentWithoutParentEntity_fails() {
+    void testDerivedFromParentWithoutParentEntity_fails() {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private String childName;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(child);
 
         assertThat(compilation).failed();
@@ -89,16 +89,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"nonExistent\")",
+                        "    @DerivedFromParent(field = \"nonExistent\")",
                         "    private String childField;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
@@ -119,16 +119,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"count\")",
+                        "    @DerivedFromParent(field = \"count\")",
                         "    private String childCount;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
@@ -151,16 +151,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"tempValue\")",
+                        "    @DerivedFromParent(field = \"tempValue\")",
                         "    private String childTemp;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
@@ -181,16 +181,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"count\")",
+                        "    @DerivedFromParent(field = \"count\")",
                         "    private long childCount;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).succeeded();
@@ -209,18 +209,18 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private String childName;",
-                        "    @CopyFromParent(field = \"count\")",
+                        "    @DerivedFromParent(field = \"count\")",
                         "    private int childCount;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).succeeded();
@@ -245,16 +245,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"inheritedField\")",
+                        "    @DerivedFromParent(field = \"inheritedField\")",
                         "    private String childField;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(grandParent, parent, child);
 
         assertThat(compilation).succeeded();
@@ -270,14 +270,14 @@ class CopyFromParentProcessorTest {
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(plain);
 
         assertThat(compilation).succeeded();
     }
 
     // @ParentEntity declared on an ancestor class, not directly on the class that
-    // declares the @CopyFromParent field.
+    // declares the @DerivedFromParent field.
     @Test
     void testParentEntityOnSuperclass_fieldOnSubclass_compiles() {
         JavaFileObject parent = JavaFileObjects.forSourceString("test.Parent",
@@ -298,14 +298,14 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "public class Child extends BaseChild {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private String childName;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, baseChild, child);
 
         assertThat(compilation).succeeded();
@@ -322,14 +322,14 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "public class Child extends BaseChild {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private String childName;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(baseChild, child);
 
         assertThat(compilation).failed();
@@ -351,16 +351,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private String childName;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
@@ -381,16 +381,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private static String childName;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
@@ -411,16 +411,16 @@ class CopyFromParentProcessorTest {
         JavaFileObject child = JavaFileObjects.forSourceString("test.Child",
                 String.join("\n",
                         "package test;",
-                        "import io.appform.dropwizard.sharding.sharding.CopyFromParent;",
+                        "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;",
                         "import io.appform.dropwizard.sharding.sharding.ParentEntity;",
                         "@ParentEntity(Parent.class)",
                         "public class Child {",
-                        "    @CopyFromParent(field = \"name\")",
+                        "    @DerivedFromParent(field = \"name\")",
                         "    private final String childName = null;",
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(parent, child);
 
         assertThat(compilation).failed();
@@ -432,14 +432,14 @@ class CopyFromParentProcessorTest {
     // the processor must not pin @SupportedSourceVersion to RELEASE_11
     @Test
     void testSupportedSourceVersion_isLatestSupported() {
-        CopyFromParentProcessor processor = new CopyFromParentProcessor();
+        DerivedFromParentProcessor processor = new DerivedFromParentProcessor();
         assertEquals(SourceVersion.latestSupported(), processor.getSupportedSourceVersion());
     }
 
     @Test
     void testUnrelatedCompilationUnit_noWarningEvenWithoutAnnotationsUsed() {
         // Simulates a downstream module that has this processor on its annotation processor
-        // path (via META-INF/services) but never uses @CopyFromParent/@ParentEntity at all.
+        // path (via META-INF/services) but never uses @DerivedFromParent/@ParentEntity at all.
         JavaFileObject plain = JavaFileObjects.forSourceString("test.Unrelated",
                 String.join("\n",
                         "package test;",
@@ -448,13 +448,13 @@ class CopyFromParentProcessorTest {
                         "}"));
 
         Compilation compilation = Compiler.javac()
-                .withProcessors(new CopyFromParentProcessor())
+                .withProcessors(new DerivedFromParentProcessor())
                 .compile(plain);
 
         assertThat(compilation).succeededWithoutWarnings();
     }
 
-    // Relying solely on explicit .withProcessors(new CopyFromParentProcessor())
+    // Relying solely on explicit .withProcessors(new DerivedFromParentProcessor())
     // exercises the validation logic but never proves that javac actually *discovers* the
     // processor via the packaged META-INF/services/javax.annotation.processing.Processor entry
     // the way a real downstream consumer's build would. com.google.testing.compile.Compiler
@@ -476,9 +476,9 @@ class CopyFromParentProcessorTest {
                             + "}\n");
             Files.writeString(packageDir.resolve("Child.java"),
                     "package test.autodiscovery;\n"
-                            + "import io.appform.dropwizard.sharding.sharding.CopyFromParent;\n"
+                            + "import io.appform.dropwizard.sharding.sharding.DerivedFromParent;\n"
                             + "public class Child {\n"
-                            + "    @CopyFromParent(field = \"name\")\n"
+                            + "    @DerivedFromParent(field = \"name\")\n"
                             + "    private String childName;\n"
                             + "}\n");
 
@@ -505,13 +505,13 @@ class CopyFromParentProcessorTest {
 
                 assertFalse(success,
                         "Compilation should have failed: Child.childName lacks @ParentEntity, "
-                                + "and CopyFromParentProcessor should have been auto-discovered "
+                                + "and DerivedFromParentProcessor should have been auto-discovered "
                                 + "via META-INF/services to catch it");
                 assertTrue(diagnostics.getDiagnostics().stream()
                                 .anyMatch(d -> d.getKind() == Diagnostic.Kind.ERROR
                                         && d.getMessage(null)
                                                 .contains("requires @ParentEntity on the enclosing class")),
-                        "Expected CopyFromParentProcessor's validation error to be present; "
+                        "Expected DerivedFromParentProcessor's validation error to be present; "
                                 + "processor was not auto-discovered via ServiceLoader");
             }
         } finally {

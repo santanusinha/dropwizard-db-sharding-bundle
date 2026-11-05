@@ -1,1 +1,1 @@
-io.appform.dropwizard.sharding.apt.CopyFromParentProcessor
+io.appform.dropwizard.sharding.apt.DerivedFromParentProcessor
