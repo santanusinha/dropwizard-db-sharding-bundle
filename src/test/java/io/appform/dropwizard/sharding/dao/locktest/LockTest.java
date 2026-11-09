@@ -40,6 +40,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.SneakyThrows;
 import lombok.val;
 import org.hibernate.SessionFactory;
@@ -50,6 +52,7 @@ import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Order;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.exception.ConstraintViolationException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -73,6 +76,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Test locking behavior
  */
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class LockTest {
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
 
@@ -105,20 +109,28 @@ public class LockTest {
             sessionFactories.add(sessionFactory);
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        ShardCalculatorTestUtils.register(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         final ShardingBundleOptions shardingOptions = ShardingBundleOptions.builder().build();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        SomeLookupObject.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        SomeLookupObject.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
         relationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        SomeOtherObject.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        SomeOtherObject.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
+    }
+
+    @AfterEach
+    public void after() {
+        sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test

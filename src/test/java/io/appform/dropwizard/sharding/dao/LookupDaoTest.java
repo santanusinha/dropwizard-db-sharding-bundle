@@ -33,6 +33,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.ListenerTriggeringObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.val;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -55,6 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class LookupDaoTest {
 
     private List<SessionFactory> sessionFactories = Lists.newArrayList();
@@ -94,36 +97,38 @@ public class LookupDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        ShardCalculatorTestUtils.register(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         final ShardingBundleOptions shardingOptions= new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TimerObserver(new ListenerTriggeringObserver().addListener(new LoggingListener()));
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        TestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        TestEntity.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         lookupDaoForAI = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        TestEntityWithAIId.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        TestEntityWithAIId.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         phoneDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        Phone.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Phone.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         transactionDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        Transaction.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Transaction.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
         auditDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        Audit.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        Audit.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
@@ -132,6 +137,7 @@ public class LookupDaoTest {
     @AfterEach
     public void after() {
         sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @Test

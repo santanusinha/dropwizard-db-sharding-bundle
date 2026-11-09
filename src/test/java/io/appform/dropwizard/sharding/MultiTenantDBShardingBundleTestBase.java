@@ -19,6 +19,9 @@ package io.appform.dropwizard.sharding;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
@@ -31,6 +34,9 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Order;
 import io.appform.dropwizard.sharding.dao.testdata.entities.OrderItem;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntity;
 import io.appform.dropwizard.sharding.dao.testdata.pending.PendingRegistrationTestEntityWithAIId;
+import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
+import io.appform.dropwizard.sharding.config.ShardedHibernateFactory;
+import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +55,20 @@ import org.junit.jupiter.api.Test;
  * Core systems are not mocked. Uses H2 for testing.
  */
 public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBundleBasedTestBase {
+
+    @Test
+    public void registersOneCalculatorPerTenant() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+
+        var tenant1Calculator = bundle.getShardCalculator("TENANT1");
+        var tenant2Calculator = bundle.getShardCalculator("TENANT2");
+
+        assertNotSame(tenant1Calculator, tenant2Calculator);
+        assertSame(tenant1Calculator, bundle.getShardCalculator("TENANT1"));
+        assertSame(tenant2Calculator, bundle.getShardCalculator("TENANT2"));
+    }
 
     @Test
     public void testBundle() throws Exception {

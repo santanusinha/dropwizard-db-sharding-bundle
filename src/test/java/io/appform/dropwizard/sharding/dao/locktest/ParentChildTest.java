@@ -12,12 +12,15 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.query.QueryUtils;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.SneakyThrows;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.cfg.Configuration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class ParentChildTest {
 
     private static final String PARENT_KEY = "123";
@@ -46,16 +50,24 @@ public class ParentChildTest {
             sessionFactories.add(sessionFactory);
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        ShardCalculatorTestUtils.register(
+                Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager));
         final ShardingBundleOptions shardingOptions = ShardingBundleOptions.builder().build();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
 
         parentClassRelationalDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        ParentClass.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
+                        ParentClass.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
         setupStore();
+    }
+
+    @AfterEach
+    public void after() {
+        sessionFactories.forEach(SessionFactory::close);
+        ShardCalculatorRegistry.clear();
     }
 
     @SneakyThrows

@@ -32,7 +32,8 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import lombok.val;
 import org.apache.commons.lang3.RandomUtils;
 import org.hibernate.SessionFactory;
@@ -58,7 +59,9 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class MultiTenantRelationalDaoTest {
 
   private final Map<String, List<SessionFactory>> sessionFactories = new HashMap<>();
@@ -66,8 +69,6 @@ public class MultiTenantRelationalDaoTest {
   private MultiTenantRelationalDao<RelationalEntityWithAIKey> relationalWithAIDao;
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
-
-  private ShardCalculator<String> shardCalculator;
 
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
@@ -98,6 +99,7 @@ public class MultiTenantRelationalDaoTest {
     this.shardManager = Map.of("TENANT1",
         new BalancedShardManager(sessionFactories.get("TENANT1").size()),
         "TENANT2", new BalancedShardManager(sessionFactories.get("TENANT2").size()));
+    ShardCalculatorTestUtils.register(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
@@ -106,19 +108,45 @@ public class MultiTenantRelationalDaoTest {
     final TransactionObserver observer = new EntityClassThreadLocalObserver(
         new DaoClassLocalObserver(new TerminalTransactionObserver()));
     relationalDao = new MultiTenantRelationalDao<>(sessionFactories, RelationalEntity.class,
-        this.shardManager,
         shardingOptions, shardInfoProvider, observer);
     relationalWithAIDao = new MultiTenantRelationalDao<>(sessionFactories,
         RelationalEntityWithAIKey.class,
-        this.shardManager,
         shardingOptions, shardInfoProvider, observer);
-    shardCalculator = relationalDao.getShardCalculator();
+  }
+
+  @Test
+  public void testRegistryIsResolvedForEveryLookup() throws Exception {
+    relationalDao.save("TENANT1", "parent", RelationalEntity.builder()
+        .key("1")
+        .value("value")
+        .build());
+
+    ShardCalculatorRegistry.clear();
+
+    IllegalStateException error = assertThrows(
+        IllegalStateException.class,
+        () -> relationalDao.get("TENANT1", "parent", "1"));
+    assertEquals(
+        "ShardCalculator has not been registered for tenant: TENANT1",
+        error.getMessage());
+  }
+
+  @Test
+  public void testRegisteredTenantOutsideDaoIsRejected() {
+    ShardCalculatorTestUtils.register(
+        Map.of("UNKNOWN", new BalancedShardManager(1)));
+
+    IllegalArgumentException error = assertThrows(
+        IllegalArgumentException.class,
+        () -> relationalDao.get("UNKNOWN", "parent", "1"));
+    assertEquals("Unknown tenant: UNKNOWN", error.getMessage());
   }
 
   @AfterEach
   public void after() {
     sessionFactories.forEach((tenantId, sessionFactory) -> sessionFactory.forEach(
         SessionFactory::close));
+    ShardCalculatorRegistry.clear();
   }
 
   @Test
@@ -467,7 +495,7 @@ public class MultiTenantRelationalDaoTest {
         .mapToObj(value -> {
           while (true) {
             String id = UUID.randomUUID().toString();
-            if (shardCalculator.shardId(tenantId, id) == expectedShardIndex) {
+            if (ShardCalculatorRegistry.get(tenantId).shardId(id) == expectedShardIndex) {
               return id;
             }
           }

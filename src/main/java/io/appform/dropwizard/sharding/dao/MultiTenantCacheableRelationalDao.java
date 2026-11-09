@@ -17,11 +17,11 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import com.google.common.base.Preconditions;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.RelationalCache;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.observers.TransactionObserver;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
 import org.hibernate.SessionFactory;
 import org.hibernate.criterion.DetachedCriteria;
 
@@ -34,7 +34,7 @@ import java.util.Optional;
  */
 public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalDao<T> {
 
-  private Map<String, RelationalCache<T>> cache;
+  private final Map<String, RelationalCache<T>> cache;
 
 
   /**
@@ -50,7 +50,6 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
    * @param sessionFactories  A list of SessionFactory instances for database access across shards.
    * @param entityClass       The Class representing the type of entities managed by this
    *                          CacheableRelationalDao.
-   * @param shardManagers     A map of ShardManager to instantiate ShardCalculator.
    * @param cache             A RelationalCache instance for caching entity data.
    * @param shardInfoProvider A ShardInfoProvider for retrieving shard information.
    * @param observer          A TransactionObserver for monitoring transaction events.
@@ -60,12 +59,11 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
    */
   public MultiTenantCacheableRelationalDao(Map<String, List<SessionFactory>> sessionFactories,
       Class<T> entityClass,
-      Map<String, ShardManager> shardManagers,
       Map<String, RelationalCache<T>> cache,
       Map<String, ShardingBundleOptions> shardingOptions,
       Map<String, ShardInfoProvider> shardInfoProvider,
       TransactionObserver observer) {
-    super(sessionFactories, entityClass, shardManagers, shardingOptions, shardInfoProvider, observer);
+    super(sessionFactories, entityClass, shardingOptions, shardInfoProvider, observer);
     this.cache = cache;
   }
 

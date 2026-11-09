@@ -29,6 +29,8 @@ import io.appform.dropwizard.sharding.dao.testdata.entities.Transaction;
 import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObserver;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorRegistry;
+import io.appform.dropwizard.sharding.utils.ShardCalculatorTestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -47,9 +49,11 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
+@org.junit.jupiter.api.parallel.ResourceLock("ShardCalculatorRegistry")
 public class MultiTenantCacheableLookupDaoTest {
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
@@ -90,6 +94,7 @@ public class MultiTenantCacheableLookupDaoTest {
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
     sessionFactories.forEach((tenant, sessionFactory) ->
         shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    ShardCalculatorTestUtils.register(shardManager);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -99,7 +104,6 @@ public class MultiTenantCacheableLookupDaoTest {
       lookupDao = new MultiTenantCacheableLookupDao<>(
               sessionFactories,
               TestEntity.class,
-              shardManager,
               Map.of("TENANT1", new LookupCache<TestEntity>() {
 
                           private Map<String, TestEntity> cache = new HashMap<>();
@@ -141,7 +145,6 @@ public class MultiTenantCacheableLookupDaoTest {
               shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     phoneDao = new MultiTenantCacheableLookupDao<>(sessionFactories,
         Phone.class,
-        shardManager,
         Map.of("TENANT1",
             new LookupCache<Phone>() {
 
@@ -184,7 +187,6 @@ public class MultiTenantCacheableLookupDaoTest {
         shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     transactionDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Transaction.class,
-        shardManager,
         Map.of("TENANT1",
             new RelationalCache<Transaction>() {
 
@@ -312,7 +314,6 @@ public class MultiTenantCacheableLookupDaoTest {
             }), shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
     auditDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
         Audit.class,
-        shardManager,
         Map.of("TENANT1", new RelationalCache<Audit>() {
 
           private Map<String, Object> cache = new HashMap<>();
@@ -418,6 +419,7 @@ public class MultiTenantCacheableLookupDaoTest {
   public void after() {
     sessionFactories.forEach((tenantId, sessionFactory) -> sessionFactory.forEach(
         SessionFactory::close));
+    ShardCalculatorRegistry.clear();
   }
 
   @Test
