@@ -11,6 +11,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ShardingBundleOptions {
     @Builder.Default
+    private boolean transactionSessionReuseEnabled = true;
+
+    @Builder.Default
     private boolean skipNativeHealthcheck = true;
 
     @Builder.Default

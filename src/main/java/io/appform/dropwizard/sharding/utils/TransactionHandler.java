@@ -34,6 +34,7 @@ public class TransactionHandler {
 
 
     public static final String TENANT_ID = "tenant.id";
+    public static final String SESSION_REUSE_ENABLED = "db.sharding.transaction.session.reuse.enabled";
     // Context variables
     @Getter
     private Session session;
@@ -81,7 +82,7 @@ public class TransactionHandler {
     @SuppressWarnings("java:S1181")
     public void beforeStart() {
         try {
-            if (ManagedSessionContext.hasBind(sessionFactory)) {
+            if (isSessionReuseEnabled() && ManagedSessionContext.hasBind(sessionFactory)) {
                 session = sessionFactory.getCurrentSession();
                 final var existingTransaction = session.getTransaction();
                 skipCommit = existingTransaction != null && existingTransaction.isActive();
@@ -143,6 +144,13 @@ public class TransactionHandler {
                 MDC.remove(TENANT_ID);
             }
         }
+    }
+
+    private boolean isSessionReuseEnabled() {
+        final Object configuredValue = sessionFactory.getProperties() == null
+                ? null
+                : sessionFactory.getProperties().get(SESSION_REUSE_ENABLED);
+        return configuredValue == null || Boolean.parseBoolean(configuredValue.toString());
     }
 
     private void configureSession() {

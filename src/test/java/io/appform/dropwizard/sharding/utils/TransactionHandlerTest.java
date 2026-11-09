@@ -20,9 +20,12 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+
 class TransactionHandlerTest {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionHandlerTest.class);
+    private static final String SESSION_REUSE_ENABLED = "db.sharding.transaction.session.reuse.enabled";
 
     private SessionFactory sessionFactory;
     private Session session;
@@ -33,6 +36,7 @@ class TransactionHandlerTest {
         session = mock(Session.class);
         when(sessionFactory.openSession()).thenReturn(session);
         when(sessionFactory.getCurrentSession()).thenReturn(session); // Mock current session retrieval
+        when(sessionFactory.getProperties()).thenReturn(new HashMap<>());
     }
 
     @Test
@@ -99,6 +103,37 @@ class TransactionHandlerTest {
             fail("Unexpected exception: " + e.getMessage()); // Fail the test if any exception occurs
         } finally {
             // Unbind the session to clean up after the test
+            ManagedSessionContext.unbind(sessionFactory);
+        }
+    }
+
+    @Test
+    void testDoesNotReuseExistingSessionWhenSessionReuseIsDisabled() {
+        Session existingSession = mock(Session.class);
+        Session openedSession = mock(Session.class);
+        org.hibernate.Transaction existingTransaction = mock(org.hibernate.Transaction.class);
+        org.hibernate.Transaction newTransaction = mock(org.hibernate.Transaction.class);
+        HashMap<String, Object> properties = new HashMap<>();
+        properties.put(SESSION_REUSE_ENABLED, false);
+
+        when(sessionFactory.getProperties()).thenReturn(properties);
+        when(sessionFactory.openSession()).thenReturn(openedSession);
+        when(sessionFactory.getCurrentSession()).thenReturn(existingSession);
+        when(existingSession.getSessionFactory()).thenReturn(sessionFactory);
+        when(existingSession.getTransaction()).thenReturn(existingTransaction);
+        when(existingTransaction.isActive()).thenReturn(true);
+        when(openedSession.getTransaction()).thenReturn(newTransaction);
+        when(newTransaction.getStatus()).thenReturn(org.hibernate.resource.transaction.spi.TransactionStatus.ACTIVE);
+
+        ManagedSessionContext.bind(existingSession);
+        try {
+            TransactionHandler transactionHandler = new TransactionHandler(sessionFactory, false);
+            transactionHandler.beforeStart();
+
+            assertSame(openedSession, transactionHandler.getSession(),
+                    "A fresh session should be opened when session reuse is disabled");
+            verify(sessionFactory, times(1)).openSession();
+        } finally {
             ManagedSessionContext.unbind(sessionFactory);
         }
     }

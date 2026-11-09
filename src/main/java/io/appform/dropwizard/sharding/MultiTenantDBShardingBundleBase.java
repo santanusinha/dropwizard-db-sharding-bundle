@@ -51,6 +51,7 @@ import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
+import io.appform.dropwizard.sharding.utils.TransactionHandler;
 import io.dropwizard.Configuration;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
@@ -157,7 +158,13 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
                 .stream()
                 .map(SessionFactorySource::getFactory)
                 .collect(Collectors.toList());
-        sessionFactory.forEach(factory -> factory.getProperties().put("tenant.id", tenantId));
+        final boolean sessionReuseEnabled = shardingOption.isTransactionSessionReuseEnabled();
+        sessionFactory.forEach(factory -> {
+          factory.getProperties().put("tenant.id", tenantId);
+          factory.getProperties().put(
+                  TransactionHandler.SESSION_REUSE_ENABLED,
+                  sessionReuseEnabled);
+        });
         if (shardingOption.isEncryptionSupportEnabled()) {
           Preconditions.checkArgument(shardingOption.getEncryptionIv().length() == 16,
                   "Encryption IV Should be 16 bytes long");

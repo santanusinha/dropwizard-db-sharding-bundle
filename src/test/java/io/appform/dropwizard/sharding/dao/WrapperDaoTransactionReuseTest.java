@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class WrapperDaoTransactionReuseTest {
 
+    private static final String SESSION_REUSE_ENABLED = "db.sharding.transaction.session.reuse.enabled";
     private final List<SessionFactory> sessionFactories = new ArrayList<>();
     private WrapperDao<Order, OrderDao> dao;
 
@@ -223,6 +224,37 @@ class WrapperDaoTransactionReuseTest {
         assertNull(ver.get(Order.class, persisted2.getId()));
         ManagedSessionContext.unbind(sf);
         ver.close();
+    }
+
+    @Test
+    void testDisabledSessionReuseKeepsInnerDaoWorkAfterOuterRollback() {
+        String parentKey = "customer-no-reuse";
+        int shardId = dao.getShardCalculator().shardId(DBShardingBundleBase.DEFAULT_NAMESPACE, parentKey);
+        SessionFactory sf = sessionFactories.get(shardId);
+        sf.getProperties().put(SESSION_REUSE_ENABLED, false);
+
+        Session outer = sf.openSession();
+        ManagedSessionContext.bind(outer);
+        Transaction outerTxn = outer.beginTransaction();
+
+        Order order = Order.builder().customerId(parentKey).build();
+        order.setItems(List.of(OrderItem.builder().order(order).name("standalone-inner-write").build()));
+        Order persisted = dao.forParent(parentKey).save(order);
+        assertTrue(persisted.getId() > 0);
+
+        outerTxn.rollback();
+        assertEquals(TransactionStatus.ROLLED_BACK, outerTxn.getStatus());
+        if (ManagedSessionContext.hasBind(sf)) {
+            ManagedSessionContext.unbind(sf);
+        }
+        outer.close();
+
+        Session verificationSession = sf.openSession();
+        ManagedSessionContext.bind(verificationSession);
+        assertNotNull(verificationSession.get(Order.class, persisted.getId()),
+                "Inner DAO work should commit independently when session reuse is disabled");
+        ManagedSessionContext.unbind(sf);
+        verificationSession.close();
     }
 
     @Test
