@@ -68,6 +68,24 @@ Dao classes in db sharding bundle are a layer above Hibernate. Daos interact wit
 * Any custom cache implementation can be used to implement this cache and initialize ```CacheableRelationalDao``` eg.
   Caffeine/Guava cache.
 
+### Creating DAOs and shard calculators
+
+DAOs are created only through the bundle (`createParentObjectDao`, `createRelatedObjectDao`, `createWrapperDao`).
+DAO classes cannot be instantiated or subclassed by applications.
+
+The bundle owns one `ShardCalculator` per tenant. Read it to find where a key lives:
+
+```java
+ShardCalculator calculator = bundle.getShardCalculator();            // single-tenant bundle
+ShardCalculator calculator = bundle.getShardCalculator("TENANT1");   // multi-tenant bundle
+ShardCalculator calculator = ShardCalculatorRegistry.get("TENANT1"); // anywhere
+
+int shard = calculator.shardId("customer-42");
+boolean healthy = calculator.isOnValidShard("customer-42");
+```
+
+Calculators cannot be created, implemented, or replaced by applications. Each tenant id may be used by only one bundle per JVM.
+
 ### FAQs about DAOs
 
 #### If both RelationalDao and LookupDao use same logic of sharding based on a key, what is the difference between these two DAOs?
