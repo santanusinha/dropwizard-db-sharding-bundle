@@ -98,13 +98,13 @@ public class RelationalDaoTest {
         final ShardingBundleOptions shardingOptions = new ShardingBundleOptions();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         final TransactionObserver observer = new EntityClassThreadLocalObserver(new DaoClassLocalObserver(new TerminalTransactionObserver()));
-        relationalDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        relationalDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         RelationalEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));
-        relationalWithAIDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        relationalWithAIDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         RelationalEntityWithAIKey.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         observer));

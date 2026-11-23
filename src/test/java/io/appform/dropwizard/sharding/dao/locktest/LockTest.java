@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
+import io.appform.dropwizard.sharding.dao.DaoFactory;
 import io.appform.dropwizard.sharding.dao.LockedContext;
 import io.appform.dropwizard.sharding.dao.LookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
@@ -109,13 +110,13 @@ public class LockTest {
         TestAccess.register(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager);
         final ShardingBundleOptions shardingOptions = ShardingBundleOptions.builder().build();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
-        lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        lookupDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         SomeLookupObject.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
-        relationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        relationDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         SomeOtherObject.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
@@ -1392,14 +1393,14 @@ public class LockTest {
         };
 
         // Build DAOs with capturing observer: DaoClassLocalObserver -> capturingObserver -> TerminalTransactionObserver
-        val capturingLookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        val capturingLookupDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         SomeLookupObject.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
                         new DaoClassLocalObserver(capturingObserver)));
-        val capturingRelationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        val capturingRelationDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         SomeOtherObject.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
@@ -1462,14 +1463,14 @@ public class LockTest {
             }
         };
 
-        val capturingLookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        val capturingLookupDao = DaoFactory.INSTANCE.createLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createLookupDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         SomeLookupObject.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),
                         new DaoClassLocalObserver(capturingObserver)));
-        val capturingRelationDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        val capturingRelationDao = DaoFactory.INSTANCE.createRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         SomeOtherObject.class,
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, ShardingBundleOptions.builder().build()),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new ShardInfoProvider("default")),

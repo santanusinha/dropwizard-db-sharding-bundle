@@ -99,13 +99,13 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
 
-    companyRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class,
+    companyRelationalDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Company.class,
         shardingOptions,
         shardInfoProvider, observer);
-    departmentRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class,
+    departmentRelationalDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Department.class,
         shardingOptions,
         shardInfoProvider, observer);
-    ceoRelationalDao = new MultiTenantRelationalDao<>(sessionFactories, Ceo.class, shardingOptions,
+    ceoRelationalDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Ceo.class, shardingOptions,
         shardInfoProvider, observer);
   }
 
@@ -269,9 +269,9 @@ public class MultiTenantRelationalReadOnlyLockedContextTest {
         "TENANT2", new ShardingBundleOptions());
     final Map<String, ShardInfoProvider> shardInfo = Map.of("TENANT1", new ShardInfoProvider("TENANT1"),
         "TENANT2", new ShardInfoProvider("TENANT2"));
-    val companyDao = new MultiTenantRelationalDao<>(sessionFactories, Company.class, options,
+    val companyDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Company.class, options,
         shardInfo, capturingObserver);
-    val deptDao = new MultiTenantRelationalDao<>(sessionFactories, Department.class, options,
+    val deptDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Department.class, options,
         shardInfo, capturingObserver);
 
     val parentKey = "PARENT_KEY_SWP";

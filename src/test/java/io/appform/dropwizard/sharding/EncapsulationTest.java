@@ -62,4 +62,45 @@ class EncapsulationTest {
         org.junit.jupiter.api.Assertions.assertThrows(ClassNotFoundException.class,
                 () -> Class.forName("io.appform.dropwizard.sharding.utils.ShardCalculator"));
     }
+
+    private static final java.util.List<Class<?>> DAO_CLASSES = java.util.List.of(
+            io.appform.dropwizard.sharding.dao.MultiTenantLookupDao.class,
+            io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao.class,
+            io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao.class,
+            io.appform.dropwizard.sharding.dao.MultiTenantCacheableRelationalDao.class,
+            io.appform.dropwizard.sharding.dao.LookupDao.class,
+            io.appform.dropwizard.sharding.dao.CacheableLookupDao.class,
+            io.appform.dropwizard.sharding.dao.RelationalDao.class,
+            io.appform.dropwizard.sharding.dao.CacheableRelationalDao.class,
+            io.appform.dropwizard.sharding.dao.WrapperDao.class);
+
+    @Test
+    void daoConstructorsAreNotAccessible() {
+        DAO_CLASSES.forEach(EncapsulationTest::assertNoAccessibleConstructors);
+    }
+
+    @Test
+    void daoHierarchiesAreClosed() {
+        assertSealedPermitting(io.appform.dropwizard.sharding.dao.MultiTenantLookupDao.class,
+                io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao.class);
+        assertSealedPermitting(io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao.class,
+                io.appform.dropwizard.sharding.dao.MultiTenantCacheableRelationalDao.class);
+        assertSealedPermitting(io.appform.dropwizard.sharding.dao.LookupDao.class,
+                io.appform.dropwizard.sharding.dao.CacheableLookupDao.class);
+        assertSealedPermitting(io.appform.dropwizard.sharding.dao.RelationalDao.class,
+                io.appform.dropwizard.sharding.dao.CacheableRelationalDao.class);
+        for (Class<?> leaf : java.util.List.of(
+                io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao.class,
+                io.appform.dropwizard.sharding.dao.MultiTenantCacheableRelationalDao.class,
+                io.appform.dropwizard.sharding.dao.CacheableLookupDao.class,
+                io.appform.dropwizard.sharding.dao.CacheableRelationalDao.class,
+                io.appform.dropwizard.sharding.dao.WrapperDao.class)) {
+            assertTrue(Modifier.isFinal(leaf.getModifiers()), leaf + " must be final");
+        }
+    }
+
+    private static void assertSealedPermitting(Class<?> base, Class<?> onlySubclass) {
+        assertTrue(base.isSealed(), base + " must be sealed");
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new Class<?>[]{onlySubclass}, base.getPermittedSubclasses());
+    }
 }

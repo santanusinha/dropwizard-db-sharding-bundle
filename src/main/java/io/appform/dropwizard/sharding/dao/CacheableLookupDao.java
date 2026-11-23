@@ -33,7 +33,7 @@ import java.util.function.Function;
  * The entity can be retrieved from any shard using the key.
  */
 @Slf4j
-public class CacheableLookupDao<T> extends LookupDao<T> {
+public final class CacheableLookupDao<T> extends LookupDao<T> {
 
     private final String dbNamespace;
     private final MultiTenantCacheableLookupDao<T> delegate;
@@ -45,7 +45,7 @@ public class CacheableLookupDao<T> extends LookupDao<T> {
      * improved performance and data retrieval optimization.
      *
      */
-    public CacheableLookupDao(final String tenantId,
+    CacheableLookupDao(final String tenantId,
                               final MultiTenantCacheableLookupDao<T> delegate) {
         super(tenantId, delegate);
         this.dbNamespace = tenantId;

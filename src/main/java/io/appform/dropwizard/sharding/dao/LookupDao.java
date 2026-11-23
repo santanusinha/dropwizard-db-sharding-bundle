@@ -49,7 +49,7 @@ import java.util.function.UnaryOperator;
  * The entity can be retrieved from any shard using the key.
  */
 @Slf4j
-public class LookupDao<T> {
+public sealed class LookupDao<T> permits CacheableLookupDao {
 
     private final String dbNamespace;
 
@@ -62,7 +62,7 @@ public class LookupDao<T> {
      * distributed across multiple shards.
      *
      */
-    public LookupDao(final String dbNamespace,
+    LookupDao(final String dbNamespace,
                      final MultiTenantLookupDao<T> delegate) {
         this.dbNamespace = dbNamespace;
         this.delegate = delegate;

@@ -44,7 +44,7 @@ class UnknownTenantTest {
 
     @Test
     void lookupDaoConstructionFailsForUnregisteredTenant() {
-        final var ex = assertThrows(IllegalArgumentException.class, () -> new MultiTenantLookupDao<>(
+        final var ex = assertThrows(IllegalArgumentException.class, () -> DaoFactory.INSTANCE.createLookupDao(
                 Map.of("T1", List.of(buildSessionFactory("unk_1"))), TestEntity.class,
                 Map.of("T1", new ShardingBundleOptions()), Map.of("T1", new ShardInfoProvider("T1")),
                 new TerminalTransactionObserver()));
@@ -54,7 +54,7 @@ class UnknownTenantTest {
     @Test
     void lookupDaoCallForUnknownTenantFails() {
         TestAccess.register("T1", new BalancedShardManager(1));
-        final var dao = new MultiTenantLookupDao<>(
+        final var dao = DaoFactory.INSTANCE.createLookupDao(
                 Map.of("T1", List.of(buildSessionFactory("unk_2"))), TestEntity.class,
                 Map.of("T1", new ShardingBundleOptions()), Map.of("T1", new ShardInfoProvider("T1")),
                 new TerminalTransactionObserver());
@@ -65,7 +65,7 @@ class UnknownTenantTest {
     @Test
     void wrapperDaoConstructionFailsForUnregisteredTenant() {
         final var ex = assertThrows(IllegalArgumentException.class,
-                () -> new WrapperDao<>("T1", List.of(buildSessionFactory("unk_3")),
+                () -> DaoFactory.INSTANCE.createWrapperDao("T1", List.of(buildSessionFactory("unk_3")),
                         io.appform.dropwizard.sharding.dao.testdata.OrderDao.class));
         assertEquals("Unknown tenant: T1", ex.getMessage());
     }
