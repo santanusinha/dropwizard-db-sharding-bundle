@@ -24,30 +24,25 @@ import io.appform.dropwizard.sharding.dao.operations.lookupdao.readonlycontext.R
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdate;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.CreateOrUpdateInLockedContext;
 import io.appform.dropwizard.sharding.dao.operations.relationaldao.readonlycontext.ReadOnlyForRelationalDao;
-import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.ToIntFunction;
 
 @Slf4j
 public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
-    private final String tenantId;
-    private final BucketIdExtractor<String> bucketIdExtractor;
+    private final ToIntFunction<String> bucketIdFunction;
     private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
-    public BucketKeyPersistor(final String tenantId,
-                              final BucketIdExtractor<String> bucketIdExtractor,
+    public BucketKeyPersistor(final ToIntFunction<String> bucketIdFunction,
                               final Map<String, EntityMeta> initialisedEntitiesMeta) {
-        Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
-        Preconditions.checkArgument(!StringUtils.isEmpty(tenantId), "tenantId must not be empty");
-        this.tenantId = tenantId;
-        this.bucketIdExtractor = bucketIdExtractor;
+        Preconditions.checkArgument(bucketIdFunction != null, "bucketIdFunction must not be null");
+        this.bucketIdFunction = bucketIdFunction;
         this.initialisedEntitiesMeta = initialisedEntitiesMeta;
     }
 
@@ -275,7 +270,7 @@ public class BucketKeyPersistor implements OpContext.OpContextVisitor<Void> {
 
         try {
             final var shardingKey = (String) shardingKeyGetter.invoke(entity);
-            final var bucketId = this.bucketIdExtractor.bucketId(this.tenantId, shardingKey);
+            final var bucketId = this.bucketIdFunction.applyAsInt(shardingKey);
             bucketKeySetter.invoke(entity, bucketId);
         } catch (Throwable e) {
             throw new RuntimeException(String.format("Error accessing/setting sharding/bucket key %s",

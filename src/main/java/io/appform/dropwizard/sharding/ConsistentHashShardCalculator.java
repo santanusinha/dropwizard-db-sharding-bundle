@@ -21,7 +21,6 @@ import io.appform.dropwizard.sharding.sharding.BucketIdExtractor;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 
-import java.util.Map;
 import java.util.Objects;
 
 final class ConsistentHashShardCalculator implements ShardCalculator {
@@ -33,7 +32,7 @@ final class ConsistentHashShardCalculator implements ShardCalculator {
     ConsistentHashShardCalculator(String tenantId, ShardManager shardManager) {
         this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
         this.shardManager = Objects.requireNonNull(shardManager, "shardManager");
-        this.extractor = new ConsistentHashBucketIdExtractor<>(Map.of(tenantId, shardManager));
+        this.extractor = new ConsistentHashBucketIdExtractor<>(shardManager);
     }
 
     @Override
@@ -52,7 +51,7 @@ final class ConsistentHashShardCalculator implements ShardCalculator {
     }
 
     int bucketId(String key) {
-        return extractor.bucketId(tenantId, key);
+        return extractor.bucketId(key);
     }
 
     @Override

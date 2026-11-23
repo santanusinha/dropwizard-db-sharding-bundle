@@ -21,5 +21,5 @@ package io.appform.dropwizard.sharding.sharding;
  * Extracts bucket id from key
  */
 public interface BucketIdExtractor<T> {
-    int bucketId(String tenantId, T id);
+    int bucketId(T id);
 }

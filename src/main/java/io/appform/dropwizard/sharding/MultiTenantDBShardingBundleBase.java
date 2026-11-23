@@ -50,7 +50,6 @@ import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObse
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.Configuration;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
@@ -87,9 +86,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   private final Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
 
-  private Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
+  private final Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
 
-  private Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
+  private final Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
 
   protected MultiTenantDBShardingBundleBase(
       Class<?> entity,
@@ -134,6 +133,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public void run(T configuration, Environment environment) {
     this.completeBundleInitialization();
     final var tenantedConfig = getConfig(configuration);
+    tenantedConfig.getTenants().keySet().forEach(tenantId -> Preconditions.checkState(
+        !ShardCalculatorRegistry.contains(tenantId),
+        "Shard calculator already registered for tenant: %s", tenantId));
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
       //Encryption Support through jasypt-hibernate5
       var shardingOption = shardConfig.getShardingOptions();
@@ -190,7 +192,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
         this.sessionFactories.put(tenantId, List.copyOf(sessionFactory));
         this.shardingOptions.put(tenantId, shardingOption);
-        setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), this.shardManagers,
+        setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), shardCalculator,
               this.initialisedEntitiesMeta);
         environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
         environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
@@ -206,7 +208,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
       }
     });
-    registerBucketIdExtractor(this.shardManagers);
+    registerBucketResolver(this.shardManagers.keySet().stream()
+        .collect(Collectors.toMap(Function.identity(),
+            tenant -> ShardCalculators.bucketIdFunction(ShardCalculatorRegistry.get(tenant)))));
   }
 
   @Override
@@ -331,7 +335,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   private void setupObservers(final String tenantId,
                               final MetricConfig metricConfig,
                               final MetricRegistry metricRegistry,
-                              final Map<String, ShardManager> shardManagers,
+                              final ShardCalculator shardCalculator,
                               final Map<String, EntityMeta> initialisedEntityMeta) {
     //Observer chain starts with filters and ends with listener invocations
     //Terminal observer calls the actual method
@@ -339,7 +343,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     if (!MapUtils.isEmpty(initialisedEntityMeta)) {
       // Only initialise if we have initialisedEntityMeta.
       // This won't be present in case bucketKey field itself is not present, so no need to apply this observer
-      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers),
+      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(ShardCalculators.bucketIdFunction(shardCalculator),
               initialisedEntityMeta)).setNext(rootObserver);
     }
     rootObserver = new ListenerTriggeringObserver(rootObserver).addListeners(

@@ -4,10 +4,11 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapUtils;
 
 import java.util.Map;
+import java.util.function.ToIntFunction;
 
 /***
  * This class is responsible for resolving the bucket information for a given sharding key and tenant id.
- * it gets initialised with a BucketIdExtractor and a map of initialised entities meta.
+ * it gets initialised with a per-tenant bucket id function and a map of initialised entities meta.
  * The getBucketInfo method takes the tenant id, sharding key and the class of the entity and returns the bucket information for that entity.
  * If the entity is not initialised or the bucket information cannot be resolved, it returns null.
  *
@@ -15,14 +16,14 @@ import java.util.Map;
  */
 public class BucketResolver<T> {
 
-    private final BucketIdExtractor<T> bucketIdExtractor;
+    private final Map<String, ToIntFunction<T>> bucketIdFunctions;
     private final Map<String, EntityMeta> initialisedEntitiesMeta;
 
-    public BucketResolver(final BucketIdExtractor<T> bucketIdExtractor,
+    public BucketResolver(final Map<String, ToIntFunction<T>> bucketIdFunctions,
                           final Map<String, EntityMeta> initialisedEntitiesMeta) {
         Preconditions.checkArgument(initialisedEntitiesMeta != null, "initialisedEntitiesMeta must not be null");
-        Preconditions.checkArgument(bucketIdExtractor != null, "BucketIdExtractor must not be null");
-        this.bucketIdExtractor = bucketIdExtractor;
+        Preconditions.checkArgument(bucketIdFunctions != null, "bucketIdFunctions must not be null");
+        this.bucketIdFunctions = Map.copyOf(bucketIdFunctions);
         this.initialisedEntitiesMeta = initialisedEntitiesMeta;
     }
 
@@ -38,7 +39,11 @@ public class BucketResolver<T> {
             return null;
         }
 
-        final var bucketId = bucketIdExtractor.bucketId(tenantId, shardingKey);
+        final var bucketIdFunction = tenantId == null ? null : bucketIdFunctions.get(tenantId);
+        if (bucketIdFunction == null) {
+            throw new IllegalArgumentException("Unknown tenant: " + tenantId);
+        }
+        final var bucketId = bucketIdFunction.applyAsInt(shardingKey);
 
         return BucketInfo.builder()
                 .value(bucketId)

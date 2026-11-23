@@ -242,4 +242,20 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
         final var ex = assertThrows(IllegalArgumentException.class, () -> bundle.getShardCalculator("unknown"));
         assertEquals("Unknown tenant: unknown", ex.getMessage());
     }
+
+    @Test
+    public void testSecondBundleWithSameTenantsFailsFastWithoutPartialState() {
+        MultiTenantDBShardingBundleBase<TestConfig> first = getBundle();
+        first.initialize(bootstrap);
+        first.run(testConfig, environment);
+        final var firstCalculators = first.getShardCalculators();
+
+        MultiTenantDBShardingBundleBase<TestConfig> second = getBundle();
+        second.initialize(bootstrap);
+        final var ex = assertThrows(IllegalStateException.class, () -> second.run(testConfig, environment));
+        assertTrue(firstCalculators.keySet().stream().anyMatch(t -> ex.getMessage().contains(t)), ex.getMessage());
+        assertTrue(second.getShardManagers().isEmpty());
+        firstCalculators.forEach((tenant, calculator) ->
+                assertSame(calculator, ShardCalculatorRegistry.get(tenant)));
+    }
 }
