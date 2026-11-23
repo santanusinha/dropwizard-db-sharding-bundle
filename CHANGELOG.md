@@ -9,14 +9,16 @@ All notable changes to this project will be documented in this file.
   **Breaking changes**
   1. Java 17 runtime is required.
   2. `ShardCalculator` moved to `io.appform.dropwizard.sharding`, is a sealed non-generic interface, and is single-tenant (`shardId(key)`, `isOnValidShard(key)`, `tenantId()`). Obtain it from `ShardCalculatorRegistry.get(tenantId)` or the bundle's `getShardCalculator(...)`. It cannot be constructed or implemented by applications.
-  3. `BucketIdExtractor.bucketId(tenantId, id)` is now `bucketId(id)`; `ConsistentHashBucketIdExtractor` takes a single `ShardManager`.
+  3. `BucketIdExtractor.bucketId(tenantId, id)` is now `bucketId(id)`; `ConsistentHashBucketIdExtractor` takes a single `ShardManager` and stays public.
   4. `ShardedDao` and every DAO `getShardCalculator()` were removed.
-  5. DAO classes are sealed or final with package-private constructors. Obtain DAOs from the bundle's `create...Dao` methods.
+  5. DAO classes are sealed or final with package-private constructors; obtain DAOs from the bundle's `create...Dao` methods (`DaoFactory` is the underlying construction path).
   6. A tenant id can be registered once per JVM; two bundles sharing a tenant id (including two single-tenant bundles on the default namespace) fail at startup.
   7. The `io.appform.dropwizard.sharding` and `io.appform.dropwizard.sharding.dao` packages are sealed in the jar; application classes in those packages will fail to load.
   8. `getShardManagers()`, `getSessionFactories()` and `getShardingOptions()` return unmodifiable maps.
   9. `BucketKeyPersistor` now takes `(ToIntFunction<String> bucketIdFunction, Map<String, EntityMeta> initialisedEntitiesMeta)`; `BucketResolver` takes a per-tenant `Map<String, ToIntFunction<T>>` plus `Map<String, EntityMeta> initialisedEntitiesMeta`, and throws `IllegalArgumentException` for an unknown tenant.
   10. `BundleCommonBase.initialisedEntitiesMeta` is no longer `protected`; use `getInitialisedEntitiesMeta()` (read-only, available once the bundle is initialised). The `bucketResolver` and `rootObserver` fields are no longer `protected`. `registerBucketIdExtractor` was removed.
+
+  **Non-breaking**: overriding `createShardManager` in a bundle subclass remains the supported way to customise shard placement; calculator creation and registration stay bundle-owned.
 
 ## [2.1.12-7]
 - Added logs to print the original exception during DB exception handling.

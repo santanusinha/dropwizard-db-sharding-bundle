@@ -30,6 +30,7 @@ import java.util.Map;
 /**
  * Single construction path for sharded DAOs. Applications should obtain DAOs from the
  * sharding bundle's {@code create...Dao} methods rather than calling this directly.
+ * Callers that use it directly supply the session factories and are responsible for their order.
  * Shard placement always comes from {@link io.appform.dropwizard.sharding.ShardCalculatorRegistry}.
  */
 public enum DaoFactory {
