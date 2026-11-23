@@ -65,7 +65,7 @@ public sealed class RelationalDao<T> permits CacheableRelationalDao {
      *                                  if the designated key field is not accessible, or if it is not of type String.
      */
     RelationalDao(final String tenantId,
-                         final MultiTenantRelationalDao<T> delegate) {
+                  final MultiTenantRelationalDao<T> delegate) {
         this.tenantId = tenantId;
         this.delegate = delegate;
     }
@@ -748,7 +748,6 @@ public sealed class RelationalDao<T> permits CacheableRelationalDao {
                 delegate.readOnlyExecutor(tenantId, parentKey, querySpec, first, numResults, entityPopulator)
         );
     }
-
 
     /**
      * Class to get detail about mapping association between parent and child entity

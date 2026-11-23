@@ -57,11 +57,11 @@ public final class MultiTenantCacheableLookupDao<T> extends MultiTenantLookupDao
    * @param observer          A TransactionObserver for observing transaction events.
    */
   MultiTenantCacheableLookupDao(Map<String, List<SessionFactory>> sessionFactories,
-                                       Class<T> entityClass,
-                                       Map<String, LookupCache<T>> cache,
-                                       Map<String, ShardingBundleOptions> shardingOptions,
-                                       Map<String, ShardInfoProvider> shardInfoProvider,
-                                       TransactionObserver observer) {
+                                Class<T> entityClass,
+                                Map<String, LookupCache<T>> cache,
+                                Map<String, ShardingBundleOptions> shardingOptions,
+                                Map<String, ShardInfoProvider> shardInfoProvider,
+                                TransactionObserver observer) {
     super(sessionFactories, entityClass, shardingOptions, shardInfoProvider, observer);
     this.cache = cache;
   }

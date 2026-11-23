@@ -56,8 +56,8 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
 
   private volatile boolean bundleInitialised = false;
 
-  protected TransactionObserver rootObserver;
-  protected BucketResolver<String> bucketResolver;
+  TransactionObserver rootObserver;
+  BucketResolver<String> bucketResolver;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
     initialiseEntities(ImmutableList.<Class<?>>builder()

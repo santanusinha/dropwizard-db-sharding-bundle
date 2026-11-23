@@ -99,6 +99,14 @@ class EncapsulationTest {
         }
     }
 
+    @Test
+    void bundleInternalsAreNotExposedToSubclasses() throws Exception {
+        for (String name : java.util.List.of("bucketResolver", "rootObserver")) {
+            final int mod = BundleCommonBase.class.getDeclaredField(name).getModifiers();
+            assertFalse(Modifier.isPublic(mod) || Modifier.isProtected(mod), "Accessible field: " + name);
+        }
+    }
+
     private static void assertSealedPermitting(Class<?> base, Class<?> onlySubclass) {
         assertTrue(base.isSealed(), base + " must be sealed");
         org.junit.jupiter.api.Assertions.assertArrayEquals(new Class<?>[]{onlySubclass}, base.getPermittedSubclasses());

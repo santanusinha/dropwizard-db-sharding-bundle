@@ -46,7 +46,7 @@ public final class CacheableLookupDao<T> extends LookupDao<T> {
      *
      */
     CacheableLookupDao(final String tenantId,
-                              final MultiTenantCacheableLookupDao<T> delegate) {
+                       final MultiTenantCacheableLookupDao<T> delegate) {
         super(tenantId, delegate);
         this.dbNamespace = tenantId;
         this.delegate = delegate;

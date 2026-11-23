@@ -40,7 +40,7 @@ public final class CacheableRelationalDao<T> extends RelationalDao<T> {
      *
      */
     CacheableRelationalDao(String dbNamespace,
-                                  MultiTenantCacheableRelationalDao<T> delegate) {
+                           MultiTenantCacheableRelationalDao<T> delegate) {
         super(dbNamespace, delegate);
         this.delegate = delegate;
         this.dbNamespace = dbNamespace;

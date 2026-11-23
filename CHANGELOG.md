@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file.
   7. The `io.appform.dropwizard.sharding` and `io.appform.dropwizard.sharding.dao` packages are sealed in the jar; application classes in those packages will fail to load.
   8. `getShardManagers()`, `getSessionFactories()` and `getShardingOptions()` return unmodifiable maps.
   9. `BucketKeyPersistor` now takes `(ToIntFunction<String> bucketIdFunction, Map<String, EntityMeta> initialisedEntitiesMeta)`; `BucketResolver` takes a per-tenant `Map<String, ToIntFunction<T>>` plus `Map<String, EntityMeta> initialisedEntitiesMeta`, and throws `IllegalArgumentException` for an unknown tenant.
-  10. `BundleCommonBase.initialisedEntitiesMeta` is no longer `protected`; use `getInitialisedEntitiesMeta()` (read-only, available once the bundle is initialised). `registerBucketIdExtractor` was removed.
+  10. `BundleCommonBase.initialisedEntitiesMeta` is no longer `protected`; use `getInitialisedEntitiesMeta()` (read-only, available once the bundle is initialised). The `bucketResolver` and `rootObserver` fields are no longer `protected`. `registerBucketIdExtractor` was removed.
 
 ## [2.1.12-7]
 - Added logs to print the original exception during DB exception handling.

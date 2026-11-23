@@ -63,7 +63,7 @@ public sealed class LookupDao<T> permits CacheableLookupDao {
      *
      */
     LookupDao(final String dbNamespace,
-                     final MultiTenantLookupDao<T> delegate) {
+              final MultiTenantLookupDao<T> delegate) {
         this.dbNamespace = dbNamespace;
         this.delegate = delegate;
     }
@@ -518,8 +518,6 @@ public sealed class LookupDao<T> permits CacheableLookupDao {
     protected Field getKeyField() {
         return delegate.getKeyField();
     }
-
-
 
     /**
      * The {@code ReadOnlyContext} class represents a context for executing read-only operations
