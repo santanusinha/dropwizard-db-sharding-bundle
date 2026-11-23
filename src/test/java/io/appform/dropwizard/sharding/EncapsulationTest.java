@@ -54,4 +54,12 @@ class EncapsulationTest {
         final Method clear = ShardCalculatorRegistry.class.getDeclaredMethod("clear");
         assertFalse(Modifier.isPublic(clear.getModifiers()) || Modifier.isProtected(clear.getModifiers()));
     }
+
+    @Test
+    void removedTypesAreGone() {
+        org.junit.jupiter.api.Assertions.assertThrows(ClassNotFoundException.class,
+                () -> Class.forName("io.appform.dropwizard.sharding.dao.ShardedDao"));
+        org.junit.jupiter.api.Assertions.assertThrows(ClassNotFoundException.class,
+                () -> Class.forName("io.appform.dropwizard.sharding.utils.ShardCalculator"));
+    }
 }

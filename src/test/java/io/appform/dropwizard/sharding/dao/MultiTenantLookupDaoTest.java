@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.TestAccess;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -100,8 +101,11 @@ public class MultiTenantLookupDaoTest {
         "TENANT2",
         List.of(buildSessionFactory("tenant2_1"), buildSessionFactory("tenant2_2"),
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
-    sessionFactories.forEach((tenant, sessionFactory) ->
-        shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    sessionFactories.forEach((tenant, sessionFactory) -> {
+      final var manager = new BalancedShardManager(sessionFactory.size());
+      shardManager.put(tenant, manager);
+      TestAccess.register(tenant, manager);
+    });
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
@@ -110,24 +114,19 @@ public class MultiTenantLookupDaoTest {
         "TENANT2", new ShardInfoProvider("TENANT2"));
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
-    lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class, shardManager,
-        shardingOptions,
+    lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class, shardingOptions,
         shardInfoProvider, observer);
 
     lookupDaoForAI = new MultiTenantLookupDao<>(sessionFactories, TestEntityWithAIId.class,
-        shardManager,
         shardingOptions,
         shardInfoProvider, observer);
 
-    phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class, shardManager,
-        shardingOptions,
+    phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class, shardingOptions,
         shardInfoProvider, observer);
     transactionDao = new MultiTenantRelationalDao<>(sessionFactories, Transaction.class,
-        shardManager,
         shardingOptions,
         shardInfoProvider, observer);
-    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, shardManager,
-        shardingOptions,
+    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, shardingOptions,
         shardInfoProvider, observer);
   }
 

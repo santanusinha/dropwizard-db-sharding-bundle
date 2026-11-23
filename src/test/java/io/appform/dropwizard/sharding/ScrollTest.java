@@ -51,13 +51,13 @@ public class ScrollTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         val shardManager = new BalancedShardManager(sessionFactories.size());
+        TestAccess.register(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager);
         val shardingOptions = new ShardingBundleOptions();
         val shardInfoProvider = new ShardInfoProvider("default");
         val observer = new TerminalTransactionObserver();
         lookupDao = new LookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantLookupDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        ScrollTestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
+                        ScrollTestEntity.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), observer));
     }
 

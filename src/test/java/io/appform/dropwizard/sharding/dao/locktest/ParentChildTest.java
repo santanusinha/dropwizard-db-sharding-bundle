@@ -1,5 +1,6 @@
 package io.appform.dropwizard.sharding.dao.locktest;
 
+import io.appform.dropwizard.sharding.TestAccess;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
@@ -46,13 +47,13 @@ public class ParentChildTest {
             sessionFactories.add(sessionFactory);
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        TestAccess.register(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager);
         final ShardingBundleOptions shardingOptions = ShardingBundleOptions.builder().build();
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
 
         parentClassRelationalDao = new RelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
                 new MultiTenantRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
-                        ParentClass.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
+                        ParentClass.class, Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new DaoClassLocalObserver(new TerminalTransactionObserver())));
         setupStore();
