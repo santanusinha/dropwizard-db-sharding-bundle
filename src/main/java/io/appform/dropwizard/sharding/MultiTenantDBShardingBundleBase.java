@@ -31,6 +31,7 @@ import io.appform.dropwizard.sharding.config.MetricConfig;
 import io.appform.dropwizard.sharding.config.MultiTenantShardedHibernateFactory;
 import io.appform.dropwizard.sharding.config.ShardingBundleOptions;
 import io.appform.dropwizard.sharding.dao.AbstractDAO;
+import io.appform.dropwizard.sharding.dao.DaoFactory;
 import io.appform.dropwizard.sharding.dao.MultiTenantCacheableLookupDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantCacheableRelationalDao;
 import io.appform.dropwizard.sharding.dao.MultiTenantLookupDao;
@@ -50,12 +51,12 @@ import io.appform.dropwizard.sharding.observers.internal.TerminalTransactionObse
 import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.Configuration;
 import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,10 +65,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.collections.MapUtils;
@@ -80,18 +81,15 @@ import org.hibernate.SessionFactory;
 public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends
     BundleCommonBase<T> {
 
-  @Getter
-  private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
+  private final Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
 
-  @Getter
-  private Map<String, ShardManager> shardManagers = Maps.newHashMap();
+  private final Map<String, ShardManager> shardManagers = Maps.newHashMap();
 
-  @Getter
-  private Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
+  private final Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
 
-  private Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
+  private final Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
 
-  private Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
+  private final Map<String, HealthCheckManager> healthCheckManagers = Maps.newHashMap();
 
   protected MultiTenantDBShardingBundleBase(
       Class<?> entity,
@@ -107,6 +105,28 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     this(Arrays.asList(classPathPrefixes));
   }
 
+  public Map<String, List<SessionFactory>> getSessionFactories() {
+    return Collections.unmodifiableMap(sessionFactories);
+  }
+
+  public Map<String, ShardManager> getShardManagers() {
+    return Collections.unmodifiableMap(shardManagers);
+  }
+
+  public Map<String, ShardingBundleOptions> getShardingOptions() {
+    return Collections.unmodifiableMap(shardingOptions);
+  }
+
+  public ShardCalculator getShardCalculator(String tenantId) {
+    Preconditions.checkArgument(shardManagers.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    return ShardCalculatorRegistry.get(tenantId);
+  }
+
+  public Map<String, ShardCalculator> getShardCalculators() {
+    return shardManagers.keySet().stream()
+        .collect(Collectors.toUnmodifiableMap(Function.identity(), ShardCalculatorRegistry::get));
+  }
+
   protected abstract ShardManager createShardManager(int numShards,
       ShardBlacklistingStore blacklistingStore);
 
@@ -114,6 +134,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public void run(T configuration, Environment environment) {
     this.completeBundleInitialization();
     final var tenantedConfig = getConfig(configuration);
+    tenantedConfig.getTenants().keySet().forEach(tenantId -> Preconditions.checkState(
+        !ShardCalculatorRegistry.contains(tenantId),
+        "Shard calculator already registered for tenant: %s", tenantId));
     tenantedConfig.getTenants().forEach((tenantId, shardConfig) -> {
       //Encryption Support through jasypt-hibernate5
       var shardingOption = shardConfig.getShardingOptions();
@@ -124,6 +147,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       try {
         final var blacklistingStore = getBlacklistingStore();
         final var shardManager = createShardManager(shardCount, blacklistingStore);
+        final var shardCalculator = ShardCalculators.forTenant(tenantId, shardManager);
+        ShardCalculatorRegistry.register(shardCalculator);
         this.shardManagers.put(tenantId, shardManager);
         final var shardInfoProvider = new ShardInfoProvider(tenantId);
         this.shardInfoProviders.put(tenantId, shardInfoProvider);
@@ -166,9 +191,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
           registerBigDecimalEncryptor(tenantId, shardingOption);
           registerByteEncryptor(tenantId, shardingOption);
         }
-        this.sessionFactories.put(tenantId, sessionFactory);
+        this.sessionFactories.put(tenantId, List.copyOf(sessionFactory));
         this.shardingOptions.put(tenantId, shardingOption);
-        setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), this.shardManagers,
+        setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), shardCalculator,
               this.initialisedEntitiesMeta);
         environment.admin().addTask(new BlacklistShardTask(tenantId, shardManager));
         environment.admin().addTask(new UnblacklistShardTask(tenantId, shardManager));
@@ -184,7 +209,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
         }
       }
     });
-    registerBucketIdExtractor(this.shardManagers);
+    registerBucketResolver(this.shardManagers.keySet().stream()
+        .collect(Collectors.toMap(Function.identity(),
+            tenant -> ShardCalculators.bucketIdFunction(ShardCalculatorRegistry.get(tenant)))));
   }
 
   @Override
@@ -210,8 +237,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   public <EntityType, T extends Configuration>
   MultiTenantLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz) {
-    return new MultiTenantLookupDao<>(this.sessionFactories, clazz,
-        this.shardManagers,
+    return DaoFactory.INSTANCE.createLookupDao(this.sessionFactories, clazz,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
@@ -220,8 +246,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public <EntityType, T extends Configuration>
   MultiTenantCacheableLookupDao<EntityType> createParentObjectDao(Class<EntityType> clazz,
       Map<String, LookupCache<EntityType>> cacheManager) {
-    return new MultiTenantCacheableLookupDao<>(this.sessionFactories,
-        clazz, this.shardManagers,
+    return DaoFactory.INSTANCE.createCacheableLookupDao(this.sessionFactories,
+        clazz,
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,
@@ -230,8 +256,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
 
   public <EntityType, T extends Configuration>
   MultiTenantRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz) {
-    return new MultiTenantRelationalDao<>(this.sessionFactories, clazz,
-        this.shardManagers,
+    return DaoFactory.INSTANCE.createRelationalDao(this.sessionFactories, clazz,
         this.shardingOptions,
         shardInfoProviders,
         rootObserver);
@@ -241,9 +266,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public <EntityType, T extends Configuration>
   MultiTenantCacheableRelationalDao<EntityType> createRelatedObjectDao(Class<EntityType> clazz,
       Map<String, RelationalCache<EntityType>> cacheManager) {
-    return new MultiTenantCacheableRelationalDao<>(this.sessionFactories,
+    return DaoFactory.INSTANCE.createCacheableRelationalDao(this.sessionFactories,
         clazz,
-        this.shardManagers,
         cacheManager,
         this.shardingOptions,
         shardInfoProviders,
@@ -253,9 +277,9 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
   WrapperDao<EntityType, DaoType> createWrapperDao(String tenantId, Class<DaoType> daoTypeClass) {
     Preconditions.checkArgument(
-            this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
+            this.sessionFactories.containsKey(tenantId) && ShardCalculatorRegistry.contains(tenantId),
             "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass, this.shardManagers.get(tenantId));
+    return DaoFactory.INSTANCE.createWrapperDao(tenantId, this.sessionFactories.get(tenantId), daoTypeClass);
   }
 
   public <EntityType, DaoType extends AbstractDAO<EntityType>, T extends Configuration>
@@ -264,10 +288,10 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       Class[] extraConstructorParamClasses,
       Class[] extraConstructorParamObjects) {
     Preconditions.checkArgument(
-            this.sessionFactories.containsKey(tenantId) && this.shardManagers.containsKey(tenantId),
+            this.sessionFactories.containsKey(tenantId) && ShardCalculatorRegistry.contains(tenantId),
             "Unknown tenant: " + tenantId);
-    return new WrapperDao<>(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
-        extraConstructorParamClasses, extraConstructorParamObjects, this.shardManagers.get(tenantId));
+    return DaoFactory.INSTANCE.createWrapperDao(tenantId, this.sessionFactories.get(tenantId), daoTypeClass,
+        extraConstructorParamClasses, extraConstructorParamObjects);
   }
 
   private int fetchParallelism(final ShardingBundleOptions bundleOptions) {
@@ -312,7 +336,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
   private void setupObservers(final String tenantId,
                               final MetricConfig metricConfig,
                               final MetricRegistry metricRegistry,
-                              final Map<String, ShardManager> shardManagers,
+                              final ShardCalculator shardCalculator,
                               final Map<String, EntityMeta> initialisedEntityMeta) {
     //Observer chain starts with filters and ends with listener invocations
     //Terminal observer calls the actual method
@@ -320,7 +344,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     if (!MapUtils.isEmpty(initialisedEntityMeta)) {
       // Only initialise if we have initialisedEntityMeta.
       // This won't be present in case bucketKey field itself is not present, so no need to apply this observer
-      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(tenantId, new ConsistentHashBucketIdExtractor<>(shardManagers),
+      rootObserver = new BucketKeyObserver(new BucketKeyPersistor(ShardCalculators.bucketIdFunction(shardCalculator),
               initialisedEntityMeta)).setNext(rootObserver);
     }
     rootObserver = new ListenerTriggeringObserver(rootObserver).addListeners(

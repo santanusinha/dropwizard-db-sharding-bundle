@@ -17,6 +17,8 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.TestAccess;
+import io.appform.dropwizard.sharding.ShardCalculatorRegistry;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
@@ -32,7 +34,6 @@ import io.appform.dropwizard.sharding.query.QuerySpec;
 import io.appform.dropwizard.sharding.scroll.ScrollResult;
 import io.appform.dropwizard.sharding.sharding.BalancedShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardManager;
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
 import lombok.val;
 import org.apache.commons.lang3.RandomUtils;
 import org.hibernate.SessionFactory;
@@ -67,7 +68,6 @@ public class MultiTenantRelationalDaoTest {
 
   private Map<String, ShardManager> shardManager = new HashMap<>();
 
-  private ShardCalculator<String> shardCalculator;
 
   private SessionFactory buildSessionFactory(String dbName) {
     Configuration configuration = new Configuration();
@@ -98,6 +98,7 @@ public class MultiTenantRelationalDaoTest {
     this.shardManager = Map.of("TENANT1",
         new BalancedShardManager(sessionFactories.get("TENANT1").size()),
         "TENANT2", new BalancedShardManager(sessionFactories.get("TENANT2").size()));
+    this.shardManager.forEach(TestAccess::register);
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
@@ -105,14 +106,11 @@ public class MultiTenantRelationalDaoTest {
         "TENANT2", new ShardInfoProvider("TENANT2"));
     final TransactionObserver observer = new EntityClassThreadLocalObserver(
         new DaoClassLocalObserver(new TerminalTransactionObserver()));
-    relationalDao = new MultiTenantRelationalDao<>(sessionFactories, RelationalEntity.class,
-        this.shardManager,
+    relationalDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, RelationalEntity.class,
         shardingOptions, shardInfoProvider, observer);
-    relationalWithAIDao = new MultiTenantRelationalDao<>(sessionFactories,
+    relationalWithAIDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories,
         RelationalEntityWithAIKey.class,
-        this.shardManager,
         shardingOptions, shardInfoProvider, observer);
-    shardCalculator = relationalDao.getShardCalculator();
   }
 
   @AfterEach
@@ -467,7 +465,7 @@ public class MultiTenantRelationalDaoTest {
         .mapToObj(value -> {
           while (true) {
             String id = UUID.randomUUID().toString();
-            if (shardCalculator.shardId(tenantId, id) == expectedShardIndex) {
+            if (ShardCalculatorRegistry.get(tenantId).shardId(id) == expectedShardIndex) {
               return id;
             }
           }

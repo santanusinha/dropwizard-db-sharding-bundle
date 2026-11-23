@@ -13,9 +13,7 @@ import io.appform.dropwizard.sharding.sharding.EntityMeta;
 import io.appform.dropwizard.sharding.sharding.LookupKey;
 import io.appform.dropwizard.sharding.sharding.NoopShardBlacklistingStore;
 import io.appform.dropwizard.sharding.sharding.ShardBlacklistingStore;
-import io.appform.dropwizard.sharding.sharding.ShardManager;
 import io.appform.dropwizard.sharding.sharding.ShardingKey;
-import io.appform.dropwizard.sharding.sharding.impl.ConsistentHashBucketIdExtractor;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import java.lang.annotation.Annotation;
@@ -31,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -53,12 +52,12 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
   protected final List<TransactionObserver> observers = new ArrayList<>();
 
   protected final List<Class<?>> initialisedEntities = new ArrayList<>();
-  protected final Map<String, EntityMeta> initialisedEntitiesMeta = new HashMap<>();
+  final Map<String, EntityMeta> initialisedEntitiesMeta = new HashMap<>();
 
   private volatile boolean bundleInitialised = false;
 
-  protected TransactionObserver rootObserver;
-  protected BucketResolver<String> bucketResolver;
+  TransactionObserver rootObserver;
+  BucketResolver<String> bucketResolver;
 
   protected BundleCommonBase(final Class<?> entity, final Class<?>... entities) {
     initialiseEntities(ImmutableList.<Class<?>>builder()
@@ -127,8 +126,8 @@ public abstract class BundleCommonBase<T extends Configuration> implements Confi
     return this.bucketResolver;
   }
 
-  protected void registerBucketIdExtractor(final Map<String, ShardManager> shardManagers) {
-    this.bucketResolver = new BucketResolver<>(new ConsistentHashBucketIdExtractor<>(shardManagers), getInitialisedEntitiesMeta());
+  void registerBucketResolver(final Map<String, ToIntFunction<String>> bucketIdFunctions) {
+    this.bucketResolver = new BucketResolver<>(bucketIdFunctions, getInitialisedEntitiesMeta());
   }
 
   protected <U> BucketInfo getBucketInfo(final String tenantId,

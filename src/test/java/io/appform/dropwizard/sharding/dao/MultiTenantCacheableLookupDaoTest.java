@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.TestAccess;
 import com.google.common.collect.ImmutableList;
 import io.appform.dropwizard.sharding.ShardInfoProvider;
 import io.appform.dropwizard.sharding.caching.LookupCache;
@@ -88,18 +89,20 @@ public class MultiTenantCacheableLookupDaoTest {
         "TENANT2",
         List.of(buildSessionFactory("tenant2_1"), buildSessionFactory("tenant2_2"),
             buildSessionFactory("tenant2_3"), buildSessionFactory("tenant2_4")));
-    sessionFactories.forEach((tenant, sessionFactory) ->
-        shardManager.put(tenant, new BalancedShardManager(sessionFactory.size())));
+    sessionFactories.forEach((tenant, sessionFactory) -> {
+      final var manager = new BalancedShardManager(sessionFactory.size());
+      shardManager.put(tenant, manager);
+      TestAccess.register(tenant, manager);
+    });
     final Map<String, ShardingBundleOptions> shardingOptions = Map.of("TENANT1",
         new ShardingBundleOptions(), "TENANT2", new ShardingBundleOptions());
 
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
         new ShardInfoProvider("TENANT1"),
         "TENANT2", new ShardInfoProvider("TENANT2"));
-      lookupDao = new MultiTenantCacheableLookupDao<>(
+      lookupDao = DaoFactory.INSTANCE.createCacheableLookupDao(
               sessionFactories,
               TestEntity.class,
-              shardManager,
               Map.of("TENANT1", new LookupCache<TestEntity>() {
 
                           private Map<String, TestEntity> cache = new HashMap<>();
@@ -139,9 +142,8 @@ public class MultiTenantCacheableLookupDaoTest {
                           }
                       }),
               shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
-    phoneDao = new MultiTenantCacheableLookupDao<>(sessionFactories,
+    phoneDao = DaoFactory.INSTANCE.createCacheableLookupDao(sessionFactories,
         Phone.class,
-        shardManager,
         Map.of("TENANT1",
             new LookupCache<Phone>() {
 
@@ -182,9 +184,8 @@ public class MultiTenantCacheableLookupDaoTest {
               }
             }),
         shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
-    transactionDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
+    transactionDao = DaoFactory.INSTANCE.createCacheableRelationalDao(sessionFactories,
         Transaction.class,
-        shardManager,
         Map.of("TENANT1",
             new RelationalCache<Transaction>() {
 
@@ -310,9 +311,8 @@ public class MultiTenantCacheableLookupDaoTest {
                     ':'));
               }
             }), shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
-    auditDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
+    auditDao = DaoFactory.INSTANCE.createCacheableRelationalDao(sessionFactories,
         Audit.class,
-        shardManager,
         Map.of("TENANT1", new RelationalCache<Audit>() {
 
           private Map<String, Object> cache = new HashMap<>();

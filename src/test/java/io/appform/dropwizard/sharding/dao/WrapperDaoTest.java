@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.TestAccess;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
@@ -66,7 +67,8 @@ public class WrapperDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
-        dao = new WrapperDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class, shardManager);
+        TestAccess.register(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager);
+        dao = DaoFactory.INSTANCE.createWrapperDao(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories, OrderDao.class);
 
     }
 

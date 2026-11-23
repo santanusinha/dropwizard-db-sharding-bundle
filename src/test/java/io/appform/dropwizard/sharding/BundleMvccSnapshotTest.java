@@ -100,6 +100,9 @@ class BundleMvccSnapshotTest {
                 .build()));
         writeLookupDao = writeBundle.createParentObjectDao(TestEntity.class);
 
+        // both bundles use the default tenant; the registry is write-once per tenant
+        TestAccess.reset();
+
         // readBundle: autoCommit=false, pool_size=1, REPEATABLE_READ — exactly like production
         val readBundle = initBundle(new TestConfig(ShardedHibernateFactory.builder()
                 .shards(List.of(buildReadDataSourceFactory(dbUrl)))

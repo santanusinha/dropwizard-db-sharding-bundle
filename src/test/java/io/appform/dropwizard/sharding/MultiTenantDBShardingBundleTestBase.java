@@ -20,6 +20,8 @@ package io.appform.dropwizard.sharding;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.google.common.collect.Maps;
 import io.appform.dropwizard.sharding.dao.MultiTenantRelationalDao;
@@ -220,5 +222,40 @@ public abstract class MultiTenantDBShardingBundleTestBase extends MultiTenantBun
                 .contains(PendingRegistrationTestEntity.class));
         assertFalse(bundle.getInitialisedEntities()
                 .contains(PendingRegistrationTestEntityWithAIId.class));
+    }
+
+    @Test
+    public void testBundleStateIsReadOnlyAndCalculatorsRegistered() {
+        MultiTenantDBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+
+        assertThrows(UnsupportedOperationException.class, () -> bundle.getShardManagers().clear());
+        assertThrows(UnsupportedOperationException.class, () -> bundle.getSessionFactories().clear());
+        assertThrows(UnsupportedOperationException.class, () -> bundle.getShardingOptions().clear());
+        assertThrows(UnsupportedOperationException.class, () -> bundle.getShardCalculators().clear());
+
+        assertEquals(bundle.getShardManagers().keySet(), bundle.getShardCalculators().keySet());
+        bundle.getShardManagers().keySet().forEach(tenant ->
+                assertSame(ShardCalculatorRegistry.get(tenant), bundle.getShardCalculator(tenant)));
+
+        final var ex = assertThrows(IllegalArgumentException.class, () -> bundle.getShardCalculator("unknown"));
+        assertEquals("Unknown tenant: unknown", ex.getMessage());
+    }
+
+    @Test
+    public void testSecondBundleWithSameTenantsFailsFastWithoutPartialState() {
+        MultiTenantDBShardingBundleBase<TestConfig> first = getBundle();
+        first.initialize(bootstrap);
+        first.run(testConfig, environment);
+        final var firstCalculators = first.getShardCalculators();
+
+        MultiTenantDBShardingBundleBase<TestConfig> second = getBundle();
+        second.initialize(bootstrap);
+        final var ex = assertThrows(IllegalStateException.class, () -> second.run(testConfig, environment));
+        assertTrue(firstCalculators.keySet().stream().anyMatch(t -> ex.getMessage().contains(t)), ex.getMessage());
+        assertTrue(second.getShardManagers().isEmpty());
+        firstCalculators.forEach((tenant, calculator) ->
+                assertSame(calculator, ShardCalculatorRegistry.get(tenant)));
     }
 }

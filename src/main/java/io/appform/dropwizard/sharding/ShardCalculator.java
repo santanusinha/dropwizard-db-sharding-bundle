@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Santanu Sinha <santanu.sinha@gmail.com>
+ * Copyright 2019 Santanu Sinha <santanu.sinha@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,18 @@
  *
  */
 
-package io.appform.dropwizard.sharding.dao;
-
-import io.appform.dropwizard.sharding.utils.ShardCalculator;
+package io.appform.dropwizard.sharding;
 
 /**
- *
+ * Maps a sharding key to a shard for one tenant.
+ * Instances are created and owned by the sharding bundle; obtain them from
+ * {@link ShardCalculatorRegistry} or the bundle's {@code getShardCalculator} methods.
  */
-public interface ShardedDao<T> {
-    ShardCalculator<String> getShardCalculator();
+public sealed interface ShardCalculator permits ConsistentHashShardCalculator {
+
+    String tenantId();
+
+    int shardId(String key);
+
+    boolean isOnValidShard(String key);
 }

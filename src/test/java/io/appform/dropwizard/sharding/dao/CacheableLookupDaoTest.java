@@ -17,6 +17,7 @@
 
 package io.appform.dropwizard.sharding.dao;
 
+import io.appform.dropwizard.sharding.TestAccess;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import io.appform.dropwizard.sharding.DBShardingBundleBase;
@@ -88,13 +89,13 @@ public class CacheableLookupDaoTest {
             sessionFactories.add(buildSessionFactory(String.format("db_%d", i)));
         }
         final ShardManager shardManager = new BalancedShardManager(sessionFactories.size());
+        TestAccess.register(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager);
         final ShardInfoProvider shardInfoProvider = new ShardInfoProvider("default");
         final ShardingBundleOptions shardingBundleOptions = new ShardingBundleOptions();
-        lookupDao = new CacheableLookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantCacheableLookupDao<>(
+        lookupDao = DaoFactory.INSTANCE.createCacheableLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createCacheableLookupDao(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         TestEntity.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new LookupCache<TestEntity>() {
 
                             private Map<String, TestEntity> cache = new HashMap<>();
@@ -117,11 +118,10 @@ public class CacheableLookupDaoTest {
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new TerminalTransactionObserver()));
-        phoneDao = new CacheableLookupDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantCacheableLookupDao<>(
+        phoneDao = DaoFactory.INSTANCE.createCacheableLookupDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createCacheableLookupDao(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Phone.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new LookupCache<Phone>() {
 
                             private Map<String, Phone> cache = new HashMap<>();
@@ -144,11 +144,10 @@ public class CacheableLookupDaoTest {
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider),
                         new TerminalTransactionObserver()));
-        transactionDao = new CacheableRelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantCacheableRelationalDao<>(
+        transactionDao = DaoFactory.INSTANCE.createCacheableRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createCacheableRelationalDao(
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Transaction.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new RelationalCache<Transaction>() {
 
                             private Map<String, Object> cache = new HashMap<>();
@@ -212,10 +211,9 @@ public class CacheableLookupDaoTest {
                             }
                         }), Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardingBundleOptions),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardInfoProvider), new TerminalTransactionObserver()));
-        auditDao = new CacheableRelationalDao<>(DBShardingBundleBase.DEFAULT_NAMESPACE,
-                new MultiTenantCacheableRelationalDao<>(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
+        auditDao = DaoFactory.INSTANCE.createCacheableRelationalDao(DBShardingBundleBase.DEFAULT_NAMESPACE,
+                DaoFactory.INSTANCE.createCacheableRelationalDao(Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, sessionFactories),
                         Audit.class,
-                        Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, shardManager),
                         Map.of(DBShardingBundleBase.DEFAULT_NAMESPACE, new RelationalCache<Audit>() {
 
                             private Map<String, Object> cache = new HashMap<>();

@@ -68,6 +68,32 @@ Dao classes in db sharding bundle are a layer above Hibernate. Daos interact wit
 * Any custom cache implementation can be used to implement this cache and initialize ```CacheableRelationalDao``` eg.
   Caffeine/Guava cache.
 
+### Creating DAOs and shard calculators
+
+Obtain DAOs from the bundle's `create...Dao` methods (`createParentObjectDao`, `createRelatedObjectDao`, `createWrapperDao`, ...).
+DAO classes cannot be subclassed and have no public constructors. `DaoFactory` is the single construction path behind
+the bundle; it is public, but if you call it directly you supply the session factories (and are responsible for their
+order). Shard placement always comes from the bundle-registered `ShardCalculator` in `ShardCalculatorRegistry`.
+
+The bundle owns one `ShardCalculator` per tenant. Read it to find where a key lives:
+
+```java
+ShardCalculator calculator = bundle.getShardCalculator();            // single-tenant bundle
+ShardCalculator calculator = bundle.getShardCalculator("TENANT1");   // multi-tenant bundle
+ShardCalculator calculator = ShardCalculatorRegistry.get("TENANT1"); // anywhere
+
+int shard = calculator.shardId("customer-42");
+boolean healthy = calculator.isOnValidShard("customer-42");
+```
+
+Calculators cannot be created, implemented, or replaced by applications. Each tenant id may be used by only one bundle per JVM.
+
+To customise shard placement, override `createShardManager` in a bundle subclass; this is the one supported extension
+point. Calculator creation and registration stay with the bundle.
+
+`getShardManagers()` returns a read-only map of the live `ShardManager`s, so blacklist/unblacklist admin operations
+keep working.
+
 ### FAQs about DAOs
 
 #### If both RelationalDao and LookupDao use same logic of sharding based on a key, what is the difference between these two DAOs?

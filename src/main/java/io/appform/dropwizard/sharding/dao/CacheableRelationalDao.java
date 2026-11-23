@@ -25,7 +25,7 @@ import java.util.Optional;
 /**
  * A read/write through cache enabled {@link RelationalDao}
  */
-public class CacheableRelationalDao<T> extends RelationalDao<T> {
+public final class CacheableRelationalDao<T> extends RelationalDao<T> {
 
     private final String dbNamespace;
 
@@ -39,8 +39,8 @@ public class CacheableRelationalDao<T> extends RelationalDao<T> {
      * The entity class should designate one field as the primary key using the `@Id` annotation.
      *
      */
-    public CacheableRelationalDao(String dbNamespace,
-                                  MultiTenantCacheableRelationalDao<T> delegate) {
+    CacheableRelationalDao(String dbNamespace,
+                           MultiTenantCacheableRelationalDao<T> delegate) {
         super(dbNamespace, delegate);
         this.delegate = delegate;
         this.dbNamespace = dbNamespace;
