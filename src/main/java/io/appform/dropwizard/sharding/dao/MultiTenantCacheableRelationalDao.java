@@ -31,7 +31,7 @@ import java.util.Optional;
 /**
  * A read/write through cache enabled {@link MultiTenantRelationalDao}
  */
-public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalDao<T> {
+public final class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalDao<T> {
 
   private Map<String, RelationalCache<T>> cache;
 
@@ -56,7 +56,7 @@ public class MultiTenantCacheableRelationalDao<T> extends MultiTenantRelationalD
    *                                  as @Id, if the designated key field is not accessible, or if
    *                                  it is not of type String.
    */
-  public MultiTenantCacheableRelationalDao(Map<String, List<SessionFactory>> sessionFactories,
+  MultiTenantCacheableRelationalDao(Map<String, List<SessionFactory>> sessionFactories,
       Class<T> entityClass,
       Map<String, RelationalCache<T>> cache,
       Map<String, ShardingBundleOptions> shardingOptions,

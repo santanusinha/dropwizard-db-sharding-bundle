@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
  * - Use {@link RelationalDao} where-ever possible as it will be slight more performant than this due to lack of any proxy.
  */
 @Slf4j
-public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
+public final class WrapperDao<T, DaoType extends AbstractDAO<T>> {
 
     private final String dbNamespace;
     private final List<DaoType> daos;
@@ -53,7 +53,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
      * @param sessionFactories List of session factories. One for each shard.
      * @param daoClass         Class for the dao.
      */
-    public WrapperDao(String dbNamespace,
+    WrapperDao(String dbNamespace,
                       List<SessionFactory> sessionFactories,
                       Class<DaoType> daoClass) {
         this(dbNamespace, sessionFactories, daoClass, null, null);
@@ -67,7 +67,7 @@ public class WrapperDao<T, DaoType extends AbstractDAO<T>> {
      * @param extraConstructorParamClasses Class names for constructor parameters to the DAO other than SessionFactory
      * @param extraConstructorParamObjects Objects for constructor parameters to the DAO other than SessionFactory
      */
-     public WrapperDao(
+     WrapperDao(
              String dbNamespace,
              List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
              Class[] extraConstructorParamClasses,

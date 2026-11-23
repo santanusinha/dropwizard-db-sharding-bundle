@@ -100,7 +100,7 @@ public class MultiTenantCacheableLookupDaoTest {
     final Map<String, ShardInfoProvider> shardInfoProvider = Map.of("TENANT1",
         new ShardInfoProvider("TENANT1"),
         "TENANT2", new ShardInfoProvider("TENANT2"));
-      lookupDao = new MultiTenantCacheableLookupDao<>(
+      lookupDao = DaoFactory.INSTANCE.createCacheableLookupDao(
               sessionFactories,
               TestEntity.class,
               Map.of("TENANT1", new LookupCache<TestEntity>() {
@@ -142,7 +142,7 @@ public class MultiTenantCacheableLookupDaoTest {
                           }
                       }),
               shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
-    phoneDao = new MultiTenantCacheableLookupDao<>(sessionFactories,
+    phoneDao = DaoFactory.INSTANCE.createCacheableLookupDao(sessionFactories,
         Phone.class,
         Map.of("TENANT1",
             new LookupCache<Phone>() {
@@ -184,7 +184,7 @@ public class MultiTenantCacheableLookupDaoTest {
               }
             }),
         shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
-    transactionDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
+    transactionDao = DaoFactory.INSTANCE.createCacheableRelationalDao(sessionFactories,
         Transaction.class,
         Map.of("TENANT1",
             new RelationalCache<Transaction>() {
@@ -311,7 +311,7 @@ public class MultiTenantCacheableLookupDaoTest {
                     ':'));
               }
             }), shardingOptions, shardInfoProvider, new TerminalTransactionObserver());
-    auditDao = new MultiTenantCacheableRelationalDao<>(sessionFactories,
+    auditDao = DaoFactory.INSTANCE.createCacheableRelationalDao(sessionFactories,
         Audit.class,
         Map.of("TENANT1", new RelationalCache<Audit>() {
 

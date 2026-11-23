@@ -114,19 +114,19 @@ public class MultiTenantLookupDaoTest {
         "TENANT2", new ShardInfoProvider("TENANT2"));
     val observer = new TimerObserver(
         new ListenerTriggeringObserver().addListener(new LoggingListener()));
-    lookupDao = new MultiTenantLookupDao<>(sessionFactories, TestEntity.class, shardingOptions,
+    lookupDao = DaoFactory.INSTANCE.createLookupDao(sessionFactories, TestEntity.class, shardingOptions,
         shardInfoProvider, observer);
 
-    lookupDaoForAI = new MultiTenantLookupDao<>(sessionFactories, TestEntityWithAIId.class,
+    lookupDaoForAI = DaoFactory.INSTANCE.createLookupDao(sessionFactories, TestEntityWithAIId.class,
         shardingOptions,
         shardInfoProvider, observer);
 
-    phoneDao = new MultiTenantLookupDao<>(sessionFactories, Phone.class, shardingOptions,
+    phoneDao = DaoFactory.INSTANCE.createLookupDao(sessionFactories, Phone.class, shardingOptions,
         shardInfoProvider, observer);
-    transactionDao = new MultiTenantRelationalDao<>(sessionFactories, Transaction.class,
+    transactionDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Transaction.class,
         shardingOptions,
         shardInfoProvider, observer);
-    auditDao = new MultiTenantRelationalDao<>(sessionFactories, Audit.class, shardingOptions,
+    auditDao = DaoFactory.INSTANCE.createRelationalDao(sessionFactories, Audit.class, shardingOptions,
         shardInfoProvider, observer);
   }
 
