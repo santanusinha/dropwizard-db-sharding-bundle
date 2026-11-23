@@ -216,6 +216,10 @@ public abstract class DBShardingBundleBase<T extends Configuration> implements C
         return delegate.getShardManagers().get(dbNamespace);
     }
 
+    public ShardCalculator getShardCalculator() {
+        return delegate.getShardCalculator(dbNamespace);
+    }
+
     public void registerObserver(TransactionObserver transactionObserver) {
         delegate.registerObserver(transactionObserver);
     }

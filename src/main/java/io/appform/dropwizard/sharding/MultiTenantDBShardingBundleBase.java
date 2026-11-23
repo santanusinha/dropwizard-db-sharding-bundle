@@ -56,6 +56,7 @@ import io.dropwizard.db.PooledDataSourceFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,10 +65,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.collections.MapUtils;
@@ -80,14 +81,11 @@ import org.hibernate.SessionFactory;
 public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> extends
     BundleCommonBase<T> {
 
-  @Getter
-  private Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
+  private final Map<String, List<SessionFactory>> sessionFactories = Maps.newHashMap();
 
-  @Getter
-  private Map<String, ShardManager> shardManagers = Maps.newHashMap();
+  private final Map<String, ShardManager> shardManagers = Maps.newHashMap();
 
-  @Getter
-  private Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
+  private final Map<String, ShardingBundleOptions> shardingOptions = Maps.newHashMap();
 
   private Map<String, ShardInfoProvider> shardInfoProviders = Maps.newHashMap();
 
@@ -107,6 +105,28 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
     this(Arrays.asList(classPathPrefixes));
   }
 
+  public Map<String, List<SessionFactory>> getSessionFactories() {
+    return Collections.unmodifiableMap(sessionFactories);
+  }
+
+  public Map<String, ShardManager> getShardManagers() {
+    return Collections.unmodifiableMap(shardManagers);
+  }
+
+  public Map<String, ShardingBundleOptions> getShardingOptions() {
+    return Collections.unmodifiableMap(shardingOptions);
+  }
+
+  public ShardCalculator getShardCalculator(String tenantId) {
+    Preconditions.checkArgument(shardManagers.containsKey(tenantId), "Unknown tenant: " + tenantId);
+    return ShardCalculatorRegistry.get(tenantId);
+  }
+
+  public Map<String, ShardCalculator> getShardCalculators() {
+    return shardManagers.keySet().stream()
+        .collect(Collectors.toUnmodifiableMap(Function.identity(), ShardCalculatorRegistry::get));
+  }
+
   protected abstract ShardManager createShardManager(int numShards,
       ShardBlacklistingStore blacklistingStore);
 
@@ -124,6 +144,8 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
       try {
         final var blacklistingStore = getBlacklistingStore();
         final var shardManager = createShardManager(shardCount, blacklistingStore);
+        final var shardCalculator = ShardCalculators.forTenant(tenantId, shardManager);
+        ShardCalculatorRegistry.register(shardCalculator);
         this.shardManagers.put(tenantId, shardManager);
         final var shardInfoProvider = new ShardInfoProvider(tenantId);
         this.shardInfoProviders.put(tenantId, shardInfoProvider);
@@ -166,7 +188,7 @@ public abstract class MultiTenantDBShardingBundleBase<T extends Configuration> e
           registerBigDecimalEncryptor(tenantId, shardingOption);
           registerByteEncryptor(tenantId, shardingOption);
         }
-        this.sessionFactories.put(tenantId, sessionFactory);
+        this.sessionFactories.put(tenantId, List.copyOf(sessionFactory));
         this.shardingOptions.put(tenantId, shardingOption);
         setupObservers(tenantId, shardConfig.getMetricConfig(), environment.metrics(), this.shardManagers,
               this.initialisedEntitiesMeta);

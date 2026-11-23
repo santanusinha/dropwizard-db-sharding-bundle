@@ -20,6 +20,8 @@ package io.appform.dropwizard.sharding;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -244,5 +246,31 @@ public abstract class DBShardingBundleTestBase extends BundleBasedTestBase {
                 .contains(PendingRegistrationTestEntity.class));
         assertFalse(bundle.getInitialisedEntities()
                 .contains(PendingRegistrationTestEntityWithAIId.class));
+    }
+
+    @Test
+    public void testBundleRegistersShardCalculator() {
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+        final var calculator = bundle.getShardCalculator();
+        assertSame(ShardCalculatorRegistry.get(bundle.getDbNamespace()), calculator);
+        assertEquals(bundle.getDbNamespace(), calculator.tenantId());
+        final int shard = calculator.shardId("customer1");
+        assertTrue(shard >= 0 && shard < testConfig.getShards().getShards().size());
+    }
+
+    @Test
+    public void testSecondBundleWithSameNamespaceFailsAndKeepsCalculator() {
+        DBShardingBundleBase<TestConfig> bundle = getBundle();
+        bundle.initialize(bootstrap);
+        bundle.run(testConfig, environment);
+        final var original = bundle.getShardCalculator();
+
+        DBShardingBundleBase<TestConfig> second = getBundle();
+        second.initialize(bootstrap);
+        final var ex = assertThrows(IllegalStateException.class, () -> second.run(testConfig, environment));
+        assertTrue(ex.getMessage().contains(bundle.getDbNamespace()), ex.getMessage());
+        assertSame(original, ShardCalculatorRegistry.get(bundle.getDbNamespace()));
     }
 }
