@@ -54,8 +54,8 @@ public final class WrapperDao<T, DaoType extends AbstractDAO<T>> {
      * @param daoClass         Class for the dao.
      */
     WrapperDao(String dbNamespace,
-                      List<SessionFactory> sessionFactories,
-                      Class<DaoType> daoClass) {
+               List<SessionFactory> sessionFactories,
+               Class<DaoType> daoClass) {
         this(dbNamespace, sessionFactories, daoClass, null, null);
     }
 
@@ -67,11 +67,11 @@ public final class WrapperDao<T, DaoType extends AbstractDAO<T>> {
      * @param extraConstructorParamClasses Class names for constructor parameters to the DAO other than SessionFactory
      * @param extraConstructorParamObjects Objects for constructor parameters to the DAO other than SessionFactory
      */
-     WrapperDao(
-             String dbNamespace,
-             List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
-             Class[] extraConstructorParamClasses,
-             Class[] extraConstructorParamObjects) {
+    WrapperDao(
+            String dbNamespace,
+            List<SessionFactory> sessionFactories, Class<DaoType> daoClass,
+            Class[] extraConstructorParamClasses,
+            Class[] extraConstructorParamObjects) {
         this.dbNamespace = dbNamespace;
         this.shardCalculator = ShardCalculatorRegistry.get(dbNamespace);
         this.daos = sessionFactories.stream().map((SessionFactory sessionFactory) -> {
